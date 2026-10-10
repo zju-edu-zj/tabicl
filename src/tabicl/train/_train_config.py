@@ -56,6 +56,18 @@ def build_parser():
     parser.add_argument(
         "--wandb_mode", default="offline", type=str, help="Wandb logging mode: online, offline, or disabled"
     )
+    parser.add_argument(
+        "--log_dir",
+        default=None,
+        type=str,
+        help="Local training log directory. Writes metrics.jsonl and optional TensorBoard events.",
+    )
+    parser.add_argument(
+        "--tensorboard_log",
+        default=False,
+        type=str2bool,
+        help="Write scalar metrics to <log_dir>/tensorboard.",
+    )
 
     ###########################################################################
     ###### Training Config ####################################################
@@ -302,6 +314,26 @@ def build_parser():
     # ICL Config
     parser.add_argument("--icl_num_blocks", type=int, default=12, help="Number of transformer blocks in ICL predictor")
     parser.add_argument("--icl_nhead", type=int, default=4, help="Number of attention heads in ICL predictor")
+    parser.add_argument(
+        "--icl_attention",
+        type=str,
+        default="dense",
+        choices=("dense", "hybrid_linear_topk"),
+        help="ICL attention implementation. hybrid_linear_topk combines global positive-kernel attention "
+        "with a content-routed exact residual.",
+    )
+    parser.add_argument(
+        "--icl_exact_topk",
+        type=int,
+        default=64,
+        help="Maximum support rows used by the exact residual in hybrid ICL attention.",
+    )
+    parser.add_argument(
+        "--icl_sparse_chunk_size",
+        type=int,
+        default=1024,
+        help="Target rows processed per sparse-attention chunk; lower values reduce peak memory.",
+    )
     parser.add_argument(
         "--icl_ssmax",
         default=False,

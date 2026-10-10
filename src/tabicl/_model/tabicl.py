@@ -198,6 +198,9 @@ class TabICL(nn.Module):
         bias_free_ln: bool = False,
         zero_init: bool = True,
         recompute: bool = False,
+        icl_attention: str = "dense",
+        icl_exact_topk: int = 64,
+        icl_sparse_chunk_size: int = 1024,
     ):
         super().__init__()
         icl_dim = embed_dim * row_num_cls  # CLS tokens are concatenated for ICL
@@ -236,6 +239,9 @@ class TabICL(nn.Module):
         self.norm_first = norm_first
         self.bias_free_ln = bias_free_ln
         self.zero_init = zero_init
+        self.icl_attention = icl_attention
+        self.icl_exact_topk = icl_exact_topk
+        self.icl_sparse_chunk_size = icl_sparse_chunk_size
 
         self.col_embedder = ColEmbedding(
             embed_dim=embed_dim,
@@ -288,6 +294,9 @@ class TabICL(nn.Module):
             ssmax=icl_ssmax,
             zero_init=zero_init,
             recompute=recompute,
+            attention_type=icl_attention,
+            exact_topk=icl_exact_topk,
+            sparse_chunk_size=icl_sparse_chunk_size,
         )
 
         # KV cache for efficient inference

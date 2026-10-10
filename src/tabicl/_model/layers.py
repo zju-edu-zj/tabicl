@@ -286,6 +286,225 @@ class MultiheadAttention(nn.MultiheadAttention):
         )
 
 
+class HybridLinearTopKAttention(nn.Module):
+    """Permutation-equivariant global kernel attention with sparse exact residuals.
+
+    The global branch summarizes every source row as ``sum(phi(k) v)`` and
+    ``sum(phi(k))``.  The residual branch uses cosine-LSH buckets to build a
+    content-based candidate set and applies exact softmax attention to at most
+    ``exact_topk`` source rows.  The hash index is deliberately detached: it is
+    a routing structure, while the attention values remain fully differentiable.
+
+    This module is intended for the ICL encoder, where the source is the
+    support prefix and every target (support or query) may read that prefix.
+    It does not use row positions, so permuting rows does not change the
+    routing rule apart from the harmless ordering of equal-hash candidates.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.0,
+        ssmax: Union[bool, str] = False,
+        exact_topk: int = 64,
+        sparse_chunk_size: int = 1024,
+        num_hashes: int = 2,
+        hash_bits: int = 8,
+    ):
+        super().__init__()
+        if embed_dim % num_heads != 0:
+            raise ValueError(f"embed_dim ({embed_dim}) must be divisible by num_heads ({num_heads})")
+        if exact_topk < 1 or sparse_chunk_size < 1:
+            raise ValueError("exact_topk and sparse_chunk_size must be positive")
+        if num_hashes < 1 or hash_bits < 1 or hash_bits > 16:
+            raise ValueError("num_hashes must be positive and hash_bits must be in [1, 16]")
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.dropout = dropout
+        self.exact_topk = exact_topk
+        self.sparse_chunk_size = sparse_chunk_size
+        self.num_hashes = num_hashes
+        self.hash_bits = hash_bits
+        self.register_parameter("in_proj_weight", nn.Parameter(torch.empty(3 * embed_dim, embed_dim)))
+        self.register_parameter("in_proj_bias", nn.Parameter(torch.empty(3 * embed_dim)))
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        if isinstance(ssmax, bool):
+            ssmax = "qassmax-mlp-elementwise" if ssmax else "none"
+        self.ssmax_layer = create_ssmax_layer(ssmax_type=ssmax, num_heads=num_heads, embed_dim=embed_dim)
+
+        # A fixed, per-head cosine-LSH family.  Keeping this independent of the
+        # learned projections avoids adding another trainable retrieval path.
+        planes = torch.randn(num_heads, num_hashes, hash_bits, self.head_dim)
+        self.register_buffer("hash_planes", planes / planes.norm(dim=-1, keepdim=True).clamp_min(1e-6))
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        nn.init.xavier_uniform_(self.in_proj_weight)
+        nn.init.constant_(self.in_proj_bias, 0.0)
+        nn.init.xavier_uniform_(self.out_proj.weight)
+        nn.init.constant_(self.out_proj.bias, 0.0)
+
+    def _hash_codes(self, x: Tensor) -> Tensor:
+        # x: (B, H, T, D), result: (B, H, num_hashes, T)
+        bits = torch.einsum("bhtd,hmrd->bhmtr", x.float(), self.hash_planes.float()) >= 0
+        weights = (2 ** torch.arange(self.hash_bits, device=x.device, dtype=torch.int64)).view(1, 1, 1, 1, -1)
+        return (bits.to(torch.int64) * weights).sum(-1)
+
+    @staticmethod
+    def _bucket_candidates(q_codes: Tensor, k_codes: Tensor, k_tie: Tensor, topk: int) -> Tensor:
+        """Return content-stable candidates near each query's LSH bucket.
+
+        A stable two-pass sort uses a key-derived scalar as the tie breaker.
+        Consequently, changing the order of support rows does not change the
+        selected candidates (the previous implementation accidentally did).
+        """
+        bsz, nheads, tgt_len = q_codes.shape
+        src_len = k_codes.shape[-1]
+        result = torch.empty((bsz, nheads, tgt_len, topk), dtype=torch.long, device=q_codes.device)
+        offsets = torch.arange(topk, device=q_codes.device, dtype=torch.long)
+        for b in range(bsz):
+            for h in range(nheads):
+                # Stable sorting by tie first, then by hash code, gives a
+                # deterministic order based on content rather than row index.
+                tie_order = torch.argsort(k_tie[b, h], stable=True)
+                tie_codes = k_codes[b, h][tie_order]
+                code_order = torch.argsort(tie_codes, stable=True)
+                sorted_idx = tie_order[code_order]
+                sorted_codes = tie_codes[code_order]
+                starts = torch.searchsorted(sorted_codes, q_codes[b, h], right=False).clamp(max=src_len - 1)
+                positions = (starts[:, None] + offsets[None, :]).clamp(0, src_len - 1)
+                result[b, h] = sorted_idx[positions]
+        return result
+
+    @torch.no_grad()
+    def _candidate_indices(self, q: Tensor, k: Tensor) -> Tensor:
+        # q: (B,H,T,D), k: (B,H,S,D).  Split the budget across hash families.
+        if k.shape[-2] <= self.exact_topk:
+            all_sources = torch.arange(k.shape[-2], device=k.device, dtype=torch.long)
+            return all_sources.view(1, 1, 1, -1).expand(q.shape[0], q.shape[1], q.shape[-2], -1)
+        topk = min(self.exact_topk, k.shape[-2])
+        per_hash = max(1, (topk + self.num_hashes - 1) // self.num_hashes)
+        q_codes = self._hash_codes(q)
+        k_codes = self._hash_codes(k)
+        # The tie breaker is a function of content, not the support position.
+        # A fixed projection reduces accidental ties.
+        tie_vector = torch.arange(1, self.head_dim + 1, device=k.device, dtype=k.dtype)
+        tie_vector = tie_vector / tie_vector.norm()
+        k_tie = torch.einsum("bhsd,d->bhs", k.float(), tie_vector.float())
+        candidates = [
+            self._bucket_candidates(q_codes[:, :, hash_id], k_codes[:, :, hash_id], k_tie, per_hash)
+            for hash_id in range(self.num_hashes)
+        ]
+        indices = torch.cat(candidates, dim=-1)
+        if indices.shape[-1] > topk:
+            indices = indices[..., :topk]
+        if indices.shape[-1] < topk:
+            indices = F.pad(indices, (0, topk - indices.shape[-1]), mode="replicate")
+        return indices
+
+    def _project(self, query: Tensor, key: Tensor, value: Tensor, rope: Optional[RotaryEmbedding]):
+        bshape = query.shape[:-2]
+        tgt_len, src_len = query.shape[-2], key.shape[-2]
+        q, k, v = F._in_projection_packed(
+            query, key, value, self.in_proj_weight, self.in_proj_bias
+        )
+        q = q.view(*bshape, tgt_len, self.num_heads, self.head_dim).transpose(-3, -2)
+        k = k.view(*bshape, src_len, self.num_heads, self.head_dim).transpose(-3, -2)
+        v = v.view(*bshape, src_len, self.num_heads, self.head_dim).transpose(-3, -2)
+        if rope is not None:
+            q = rope.rotate_queries_or_keys(q)
+            k = rope.rotate_queries_or_keys(k)
+        return q, k, v
+
+    def forward(
+        self,
+        query: Tensor,
+        key: Optional[Tensor] = None,
+        value: Optional[Tensor] = None,
+        cached_kv: Optional[KVCacheEntry] = None,
+        key_padding_mask: Optional[Tensor] = None,
+        attn_mask: Optional[Tensor | int] = None,
+        rope: Optional[RotaryEmbedding] = None,
+        need_kv: bool = False,
+    ) -> Union[Tensor, Tuple[Tensor, Tensor, Tensor]]:
+        # A cached support prefix already contains projected K/V.  Reuse it in
+        # the same hybrid computation instead of falling back to O(N^2) dense
+        # attention; this keeps inference on the intended long-context path.
+        if cached_kv is not None and key_padding_mask is None and not isinstance(attn_mask, Tensor):
+            bshape = query.shape[:-2]
+            tgt_len = query.shape[-2]
+            q_proj_weight = self.in_proj_weight[: self.embed_dim]
+            q_proj_bias = self.in_proj_bias[: self.embed_dim]
+            q = F.linear(query, q_proj_weight, q_proj_bias)
+            q = q.view(*bshape, tgt_len, self.num_heads, self.head_dim).transpose(-3, -2)
+            if rope is not None:
+                q = rope.rotate_queries_or_keys(q)
+            return self._hybrid_attention(q, cached_kv.key, cached_kv.value)
+        if key_padding_mask is not None or attn_mask is not None:
+            raise NotImplementedError(
+                "M3 uses an explicit support prefix; arbitrary masks cannot fall back to a different attention."
+            )
+
+        key = query if key is None else key
+        value = key if value is None else value
+        q, k, v = self._project(query, key, value, rope)
+        output = self._hybrid_attention(q, k, v)
+        if need_kv:
+            return output, k, v
+        return output
+
+    def _hybrid_attention(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
+        """Run the global-statistics and exact-candidate branches."""
+        source_len = k.shape[-2]
+
+        # Positive ELU features make the denominator well-defined.  Accumulate
+        # the two global statistics in fp32 even when AMP is enabled.
+        with torch.autocast(device_type=q.device.type, enabled=False):
+            phi_q = (F.elu(q.float(), alpha=1.0) + 1.0).clamp_min(1e-6)
+            phi_k = (F.elu(k.float(), alpha=1.0) + 1.0).clamp_min(1e-6)
+            kv_state = torch.einsum("bhsd,bhsv->bhdv", phi_k, v.float())
+            k_state = phi_k.sum(dim=-2)
+            global_out = torch.einsum("bhtd,bhdv->bhtv", phi_q, kv_state)
+            normalizer = torch.einsum("bhtd,bhd->bht", phi_q, k_state).clamp_min(1e-6)
+            global_out = (global_out / normalizer.unsqueeze(-1)).to(q.dtype)
+
+        # Exact residual in chunks bounds peak memory at O(chunk * topk * D).
+        q_exact = q
+        if self.ssmax_layer is not None:
+            q_exact = self.ssmax_layer(q_exact, source_len)
+        sparse_out = torch.empty_like(global_out)
+        # Build the support index once, not once per target chunk (which made
+        # sorting cost grow quadratically with sequence length).
+        all_indices = self._candidate_indices(q, k).sort(dim=-1).values
+        batch_ids = torch.arange(k.shape[0], device=k.device)[:, None, None, None]
+        head_ids = torch.arange(k.shape[1], device=k.device)[None, :, None, None]
+        for start in range(0, q.shape[-2], self.sparse_chunk_size):
+            stop = min(start + self.sparse_chunk_size, q.shape[-2])
+            q_chunk = q_exact[:, :, start:stop]
+            indices = all_indices[:, :, start:stop]
+            # Advanced indexing scatters gradients directly into (B,H,S,D);
+            # expanded gather would allocate a (B,H,chunk,S,D) backward tensor.
+            k_chunk = k[batch_ids, head_ids, indices]
+            v_chunk = v[batch_ids, head_ids, indices]
+            duplicate = torch.zeros_like(indices, dtype=torch.bool)
+            duplicate[..., 1:] = indices[..., 1:] == indices[..., :-1]
+            logits = torch.einsum("bhtd,bhtkd->bhtk", q_chunk, k_chunk) / (self.head_dim**0.5)
+            logits = logits.masked_fill(duplicate, float("-inf"))
+            weights = torch.softmax(logits.float(), dim=-1).to(logits.dtype)
+            if self.training and self.dropout:
+                weights = F.dropout(weights, p=self.dropout)
+            sparse_out[:, :, start:stop] = torch.einsum("bhtk,bhtkd->bhtd", weights, v_chunk)
+
+        combined = (global_out + sparse_out).transpose(-3, -2).contiguous().view(
+            *q.shape[:-3], q.shape[-2], self.embed_dim
+        )
+        output = F.linear(combined, self.out_proj.weight, self.out_proj.bias)
+        return output
+
+
 class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
     """Attention block supporting RoPE, scalable softmax, and KV caching.
 
@@ -341,6 +560,9 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         bias_free_ln: bool = False,
         ssmax: Union[bool, str] = False,
         zero_init: bool = True,
+        attention_type: str = "dense",
+        exact_topk: int = 64,
+        sparse_chunk_size: int = 1024,
     ):
         super().__init__(
             d_model, nhead, dim_feedforward, dropout, activation=activation, norm_first=norm_first, batch_first=True
@@ -350,7 +572,19 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
             self.norm2 = nn.LayerNorm(d_model, bias=False)
 
         del self.self_attn
-        self.attn = MultiheadAttention(d_model, nhead, dropout, ssmax)
+        if attention_type == "dense":
+            self.attn = MultiheadAttention(d_model, nhead, dropout, ssmax)
+        elif attention_type == "hybrid_linear_topk":
+            self.attn = HybridLinearTopKAttention(
+                d_model,
+                nhead,
+                dropout,
+                ssmax,
+                exact_topk=exact_topk,
+                sparse_chunk_size=sparse_chunk_size,
+            )
+        else:
+            raise ValueError(f"Unknown attention_type: {attention_type}")
         if zero_init:
             self.init_weights()
 

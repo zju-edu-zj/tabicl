@@ -4,7 +4,9 @@ import os
 import timeit
 import warnings
 import functools
+import json
 from contextlib import nullcontext
+from pathlib import Path
 
 import math
 import numpy as np
@@ -15,6 +17,10 @@ from torch import nn
 from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except ModuleNotFoundError:  # TensorBoard is optional outside the pretraining environment.
+    SummaryWriter = None
 from torch.multiprocessing import set_start_method
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
@@ -60,6 +66,7 @@ def ddp_cleanup(func):
         try:
             return func(self, *args, **kwargs)
         finally:
+            self.close_local_logging()
             if self.ddp:
                 destroy_process_group()
 
@@ -93,6 +100,7 @@ class Trainer:
         self.configure_amp()
         self.load_checkpoint()
         self.seed()
+        self.configure_local_logging()
 
     def configure_ddp(self):
         """Set up distributed training and system configuration.
@@ -170,6 +178,46 @@ class Trainer:
         else:
             self.wandb_run = None
 
+    def configure_local_logging(self):
+        """Create append-only JSONL and optional TensorBoard logging on rank zero."""
+        self.local_log_dir = None
+        self.tb_writer = None
+        self.metrics_file = None
+        self.log_started_at = timeit.default_timer()
+        if not self.master_process or not getattr(self.config, "log_dir", None):
+            return
+        self.local_log_dir = Path(self.config.log_dir)
+        self.local_log_dir.mkdir(parents=True, exist_ok=True)
+        (self.local_log_dir / "config.json").write_text(
+            json.dumps(vars(self.config), indent=2, default=str) + "\n"
+        )
+        self.metrics_file = (self.local_log_dir / "metrics.jsonl").open("a", buffering=1)
+        if getattr(self.config, "tensorboard_log", False):
+            if SummaryWriter is None:
+                raise RuntimeError("TensorBoard logging requested but tensorboard is not installed.")
+            self.tb_writer = SummaryWriter(str(self.local_log_dir / "tensorboard"), flush_secs=10)
+
+    def log_local_metrics(self, step: int, results: dict[str, float]) -> None:
+        """Persist one step in a tool-independent format and TensorBoard."""
+        if self.metrics_file is None:
+            return
+        row = {"step": step, "elapsed_s": timeit.default_timer() - self.log_started_at}
+        row.update({key: float(value) for key, value in results.items()})
+        self.metrics_file.write(json.dumps(row, allow_nan=False) + "\n")
+        if self.tb_writer is not None:
+            for key, value in results.items():
+                tag = "system/" + key if key in {"prior_time", "train_time"} else "train/" + key
+                self.tb_writer.add_scalar(tag, value, step)
+            self.tb_writer.flush()
+
+    def close_local_logging(self) -> None:
+        if self.tb_writer is not None:
+            self.tb_writer.close()
+            self.tb_writer = None
+        if self.metrics_file is not None:
+            self.metrics_file.close()
+            self.metrics_file = None
+
     def build_model(self):
         """Build and initialize the TabICL model."""
 
@@ -225,6 +273,9 @@ class Trainer:
             "row_rope_interleaved": self.config.row_rope_interleaved,
             "icl_num_blocks": self.config.icl_num_blocks,
             "icl_nhead": self.config.icl_nhead,
+            "icl_attention": self.config.icl_attention,
+            "icl_exact_topk": self.config.icl_exact_topk,
+            "icl_sparse_chunk_size": self.config.icl_sparse_chunk_size,
             "icl_ssmax": self.config.ssmax_type if self.config.icl_ssmax else False,
             "ff_factor": self.config.ff_factor,
             "dropout": self.config.dropout,
@@ -560,6 +611,8 @@ class Trainer:
                 # Add timing information to results
                 results.update({"prior_time": prior_time, "train_time": train_time})
 
+                self.log_local_metrics(self.curr_step, results)
+
                 # Update progress bar with rounded values for cleaner display
                 step_progress.set_postfix(**{k: round(v, 3) if isinstance(v, float) else v for k, v in results.items()})
 
@@ -722,6 +775,8 @@ class Trainer:
                 loss = F.cross_entropy(pred, true)
 
         # Scale loss for gradient accumulation and backpropagate
+        if getattr(self.config, "fail_fast", False) and not torch.isfinite(loss):
+            raise FloatingPointError(f"Non-finite loss at step {self.curr_step}, micro-batch {micro_batch_idx}")
         scaled_loss = loss / num_micro_batches
         self.scaler.scale(scaled_loss).backward()
 
@@ -780,6 +835,9 @@ class Trainer:
                 for k, v in micro_results.items():
                     results[k] += v
             except torch.cuda.OutOfMemoryError:
+                if getattr(self.config, "fail_fast", False):
+                    self.optimizer.zero_grad(set_to_none=True)
+                    raise
                 print(
                     f"Warning: OOM error in micro-batch {idx+1}/{num_micro_batches} at step {self.curr_step}. Skipping."
                 )
@@ -797,9 +855,16 @@ class Trainer:
         # Clip the gradient
         if self.config.gradient_clipping > 0:
             self.scaler.unscale_(self.optimizer)
-            nn.utils.clip_grad_norm_(self.model.parameters(), self.config.gradient_clipping)
+            grad_norm = nn.utils.clip_grad_norm_(
+                self.model.parameters(), self.config.gradient_clipping,
+                error_if_nonfinite=getattr(self.config, "fail_fast", False),
+            )
+            results["grad_norm"] = float(grad_norm)
+            results["grad_clipped"] = float(grad_norm > self.config.gradient_clipping)
 
         # Update parameters
+        results["lr_used"] = self.optimizer.param_groups[0]["lr"]
+        results["oom_micro_batches"] = failed_batches
         self.scaler.step(self.optimizer)
         self.scaler.update()
 

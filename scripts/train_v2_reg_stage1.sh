@@ -25,6 +25,8 @@
 # training instabilities. v2 uses standard residual init (--zero_init False; v1
 # zero-initializes residual branches) and enables FlashAttention-3 only in stages
 # 2 & 3 (--use_flash_attn3).
+# This branch uses the ICL M3 attention: global positive-kernel aggregation plus
+# a content-routed exact residual over at most 64 support rows per target.
 #
 # Adjust the placeholder paths and --nproc_per_node / --n_jobs for your hardware.
 
@@ -88,6 +90,9 @@ torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --row_rope_interleaved False \
             --icl_num_blocks 12 \
             --icl_nhead 8 \
+            --icl_attention hybrid_linear_topk \
+            --icl_exact_topk 64 \
+            --icl_sparse_chunk_size 1024 \
             --icl_ssmax True \
             --ssmax_type qassmax-mlp-elementwise \
             --ff_factor 2 \

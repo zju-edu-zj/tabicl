@@ -89,6 +89,9 @@ class Encoder(nn.Module):
         ssmax: Union[bool, str] = False,
         zero_init: bool = True,
         recompute: bool = False,
+        attention_type: str = "dense",
+        exact_topk: int = 64,
+        sparse_chunk_size: int = 1024,
     ):
         super().__init__()
 
@@ -107,6 +110,9 @@ class Encoder(nn.Module):
                     bias_free_ln=bias_free_ln,
                     ssmax=ssmax,
                     zero_init=zero_init,
+                    attention_type=attention_type,
+                    exact_topk=exact_topk,
+                    sparse_chunk_size=sparse_chunk_size,
                 )
                 for _ in range(num_blocks)
             ]

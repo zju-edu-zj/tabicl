@@ -81,6 +81,9 @@ torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --row_rope_interleaved False \
             --icl_num_blocks 12 \
             --icl_nhead 8 \
+            --icl_attention hybrid_linear_topk \
+            --icl_exact_topk 64 \
+            --icl_sparse_chunk_size 1024 \
             --icl_ssmax True \
             --ssmax_type qassmax-mlp-elementwise \
             --ff_factor 2 \

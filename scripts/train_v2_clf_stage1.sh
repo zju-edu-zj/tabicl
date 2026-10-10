@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # TabICLv2 pre-training -- CLASSIFIER, Stage 1 (of 3).
 # (The regressor is a separate checkpoint; see train_v2_reg_stage{1,2,3}.sh.)
 #
@@ -20,21 +21,42 @@
 # unlike the regressor, which uses bias-free LayerNorm (--norm_type layernorm_nobias).
 # v2 uses standard residual init (--zero_init False; v1 zero-initializes residual
 # branches) and enables FlashAttention-3 only in stages 2 & 3 (--use_flash_attn3).
+# This branch uses the ICL M3 attention: global positive-kernel aggregation plus
+# a content-routed exact residual over at most 64 support rows per target.
 #
 # Adjust the placeholder paths and --nproc_per_node / --n_jobs for your hardware.
 
-NUM_GPUS=4                                   # the paper used 4 GPUs for pre-training
-CKPT_DIR=/path/to/checkpoints/tabiclv2-clf/stage1
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+
+NUM_GPUS=${NUM_GPUS:-1}                      # the paper used 4 GPUs for pre-training
+CKPT_DIR=${CKPT_DIR:-/home/zj/table_foundation/checkpoints/tabiclv2-clf/stage1}
+LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
+MAX_STEPS=${MAX_STEPS:-500000}
+WANDB_LOG=${WANDB_LOG:-True}
+WANDB_MODE=${WANDB_MODE:-offline}
+mkdir -p "$LOG_DIR"
+
+render_curve() {
+    if ! python "$REPO_ROOT/scripts/plot_pretrain_metrics.py" "$LOG_DIR"; then
+        echo "Warning: could not render $LOG_DIR/curves.png; metrics.jsonl is still complete." >&2
+    fi
+}
+trap render_curve EXIT
 
 torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
-            --wandb_log False \
+            --wandb_log "$WANDB_LOG" \
             --wandb_project TabICLv2 \
             --wandb_name tabiclv2_clf_stage1 \
+            --wandb_dir $LOG_DIR/wandb \
+            --wandb_mode "$WANDB_MODE" \
+            --log_dir $LOG_DIR \
+            --tensorboard_log True \
             --device cuda \
             --dtype float32 \
             --np_seed 42 \
             --torch_seed 42 \
-            --max_steps 500000 \
+            --max_steps "$MAX_STEPS" \
             --batch_size 64 \
             --micro_batch_size 4 \
             --lr 8e-4 \
@@ -82,6 +104,9 @@ torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --row_rope_interleaved False \
             --icl_num_blocks 12 \
             --icl_nhead 8 \
+            --icl_attention hybrid_linear_topk \
+            --icl_exact_topk 64 \
+            --icl_sparse_chunk_size 1024 \
             --icl_ssmax True \
             --ssmax_type qassmax-mlp-elementwise \
             --ff_factor 2 \
@@ -91,6 +116,9 @@ torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --checkpoint_dir $CKPT_DIR \
             --save_temp_every 500 \
             --save_perm_every 5000
+
+# JSONL and TensorBoard are written during training.  The EXIT trap renders a
+# static snapshot for both normal completion and an interrupted batch job.
 
 # Note on cautious weight decay: the paper reports using cautious weight decay (parameter
 # 0.01), but the reference pretraining runs that produced the released checkpoints
