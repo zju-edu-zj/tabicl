@@ -199,8 +199,13 @@ class TabICL(nn.Module):
         zero_init: bool = True,
         recompute: bool = False,
         icl_attention: str = "dense",
-        icl_exact_topk: int = 64,
-        icl_sparse_chunk_size: int = 1024,
+        icl_sparse_every: int = 3,
+        icl_induced_num_slots: int = 64,
+        icl_flex_block_size: int = 128,
+        icl_flex_num_kv_blocks: int = 4,
+        icl_flex_qk_norm: bool = False,
+        icl_flex_scale_mode: str = "auto",
+        icl_linear_num_features: int = 64,
     ):
         super().__init__()
         icl_dim = embed_dim * row_num_cls  # CLS tokens are concatenated for ICL
@@ -240,8 +245,13 @@ class TabICL(nn.Module):
         self.bias_free_ln = bias_free_ln
         self.zero_init = zero_init
         self.icl_attention = icl_attention
-        self.icl_exact_topk = icl_exact_topk
-        self.icl_sparse_chunk_size = icl_sparse_chunk_size
+        self.icl_sparse_every = icl_sparse_every
+        self.icl_induced_num_slots = icl_induced_num_slots
+        self.icl_flex_block_size = icl_flex_block_size
+        self.icl_flex_num_kv_blocks = icl_flex_num_kv_blocks
+        self.icl_flex_qk_norm = icl_flex_qk_norm
+        self.icl_flex_scale_mode = icl_flex_scale_mode
+        self.icl_linear_num_features = icl_linear_num_features
 
         self.col_embedder = ColEmbedding(
             embed_dim=embed_dim,
@@ -295,8 +305,13 @@ class TabICL(nn.Module):
             zero_init=zero_init,
             recompute=recompute,
             attention_type=icl_attention,
-            exact_topk=icl_exact_topk,
-            sparse_chunk_size=icl_sparse_chunk_size,
+            sparse_every=icl_sparse_every,
+            induced_num_slots=icl_induced_num_slots,
+            flex_block_size=icl_flex_block_size,
+            flex_num_kv_blocks=icl_flex_num_kv_blocks,
+            flex_qk_norm=icl_flex_qk_norm,
+            flex_scale_mode=icl_flex_scale_mode,
+            linear_num_features=icl_linear_num_features,
         )
 
         # KV cache for efficient inference

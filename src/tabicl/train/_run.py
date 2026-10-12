@@ -92,6 +92,8 @@ class Trainer:
 
     def __init__(self, config):
         self.config = config
+        if config.icl_diagnostics_every < 0 or min(config.icl_diagnostic_queries, config.icl_diagnostic_topk) < 1:
+            raise ValueError("Diagnostics interval must be >= 0; query count and top-k must be positive")
         self.configure_ddp()
         self.configure_wandb()
         self.build_model()
@@ -274,8 +276,13 @@ class Trainer:
             "icl_num_blocks": self.config.icl_num_blocks,
             "icl_nhead": self.config.icl_nhead,
             "icl_attention": self.config.icl_attention,
-            "icl_exact_topk": self.config.icl_exact_topk,
-            "icl_sparse_chunk_size": self.config.icl_sparse_chunk_size,
+            "icl_sparse_every": self.config.icl_sparse_every,
+            "icl_induced_num_slots": self.config.icl_induced_num_slots,
+            "icl_flex_block_size": self.config.icl_flex_block_size,
+            "icl_flex_num_kv_blocks": self.config.icl_flex_num_kv_blocks,
+            "icl_flex_qk_norm": self.config.icl_flex_qk_norm,
+            "icl_flex_scale_mode": self.config.icl_flex_scale_mode,
+            "icl_linear_num_features": self.config.icl_linear_num_features,
             "icl_ssmax": self.config.ssmax_type if self.config.icl_ssmax else False,
             "ff_factor": self.config.ff_factor,
             "dropout": self.config.dropout,
@@ -507,6 +514,26 @@ class Trainer:
         if "state_dict" not in checkpoint:
             raise ValueError("Checkpoint does not contain model state")
 
+        # Normalization/routing flags can alter behavior without changing any
+        # parameter shape. Reject accidental changes during curriculum resumes.
+        stored = checkpoint.get("config", {})
+        defaults = {"icl_attention": "dense", "icl_flex_qk_norm": False,
+                    "icl_flex_scale_mode": "auto", "icl_sparse_every": 3,
+                    "icl_flex_block_size": 128, "icl_flex_num_kv_blocks": 4}
+        keys = ["icl_attention"]
+        if "flex" in self.model_config["icl_attention"]:
+            keys.extend(k for k in defaults if k != "icl_attention")
+        for key in keys:
+            previous = stored.get(key, defaults[key])
+            requested = self.model_config[key]
+            if key == "icl_flex_scale_mode":
+                if previous == "auto":
+                    previous = "ssmax" if stored.get("icl_ssmax", False) else "none"
+                if requested == "auto":
+                    requested = "ssmax" if self.model_config.get("icl_ssmax", False) else "none"
+            if previous != requested:
+                raise ValueError(f"Checkpoint {key}={previous!r}, requested {requested!r}; "
+                                 "resume with the same architecture or use a new checkpoint directory")
         self.raw_model.load_state_dict(checkpoint["state_dict"])
 
         # Optionally load optimizer and scheduler state
@@ -614,7 +641,10 @@ class Trainer:
                 self.log_local_metrics(self.curr_step, results)
 
                 # Update progress bar with rounded values for cleaner display
-                step_progress.set_postfix(**{k: round(v, 3) if isinstance(v, float) else v for k, v in results.items()})
+                step_progress.set_postfix(**{
+                    k: round(v, 3) if isinstance(v, float) else v
+                    for k, v in results.items() if not k.startswith("icl_diag/")
+                })
 
                 # Save checkpoints
                 is_temp_save = self.curr_step % self.config.save_temp_every == 0
@@ -758,6 +788,23 @@ class Trainer:
         # variable-feature priors (e.g. graph_scm).
         model_d = None if self.config.ignore_d else micro_d
 
+        # Diagnostics use only rank 0's first dataset/microbatch; no collectives.
+        # Each operator disables sampling after forward so recompute stays cheap.
+        interval = getattr(self.config, "icl_diagnostics_every", 0)
+        diagnose = (self.master_process and micro_batch_idx == 0 and interval > 0
+                    and (self.curr_step == 0 or (self.curr_step + 1) % interval == 0))
+        core_model = self.model.module if self.ddp else self.model
+        diagnostic_modules = []
+        for name, module in core_model.icl_predictor.named_modules():
+            if hasattr(module, "diagnostics_enabled"):
+                module.diagnostics_enabled = diagnose
+                if diagnose:
+                    module.last_diagnostics = {}
+                    module.diagnostic_queries = self.config.icl_diagnostic_queries
+                    module.diagnostic_topk = self.config.icl_diagnostic_topk
+                    module.diagnostic_query_start = train_size
+                    diagnostic_modules.append((name, module))
+
         with self.amp_ctx, self._sdpa_ctx():
             if self.regression:
                 # (B, test_size, num_quantiles) predicted quantiles at levels
@@ -789,6 +836,20 @@ class Trainer:
                 accuracy = (pred.argmax(dim=1) == true).sum() / len(true)
                 micro_results["accuracy"] = accuracy.item() / num_micro_batches
 
+        for name, module in diagnostic_modules:
+            for key, value in module.last_diagnostics.items():
+                micro_results[f"icl_diag/{name}/{key}"] = float(value)
+                if getattr(self.config, "fail_fast", False) and not math.isfinite(float(value)):
+                    raise FloatingPointError(f"Non-finite ICL diagnostic: {name}/{key}")
+                if (getattr(self.config, "fail_fast", False)
+                        and key == "nonfinite_fraction" and float(value) > 0):
+                    raise FloatingPointError(f"Non-finite ICL attention values: {name}")
+            grad = module.in_proj_weight.grad
+            if grad is not None:
+                grad_rms = grad.detach().float().square().mean().sqrt() / self.scaler.get_scale()
+                micro_results[f"icl_diag/{name}/grad_in_proj_rms"] = float(grad_rms)
+                if getattr(self.config, "fail_fast", False) and not torch.isfinite(grad_rms):
+                    raise FloatingPointError(f"Non-finite ICL projection gradient: {name}")
         return micro_results
 
     def run_batch(self, batch):
@@ -833,7 +894,7 @@ class Trainer:
             try:
                 micro_results = self.run_micro_batch(micro_batch, idx, num_micro_batches)
                 for k, v in micro_results.items():
-                    results[k] += v
+                    results[k] = results.get(k, 0.0) + v
             except torch.cuda.OutOfMemoryError:
                 if getattr(self.config, "fail_fast", False):
                     self.optimizer.zero_grad(set_to_none=True)

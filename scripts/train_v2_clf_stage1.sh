@@ -21,8 +21,8 @@ set -euo pipefail
 # unlike the regressor, which uses bias-free LayerNorm (--norm_type layernorm_nobias).
 # v2 uses standard residual init (--zero_init False; v1 zero-initializes residual
 # branches) and enables FlashAttention-3 only in stages 2 & 3 (--use_flash_attn3).
-# This branch uses the ICL M3 attention: global positive-kernel aggregation plus
-# a content-routed exact residual over at most 64 support rows per target.
+# Experimental recipe: ELU+1 global layers, every third layer Flex sparse.
+# See docs/icl_attention.md for normalization, diagnostics and ablations.
 #
 # Adjust the placeholder paths and --nproc_per_node / --n_jobs for your hardware.
 
@@ -35,16 +35,10 @@ LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
 MAX_STEPS=${MAX_STEPS:-500000}
 WANDB_LOG=${WANDB_LOG:-True}
 WANDB_MODE=${WANDB_MODE:-offline}
+source "$REPO_ROOT/scripts/icl_recipe.sh"
 mkdir -p "$LOG_DIR"
 
-render_curve() {
-    if ! python "$REPO_ROOT/scripts/plot_pretrain_metrics.py" "$LOG_DIR"; then
-        echo "Warning: could not render $LOG_DIR/curves.png; metrics.jsonl is still complete." >&2
-    fi
-}
-trap render_curve EXIT
-
-torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
+run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --wandb_log "$WANDB_LOG" \
             --wandb_project TabICLv2 \
             --wandb_name tabiclv2_clf_stage1 \
@@ -53,7 +47,7 @@ torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --log_dir $LOG_DIR \
             --tensorboard_log True \
             --device cuda \
-            --dtype float32 \
+            --dtype "$TRAIN_DTYPE" \
             --np_seed 42 \
             --torch_seed 42 \
             --max_steps "$MAX_STEPS" \
@@ -104,21 +98,17 @@ torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --row_rope_interleaved False \
             --icl_num_blocks 12 \
             --icl_nhead 8 \
-            --icl_attention hybrid_linear_topk \
-            --icl_exact_topk 64 \
-            --icl_sparse_chunk_size 1024 \
-            --icl_ssmax True \
-            --ssmax_type qassmax-mlp-elementwise \
+            "${ICL_ARGS[@]}" \
             --ff_factor 2 \
             --norm_first True \
             --zero_init False \
-            --use_flash_attn3 False \
+            --use_flash_attn3 "${USE_FLASH_ATTN3:-False}" \
+            --recompute "$RECOMPUTE" \
             --checkpoint_dir $CKPT_DIR \
             --save_temp_every 500 \
             --save_perm_every 5000
 
-# JSONL and TensorBoard are written during training.  The EXIT trap renders a
-# static snapshot for both normal completion and an interrupted batch job.
+# JSONL and TensorBoard are written during training, including ICL diagnostics.
 
 # Note on cautious weight decay: the paper reports using cautious weight decay (parameter
 # 0.01), but the reference pretraining runs that produced the released checkpoints

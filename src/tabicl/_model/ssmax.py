@@ -6,9 +6,24 @@ import torch
 from torch import nn
 
 
-def _logn(n: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+def _logn(n: int | torch.Tensor, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
     """Compute :math:`\\log(n)` safely, avoiding fp16 overflow for large ``n``."""
+    if isinstance(n, torch.Tensor):
+        return n.to(device=device, dtype=torch.float32).clamp_min(1).log().to(dtype)
     return torch.tensor(math.log(max(n, 1)), device=device, dtype=dtype)
+
+
+def _length_input(q, n):
+    """Scalar or per-row (B,T) log-length input for length MLPs."""
+    logn = _logn(n, q.device, q.dtype)
+    return logn.reshape(1, 1) if logn.ndim == 0 else logn.unsqueeze(-1)
+
+
+def _head_scales(scales, q, num_heads, elementwise):
+    width = q.shape[-1] if elementwise else 1
+    if scales.ndim == 2:
+        return scales.view(1, num_heads, 1, width)
+    return scales.view(q.shape[0], q.shape[-2], num_heads, width).transpose(1, 2)
 
 
 class SSMax(nn.Module):
@@ -45,6 +60,8 @@ class SSMax(nn.Module):
             Scaled query tensor, same shape as ``q``.
         """
         logn = _logn(n, q.device, q.dtype)
+        if logn.ndim:
+            logn = logn[:, None, :, None]
         scales = self.scales.view(1, -1, 1, 1) * logn
         return q * scales
 
@@ -106,14 +123,9 @@ class SSMaxMLP(nn.Module):
         torch.Tensor
             Scaled query tensor, same shape as ``q``.
         """
-        logn = _logn(n, q.device, q.dtype).reshape(1, 1)
+        logn = _length_input(q, n)
         scales = self.mlp(logn)
-        if self.elementwise:
-            # scales: (1, num_heads * head_dim) -> (1, num_heads, 1, head_dim)
-            head_dim = q.shape[-1]
-            scales = scales.view(1, self.num_heads, 1, head_dim)
-        else:
-            scales = scales.view(1, self.num_heads, 1, 1)
+        scales = _head_scales(scales, q, self.num_heads, self.elementwise)
         return q * scales
 
 
@@ -182,14 +194,14 @@ class QASSMaxMLP(nn.Module):
         torch.Tensor
             Scaled query tensor, same shape as ``q``.
         """
-        logn = _logn(n, q.device, q.dtype).reshape(1, 1)
+        logn = _length_input(q, n)
 
         if self.elementwise:
             # base_scales: (1, num_heads * head_dim) -> (1, num_heads, 1, head_dim)
-            base_scales = self.base_mlp(logn).view(1, self.num_heads, 1, self.head_dim)
+            base_scales = _head_scales(self.base_mlp(logn), q, self.num_heads, True)
             modulation = 1 + torch.tanh(self.query_mlp(q))  # (bs, n_heads, seq_len, head_dim)
         else:
-            base_scales = self.base_mlp(logn).view(1, self.num_heads, 1, 1)
+            base_scales = _head_scales(self.base_mlp(logn), q, self.num_heads, False)
             modulation = 1 + torch.tanh(self.query_mlp(q))  # (bs, n_heads, seq_len, 1)
 
         scales = base_scales * modulation

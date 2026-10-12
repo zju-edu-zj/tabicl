@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # TabICLv2 pre-training -- CLASSIFIER, Stage 2 (of 3). See train_v2_clf_stage1.sh for
 # the full recipe.
 #
@@ -9,9 +10,14 @@
 #
 # Adjust the placeholder paths and --nproc_per_node / --n_jobs for your hardware.
 
-NUM_GPUS=4                                   # the paper used 4 GPUs for pre-training
-CKPT_DIR=/path/to/checkpoints/tabiclv2-clf/stage2
-STAGE1_CKPT=/path/to/checkpoints/tabiclv2-clf/stage1/step-500000.ckpt
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+source "$REPO_ROOT/scripts/icl_recipe.sh"
+
+NUM_GPUS=${NUM_GPUS:-4}                                   # the paper used 4 GPUs for pre-training
+CKPT_DIR=${CKPT_DIR:-/path/to/checkpoints/tabiclv2-clf/stage2}
+LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
+STAGE1_CKPT=${STAGE1_CKPT:-/path/to/checkpoints/tabiclv2-clf/stage1/step-500000.ckpt}
 
 # Load the Stage 1 weights only on the very first launch. On later launches (e.g.
 # restarts after a cluster time limit), CKPT_DIR already contains Stage 2
@@ -23,12 +29,14 @@ if ls "$CKPT_DIR"/step-*.ckpt >/dev/null 2>&1; then
     RESUME_ARGS=""
 fi
 
-torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
+run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --wandb_log False \
             --wandb_project TabICLv2 \
             --wandb_name tabiclv2_clf_stage2 \
+            --log_dir "$LOG_DIR" \
+            --tensorboard_log "${TENSORBOARD_LOG:-False}" \
             --device cuda \
-            --dtype float32 \
+            --dtype "$TRAIN_DTYPE" \
             --np_seed 42 \
             --torch_seed 42 \
             --max_steps 40000 \
@@ -81,15 +89,12 @@ torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --row_rope_interleaved False \
             --icl_num_blocks 12 \
             --icl_nhead 8 \
-            --icl_attention hybrid_linear_topk \
-            --icl_exact_topk 64 \
-            --icl_sparse_chunk_size 1024 \
-            --icl_ssmax True \
-            --ssmax_type qassmax-mlp-elementwise \
+            "${ICL_ARGS[@]}" \
             --ff_factor 2 \
             --norm_first True \
             --zero_init False \
-            --use_flash_attn3 True \
+            --use_flash_attn3 "${USE_FLASH_ATTN3:-True}" \
+            --recompute "$RECOMPUTE" \
             --checkpoint_dir $CKPT_DIR \
             $RESUME_ARGS \
             --save_temp_every 50 \

@@ -90,13 +90,34 @@ class Encoder(nn.Module):
         zero_init: bool = True,
         recompute: bool = False,
         attention_type: str = "dense",
-        exact_topk: int = 64,
-        sparse_chunk_size: int = 1024,
+        sparse_every: int = 3,
+        induced_num_slots: int = 64,
+        flex_block_size: int = 128,
+        flex_num_kv_blocks: int = 4,
+        flex_qk_norm: bool = False,
+        flex_scale_mode: str = "auto",
+        linear_num_features: int = 64,
     ):
         super().__init__()
 
         if d_model % nhead != 0:
             raise ValueError(f"d_model ({d_model}) must be divisible by nhead ({nhead})")
+        if sparse_every < 1:
+            raise ValueError("sparse_every must be positive")
+        self.attention_type = attention_type
+        self.sparse_every = sparse_every
+        self.sparse_layers = []
+        block_specs = []
+        for layer_idx in range(num_blocks):
+            use_sparse = attention_type in ("linear_induced", "linear_flex", "elu_linear_flex", "induced_flex") and (layer_idx + 1) % sparse_every == 0
+            layer_attention = (
+                ("flex_sparse" if attention_type in ("linear_flex", "elu_linear_flex", "induced_flex") else "induced")
+                if use_sparse else ("linear" if attention_type in ("linear_induced", "linear_flex") else
+                                    "elu_linear" if attention_type == "elu_linear_flex" else
+                                    "induced" if attention_type == "induced_flex" else attention_type)
+            )
+            self.sparse_layers.append(use_sparse)
+            block_specs.append(layer_attention)
 
         self.blocks = nn.ModuleList(
             [
@@ -110,11 +131,15 @@ class Encoder(nn.Module):
                     bias_free_ln=bias_free_ln,
                     ssmax=ssmax,
                     zero_init=zero_init,
-                    attention_type=attention_type,
-                    exact_topk=exact_topk,
-                    sparse_chunk_size=sparse_chunk_size,
+                    attention_type=layer_attention,
+                    induced_num_slots=induced_num_slots,
+                    flex_block_size=flex_block_size,
+                    flex_num_kv_blocks=flex_num_kv_blocks,
+                    flex_qk_norm=flex_qk_norm,
+                    flex_scale_mode=flex_scale_mode,
+                    linear_num_features=linear_num_features,
                 )
-                for _ in range(num_blocks)
+                for layer_attention in block_specs
             ]
         )
 

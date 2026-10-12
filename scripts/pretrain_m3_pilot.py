@@ -66,7 +66,11 @@ def main():
     if (run / "metrics.jsonl").exists():
         parser.error("run-dir already contains metrics; use a fresh directory")
     repo = Path(__file__).resolve().parents[1]
-    tokens = [t for t in shlex.split((repo / "scripts/train_v2_clf_stage1.sh").read_text(), comments=True) if t.strip()]
+    launch_env = dict(os.environ, DRY_RUN="1", CKPT_DIR=str(run / "checkpoints"), LOG_DIR=str(run / "logs"))
+    command = subprocess.check_output(
+        ["bash", str(repo / "scripts/train_v2_clf_stage1.sh")], env=launch_env, text=True
+    )
+    tokens = shlex.split(command)
     start = tokens.index("--wandb_log")
     config = build_parser().parse_args(tokens[start:])
     config.checkpoint_dir = str(run / "checkpoints")
@@ -79,7 +83,6 @@ def main():
     config.dtype = args.dtype
     config.amp = args.dtype != "float32"
     config.recompute = True
-    config.icl_sparse_chunk_size = 128
     config.wandb_log = False
     config.fail_fast = True
     config.model_compile = False
