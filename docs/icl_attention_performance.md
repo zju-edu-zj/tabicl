@@ -1,5 +1,7 @@
 # ICL attention 审计与性能测试（2026-10-15）
 
+后续 content_tree 实现、五分支筛选和 2026-10-16 实测见 [更新报告](icl_content_tree_results_20261016.md)。本文保留此前测试条件与历史结果。
+
 ## 结论与默认配置
 
 第一版保留 `dense / global / global_full / global_sparse_alternating / global_sparse` 五种配方，使用同一层组织规则，删除原有 Performer、ICL induced、窗口、池化 MoBA、Flex 等入口及遗留参数。column encoder 的 induced attention 不属于此次清理范围。

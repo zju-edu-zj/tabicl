@@ -1,0 +1,78 @@
+{
+  "attention": "global_sparse_alternating",
+  "rows": 1024,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_global_sparse_alternating_1024.json",
+  "benchmark_version": 5,
+  "support": 819,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "63 %, 13790 MiB, 2865 MHz, 327.00 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.2446136474609375,
+  "peak_reserved_gib": 0.263671875,
+  "median_fwd_s": 0.008339014020748436,
+  "min_fwd_s": 0.00739472103305161,
+  "max_fwd_s": 0.008352925069630146,
+  "median_bwd_s": 0.020565666956827044,
+  "min_bwd_s": 0.016986193018965423,
+  "max_bwd_s": 0.027357222978025675,
+  "median_total_s": 0.02891859202645719,
+  "min_total_s": 0.024380914052017033,
+  "max_total_s": 0.03569623699877411,
+  "records": [
+    {
+      "total_s": 0.03569623699877411,
+      "support": 819,
+      "fwd_s": 0.008339014020748436,
+      "bwd_s": 0.027357222978025675
+    },
+    {
+      "total_s": 0.02891859202645719,
+      "support": 819,
+      "fwd_s": 0.008352925069630146,
+      "bwd_s": 0.020565666956827044
+    },
+    {
+      "total_s": 0.024380914052017033,
+      "support": 819,
+      "fwd_s": 0.00739472103305161,
+      "bwd_s": 0.016986193018965423
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 1.119645725004375,
+      "support": 819
+    },
+    {
+      "total_s": 0.03658885997720063,
+      "support": 819
+    }
+  ]
+}

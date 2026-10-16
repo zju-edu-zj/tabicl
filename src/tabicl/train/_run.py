@@ -36,6 +36,7 @@ from tabicl.prior.graph_lib._config import PriorConfig
 from tabicl.train._optim import get_scheduler
 from tabicl.train._muon import Muon
 from tabicl.train._train_config import build_parser
+from tabicl.train._screening import StepSeededPrior, evaluate_cases, load_common_initialization
 
 warnings.filterwarnings(
     "ignore", message=".*The PyTorch API of nested tensors is in prototype stage.*", category=UserWarning
@@ -101,6 +102,14 @@ class Trainer:
         self.configure_optimizer()
         self.configure_amp()
         self.load_checkpoint()
+        if isinstance(self.dataloader.dataset, StepSeededPrior):
+            self.dataloader.dataset.start_step = self.curr_step
+        self.eval_cases = None
+        if config.eval_data:
+            if config.eval_every < 1:
+                raise ValueError("eval_every must be positive")
+            if self.master_process:
+                self.eval_cases = torch.load(config.eval_data, map_location="cpu", weights_only=True)
         self.seed()
         self.configure_local_logging()
 
@@ -147,13 +156,19 @@ class Trainer:
             print("No DDP training")
 
         self.curr_step = 0  # Initialize current step for training
+        memory_cap = float(os.environ.get("TABICL_CUDA_MEMORY_LIMIT_GIB", "0"))
+        if memory_cap and "cuda" in self.config.device:
+            device = torch.device(self.config.device)
+            torch.cuda.set_per_process_memory_fraction(
+                memory_cap * 2**30 / torch.cuda.get_device_properties(device).total_memory, device)
 
         # Set random seeds
         seed_offset = self.ddp_rank if self.ddp else 0
         np.random.seed(self.config.np_seed + seed_offset)
         torch.manual_seed(self.config.torch_seed + seed_offset)
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
+        if torch.device(self.config.device).type == "cuda":
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
 
     def configure_wandb(self):
         """Set up Weights & Biases logging."""
@@ -267,7 +282,7 @@ class Trainer:
             "col_feature_group": self.config.col_feature_group,
             "col_feature_group_size": self.config.col_feature_group_size,
             "col_target_aware": self.config.col_target_aware,
-            "col_ssmax": self.config.ssmax_type if self.config.col_ssmax else False,
+            "col_ssmax": self.config.col_ssmax_type if self.config.col_ssmax else False,
             "row_num_blocks": self.config.row_num_blocks,
             "row_nhead": self.config.row_nhead,
             "row_num_cls": self.config.row_num_cls,
@@ -276,14 +291,16 @@ class Trainer:
             "icl_num_blocks": self.config.icl_num_blocks,
             "icl_nhead": self.config.icl_nhead,
             "icl_attention": self.config.icl_attention,
-            "icl_attention_impl_version": 3,
+            "icl_attention_impl_version": 4,
             "icl_sparse_every": self.config.icl_sparse_every,
             "icl_block_size": self.config.icl_block_size,
             "icl_num_selected_blocks": self.config.icl_num_selected_blocks,
             "icl_query_chunk_size": self.config.icl_query_chunk_size,
             "icl_router": self.config.icl_router,
             "icl_router_beam": self.config.icl_router_beam,
-            "icl_ssmax": self.config.ssmax_type if self.config.icl_ssmax else False,
+            "icl_partition": self.config.icl_partition,
+            "icl_ssmax": self.config.icl_ssmax_type if self.config.icl_ssmax else False,
+            "icl_qk_norm": self.config.icl_qk_norm,
             "ff_factor": self.config.ff_factor,
             "dropout": self.config.dropout,
             "activation": self.config.activation,
@@ -294,6 +311,8 @@ class Trainer:
         }
 
         model = TabICL(**self.model_config)
+        if self.config.initial_weights:
+            load_common_initialization(model, self.config.initial_weights, self.model_config, self.config.torch_seed)
         model.to(device=self.config.device)
 
         if self.master_process:
@@ -383,6 +402,9 @@ class Trainer:
             prefetch_factor = 4
 
         # Create dataloader for efficient loading and prefetching
+        if self.config.prior_seed_by_step and self.config.prior_dir is None:
+            dataset = StepSeededPrior(dataset, self.config.np_seed, self.config.torch_seed,
+                                      self.ddp_rank, self.ddp_world_size)
         self.dataloader = DataLoader(
             dataset,
             batch_size=None,  # No additional batching since PriorDataset handles batching internally
@@ -517,18 +539,19 @@ class Trainer:
         # Reject semantic architecture changes even when parameter shapes match.
         stored = checkpoint.get("config", {})
         mode = self.model_config["icl_attention"]
-        if mode != "dense" and stored.get("icl_attention_impl_version") != 3:
-            raise ValueError("Experimental checkpoint requires ICL implementation version 3; "
+        if mode != "dense" and stored.get("icl_attention_impl_version") != 4:
+            raise ValueError("Experimental checkpoint requires ICL implementation version 4; "
                              "start a new checkpoint directory")
         defaults = {"icl_attention": "dense", "icl_sparse_every": 3,
                     "icl_block_size": 128, "icl_num_selected_blocks": 4,
                     "icl_router": "centroid", "icl_router_beam": 16,
-                    "icl_ssmax": False}
-        keys = ["icl_attention", "icl_ssmax"]
+                    "icl_partition": "projection",
+                    "icl_ssmax": False, "icl_qk_norm": False}
+        keys = ["icl_attention", "icl_ssmax", "icl_qk_norm"]
         if mode in ("global_full", "global_sparse", "global_sparse_alternating"):
             keys.append("icl_sparse_every")
         if mode in ("global_sparse", "global_sparse_alternating"):
-            keys.extend(("icl_block_size", "icl_num_selected_blocks", "icl_router"))
+            keys.extend(("icl_block_size", "icl_num_selected_blocks", "icl_router", "icl_partition"))
             if self.model_config.get("icl_router") == "hierarchical":
                 keys.append("icl_router_beam")
         for key in keys:
@@ -621,6 +644,7 @@ class Trainer:
         else:
             step_progress = range(self.curr_step, self.config.max_steps)
 
+        self.validate_screen()
         dataloader = iter(self.dataloader)
         for step in step_progress:
             # Get the next batch
@@ -632,9 +656,6 @@ class Trainer:
             with Timer() as train_timer:
                 results = self.run_batch(batch)
             train_time = train_timer.elapsed
-
-            # Clear CUDA cache to free memory
-            torch.cuda.empty_cache()
 
             self.curr_step = step + 1
             if self.master_process:
@@ -666,6 +687,30 @@ class Trainer:
                 # Add learning rate to results
                 results["lr"] = self.scheduler.get_last_lr()[0]
                 wandb.log(results, step=self.curr_step)
+            if self.config.eval_data and (self.curr_step % self.config.eval_every == 0
+                                          or self.curr_step == self.config.max_steps):
+                self.validate_screen()
+        if self.master_process and self.curr_step > 0:
+            self.save_checkpoint(f"step-{self.curr_step}.ckpt")
+
+    def validate_screen(self):
+        """Rank zero evaluates without DDP collectives; other ranks wait."""
+        if not self.config.eval_data:
+            return
+        if self.ddp:
+            torch.distributed.barrier()
+        if self.master_process:
+            with self._sdpa_ctx():
+                metrics, records = evaluate_cases(self.raw_model, self.eval_cases, self.config.device,
+                                                  self.amp_ctx, self.config.icl_diagnostic_queries)
+            self.log_local_metrics(self.curr_step, metrics)
+            if self.local_log_dir:
+                with (self.local_log_dir / "validation.jsonl").open("a") as stream:
+                    stream.write(json.dumps({"step": self.curr_step, "cases": records}, allow_nan=False) + "\n")
+            print(f"Validation step={self.curr_step}: " + json.dumps({k: v for k, v in metrics.items()
+                                                                    if "/diag/" not in k}), flush=True)
+        if self.ddp:
+            torch.distributed.barrier()
 
     def validate_micro_batch(self, micro_seq_len, micro_train_size):
         """Validate consistent sequence length and train size within a micro batch.

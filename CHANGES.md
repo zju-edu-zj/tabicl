@@ -8,7 +8,8 @@ New features
   pinball loss (`--regression_method quantile`) in addition to classification, and the Muon
   optimizer (`--muon True`) alongside AdamW. The training CLI now also exposes the `graph_scm`
   prior options, layernorm-without-bias (`--norm_type layernorm_nobias`), SSMax
-  (`--col_ssmax`/`--icl_ssmax` with `--ssmax_type`), feature grouping and target-aware embeddings
+  (`--col_ssmax`/`--icl_ssmax` with independent `--col_ssmax_type`/`--icl_ssmax_type`),
+  feature grouping and target-aware embeddings
   (`--col_feature_group`, `--col_target_aware`, `--col_affine`), the RoPE variant
   (`--row_rope_interleaved`; v1 interleaved by default, v2 uses `False`), residual initialization
   (`--zero_init`; v2 uses `False`), FlashAttention-3 during training (`--use_flash_attn3`;

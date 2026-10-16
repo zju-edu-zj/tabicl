@@ -1,0 +1,14 @@
+[
+  {
+    "job": "train_global_sparse_alternating_65536",
+    "returncode": 1
+  },
+  {
+    "job": "train_global_sparse_projection_65536",
+    "returncode": 1
+  },
+  {
+    "job": "train_global_sparse_content_tree_65536",
+    "returncode": 1
+  }
+]

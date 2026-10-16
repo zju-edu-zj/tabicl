@@ -10,9 +10,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from tabicl._model.icl_attention import ICL_ATTENTION_TYPES
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("results", type=Path)
@@ -26,6 +23,12 @@ def main():
                 dict(
                     file=path.name,
                     attention=result["attention"],
+                    partition=result.get("partition", "projection"),
+                    scope=result.get("scope", "encoder"),
+                    phase=result.get("phase", "train"),
+                    dtype=result.get("dtype", "bfloat16"),
+                    recompute=result.get("recompute", False),
+                    portable=result.get("portable", False),
                     rows=result["rows"],
                     blocks=result["blocks"],
                     router=result.get("router", result.get("fused_router", "")),
@@ -36,17 +39,22 @@ def main():
                     peak_reserved_gib=result["peak_reserved_gib"],
                 )
             )
+    if not records:
+        parser.error("No successful benchmark records found")
     with (args.results / "timings.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(records[0]))
         writer.writeheader()
         writer.writerows(records)
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.4), layout="constrained")
-    for attention in ICL_ATTENTION_TYPES:
+    variants = sorted(set((r["attention"], r["partition"]) for r in records))
+    for attention, partition in variants:
         selected = sorted(
             (
                 row
                 for row in records
-                if row["file"].startswith(f"matrix_{attention}_") and row["attention"] == attention
+                if row["file"].startswith(("matrix_", "train_")) and row["attention"] == attention
+                and row["partition"] == partition and row["scope"] == "encoder" and row["phase"] == "train"
+                and row["blocks"] == 12 and row["dtype"] == "bfloat16" and row["recompute"] and not row["portable"]
             ),
             key=lambda row: row["rows"],
         )
@@ -54,9 +62,10 @@ def main():
             continue
         x = [row["rows"] for row in selected]
         y = [row["median_ms"] for row in selected]
-        axes[0].plot(x, y, ".-", label=attention)
+        label = attention + ("/" + partition if attention == "global_sparse" else "")
+        axes[0].plot(x, y, ".-", label=label)
         axes[0].fill_between(x, [r["min_ms"] for r in selected], [r["max_ms"] for r in selected], alpha=0.12)
-        axes[1].plot(x, [row["peak_allocated_gib"] for row in selected], ".-", label=attention)
+        axes[1].plot(x, [row["peak_allocated_gib"] for row in selected], ".-", label=label)
     for ax in axes:
         ax.set_xscale("log", base=2)
         ax.set_xlabel("Total rows (80% support)")

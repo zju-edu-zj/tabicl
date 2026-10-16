@@ -4,6 +4,8 @@ All queries route independently per head, and only support rows supply K/V.
 The hard router has no trainable parameters. Q/K still learn through attention.
 """
 
+from contextlib import contextmanager
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -32,6 +34,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
         query_chunk_size=64,
         router="centroid",
         router_beam=16,
+        partition="projection",
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -43,6 +46,8 @@ class SetRetrievalAttention(GlobalLinearAttention):
             raise ValueError("selected blocks and query chunk size must be positive")
         if router not in ("centroid", "hierarchical"):
             raise ValueError("router must be centroid or hierarchical")
+        if partition not in ("projection", "content_tree"):
+            raise ValueError("partition must be projection or content_tree")
         if router_beam < 1 or (router == "hierarchical" and router_beam < num_selected_blocks):
             raise ValueError("router_beam must be >= num_selected_blocks")
         # The reference and fused kernels use zero attention dropout alike.
@@ -54,11 +59,14 @@ class SetRetrievalAttention(GlobalLinearAttention):
         self.query_chunk_size = query_chunk_size
         self.router = router
         self.router_beam = router_beam
+        self.partition = partition
         # A 32 MiB score tile amortizes GEMM/top-k dispatch at long contexts.
         # This is a workspace bound, not an attention or candidate budget.
         self.route_score_chunk_elements = 8 * 1024**2
         self.diagnostic_query_start = 0
         self.use_triton = True
+        self._route_record = None
+        self._route_replay = None
         self.register_buffer("route_direction", F.normalize(torch.randn(self.head_dim), dim=0))
         if mode != "sparse":
             self.fusion_gate_weight = nn.Parameter(torch.zeros(self.num_heads, self.head_dim))
@@ -67,14 +75,25 @@ class SetRetrievalAttention(GlobalLinearAttention):
     @torch.no_grad()
     def route(self, q, k):
         """Return head-specific support ordering and selected leaf IDs."""
+        if self._route_replay is not None:
+            return next(self._route_replay)
         if k.shape[-2] == 0:
             raise ValueError("ICL retrieval needs at least one support row")
         size, s = self.block_size, k.shape[-2]
         nk = (s + size - 1) // size
         budget = min(self.num_selected_blocks, nk)
         with torch.autocast(device_type=q.device.type, enabled=False):
-            score = torch.einsum("bhsd,d->bhs", k.float(), self.route_direction.float())
+            if k.is_cuda and self.use_triton:
+                from ._routing_triton import projection_scores
+
+                score = projection_scores(k, self.route_direction)
+            else:
+                score = torch.einsum("bhsd,d->bhs", k.float(), self.route_direction.float())
             order = score.argsort(dim=-1, stable=True)
+            if self.partition == "content_tree":
+                from ._content_tree import content_tree_order
+
+                order = content_tree_order(k, order, size, self.use_triton)
             lengths = (s - torch.arange(nk, device=k.device) * size).clamp(1, size)
             if k.is_cuda and self.use_triton:
                 from ._routing_triton import block_centroids
@@ -91,14 +110,45 @@ class SetRetrievalAttention(GlobalLinearAttention):
                 # Routing scores are discrete; positive scaling by sqrt(d)
                 # cannot change top-k, so no temperature operation is needed.
                 chunk = max(1, self.route_score_chunk_elements // (q.shape[0] * q.shape[1] * nk))
-                selected = torch.cat(
-                    [
-                        (q[:, :, start : start + chunk].float() @ centroids.transpose(-1, -2)).topk(budget, -1).indices
-                        for start in range(0, q.shape[-2], chunk)
-                    ],
-                    dim=2,
-                )
-        return order, selected
+                pieces = []
+                for start in range(0, q.shape[-2], chunk):
+                    queries = q[:, :, start : start + chunk]
+                    if q.is_cuda and self.use_triton:
+                        from ._routing_triton import centroid_scores
+
+                        scores = centroid_scores(queries, centroids)
+                    else:
+                        scores = queries.float() @ centroids.transpose(-1, -2)
+                    pieces.append(scores.topk(budget, -1).indices)
+                selected = torch.cat(pieces, dim=2)
+        result = order.to(torch.int32), selected.to(torch.int32)
+        if self._route_record is not None:
+            self._route_record.append(result)
+        return result
+
+    def checkpoint_contexts(self):
+        """Record discrete routing once and replay it during block checkpointing."""
+        records = []
+        diagnose = self.diagnostics_enabled
+
+        @contextmanager
+        def record():
+            self._route_record = records
+            try:
+                yield
+            finally:
+                self._route_record = None
+
+        @contextmanager
+        def replay():
+            self._route_replay = iter(records)
+            self.diagnostics_enabled = diagnose
+            try:
+                yield
+            finally:
+                self._route_replay = None
+
+        return record(), replay()
 
     def _route_tree(self, q, centroids, lengths, budget):
         nk = centroids.shape[-2]
@@ -142,11 +192,13 @@ class SetRetrievalAttention(GlobalLinearAttention):
         return torch.cat(outputs, dim=2)
 
     @staticmethod
-    def _selected_attention(q, k, v, selected, size):
+    def _selected_attention(q, k, v, order, selected, size):
         b, h, n, d = q.shape
-        pos = (selected[..., None] * size + torch.arange(size, device=q.device)).flatten(-2)
+        pos = (selected.long()[..., None] * size + torch.arange(size, device=q.device)).flatten(-2)
         valid = pos < k.shape[-2]
-        index = pos.clamp_max(k.shape[-2] - 1)[..., None].expand(-1, -1, -1, -1, d)
+        sorted_pos = pos.clamp_max(k.shape[-2] - 1)
+        original = order.long()[:, :, None].expand(-1, -1, n, -1).gather(3, sorted_pos)
+        index = original[..., None].expand(-1, -1, -1, -1, d)
         keys = k[:, :, None].expand(-1, -1, n, -1, -1).gather(3, index)
         values = v[:, :, None].expand(-1, -1, n, -1, -1).gather(3, index)
         return F.scaled_dot_product_attention(
@@ -158,8 +210,8 @@ class SetRetrievalAttention(GlobalLinearAttention):
 
     def _sparse_attention(self, q, k, v):
         order, selected = self.route(q, k)
-        index = order[..., None].expand_as(k)
-        ks, vs = k.gather(2, index), v.gather(2, index)
+        visible = min(k.shape[-2], self.num_selected_blocks * self.block_size)
+        attention_q = self.qk_norm.scale_query(q, visible) if self.qk_norm is not None else q
         if (
             q.is_cuda
             and self.use_triton
@@ -168,14 +220,15 @@ class SetRetrievalAttention(GlobalLinearAttention):
         ):
             from ._sparse_triton import routed_attention
 
-            out = routed_attention(q, ks, vs, selected, self.block_size)
+            out = routed_attention(attention_q, k, v, order, selected, self.block_size)
         else:
             outputs = []
             for start in range(0, q.shape[-2], self.query_chunk_size):
                 args = (
-                    q[:, :, start : start + self.query_chunk_size],
-                    ks,
-                    vs,
+                    attention_q[:, :, start : start + self.query_chunk_size],
+                    k,
+                    v,
+                    order,
                     selected[:, :, start : start + self.query_chunk_size],
                     self.block_size,
                 )
@@ -185,7 +238,9 @@ class SetRetrievalAttention(GlobalLinearAttention):
                     outputs.append(self._selected_attention(*args))
             out = torch.cat(outputs, dim=2)
         if self.diagnostics_enabled:
-            self._diagnose(q, ks, vs, selected)
+            index = order.long()[..., None].expand_as(k)
+            ks, vs = k.gather(2, index), v.gather(2, index)
+            self._diagnose(attention_q, ks, vs, selected)
         return out
 
     @torch.no_grad()
@@ -230,19 +285,37 @@ class SetRetrievalAttention(GlobalLinearAttention):
             global_heads = self._global_attention(q, k, v)
         self.diagnostics_enabled = diagnose
         if self.mode == "fused_full" or k.shape[-2] <= self.block_size * self.num_selected_blocks:
-            sparse_heads = F.scaled_dot_product_attention(q, k, v)
+            attention_q = self.qk_norm.scale_query(q, k.shape[-2]) if self.qk_norm is not None else q
+            sparse_heads = F.scaled_dot_product_attention(attention_q, k, v)
             if diagnose:
-                self._diagnose(q, k, v)
+                self._diagnose(attention_q, k, v)
         else:
             sparse_heads = self._sparse_attention(q, k, v)
         heads = sparse_heads
         if global_heads is not None:
+            if q.is_cuda and q.ndim == 4 and q.shape[-1] <= 128:
+                from ._fusion_triton import fused_gate
+
+                combined = fused_gate(
+                    q, sparse_heads, global_heads, self.fusion_gate_weight, self.fusion_gate_bias
+                )
+                if diagnose:
+                    with torch.no_grad(), torch.autocast(device_type=q.device.type, enabled=False):
+                        gate = torch.sigmoid(
+                            torch.einsum("bhtd,hd->bht", q.float(), self.fusion_gate_weight.float())
+                            + self.fusion_gate_bias.float()[None, :, None]
+                        )
+                        self.last_diagnostics["fusion_sparse_gate_mean"] = gate.mean()
+                return self.out_proj(combined)
             with torch.autocast(device_type=q.device.type, enabled=False):
                 gate = torch.sigmoid(
                     torch.einsum("bhtd,hd->bht", q.float(), self.fusion_gate_weight.float())
                     + self.fusion_gate_bias.float()[None, :, None]
-                ).to(q.dtype)[..., None]
-            heads = gate * sparse_heads + (1 - gate) * global_heads
+                )[..., None]
+                heads = (
+                    global_heads.float() + gate * (sparse_heads.float() - global_heads.float())
+                ).to(q.dtype)
             if diagnose:
                 self.last_diagnostics["fusion_sparse_gate_mean"] = gate.detach().float().mean()
-        return self.out_proj(heads.transpose(-3, -2).contiguous().view(*q.shape[:-3], q.shape[-2], self.embed_dim))
+        combined = heads.transpose(-3, -2).contiguous().view(*q.shape[:-3], q.shape[-2], self.embed_dim)
+        return self.out_proj(combined)

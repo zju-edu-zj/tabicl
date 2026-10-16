@@ -163,6 +163,15 @@ class TabICL(nn.Module):
         Exact leaf-centroid top-k or approximate hierarchical beam search.
         The beam controls search width independently of the selected leaf budget.
 
+    icl_partition : str, default="projection"
+        Fixed random-projection ordering or recursively rebuilt balanced content_tree.
+        Each layer/head partitions only its current support keys.
+
+    icl_qk_norm : bool, default=False
+        Apply head-wise Q/K RMS normalization and bounded per-head length scaling
+        in ICL attention. Experimental long-context recipes enable this instead
+        of ICL SSMax; column SSMax is configured independently.
+
     icl_query_chunk_size : int, default=64
         Query workspace chunk size for the portable gathered-SDPA fallback.
     """
@@ -222,7 +231,9 @@ class TabICL(nn.Module):
         icl_query_chunk_size: int = 64,
         icl_router: str = "centroid",
         icl_router_beam: int = 16,
-        icl_attention_impl_version: int = 3,
+        icl_partition: str = "projection",
+        icl_qk_norm: bool = False,
+        icl_attention_impl_version: int = 4,
     ):
         super().__init__()
         icl_dim = embed_dim * row_num_cls  # CLS tokens are concatenated for ICL
@@ -255,6 +266,7 @@ class TabICL(nn.Module):
         self.icl_num_blocks = icl_num_blocks
         self.icl_nhead = icl_nhead
         self.icl_ssmax = icl_ssmax
+        self.icl_qk_norm = icl_qk_norm
         self.ff_factor = ff_factor
         self.dropout = dropout
         self.activation = activation
@@ -262,14 +274,17 @@ class TabICL(nn.Module):
         self.bias_free_ln = bias_free_ln
         self.zero_init = zero_init
         self.icl_attention = icl_attention
-        if icl_attention != "dense" and icl_attention_impl_version != 3:
-            raise ValueError("ICL experiments require implementation version 3; start a new experimental run")
+        if icl_attention != "dense" and icl_attention_impl_version != 4:
+            raise ValueError("ICL experiments require implementation version 4; start a new experimental run")
         self.icl_sparse_every = icl_sparse_every
         self.icl_block_size = icl_block_size
         self.icl_num_selected_blocks = icl_num_selected_blocks
         self.icl_query_chunk_size = icl_query_chunk_size
         self.icl_router = icl_router
         self.icl_router_beam = icl_router_beam
+        if icl_partition not in ("projection", "content_tree"):
+            raise ValueError("icl_partition must be projection or content_tree")
+        self.icl_partition = icl_partition
 
         self.col_embedder = ColEmbedding(
             embed_dim=embed_dim,
@@ -329,6 +344,8 @@ class TabICL(nn.Module):
             query_chunk_size=icl_query_chunk_size,
             router=icl_router,
             router_beam=icl_router_beam,
+            partition=icl_partition,
+            qk_norm=icl_qk_norm,
         )
 
         # KV cache for efficient inference

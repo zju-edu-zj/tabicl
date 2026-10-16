@@ -1,0 +1,106 @@
+{
+  "attention": "global_sparse_alternating",
+  "rows": 16384,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 7,
+  "warmup": 3,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_short_retry/train_global_sparse_alternating_16384.json",
+  "benchmark_version": 5,
+  "support": 13107,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "84 %, 13790 MiB, 2865 MHz, 296.18 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 1.0009264945983887,
+  "peak_reserved_gib": 1.177734375,
+  "median_fwd_s": 0.02534829592332244,
+  "min_fwd_s": 0.02528295700903982,
+  "max_fwd_s": 0.04307055601384491,
+  "median_bwd_s": 0.07576185103971511,
+  "min_bwd_s": 0.0691466600401327,
+  "max_bwd_s": 0.12176036008168012,
+  "median_total_s": 0.10385074908845127,
+  "min_total_s": 0.09442961704917252,
+  "max_total_s": 0.16483091609552503,
+  "records": [
+    {
+      "total_s": 0.10385074908845127,
+      "support": 13107,
+      "fwd_s": 0.028088898048736155,
+      "bwd_s": 0.07576185103971511
+    },
+    {
+      "total_s": 0.09442961704917252,
+      "support": 13107,
+      "fwd_s": 0.02528295700903982,
+      "bwd_s": 0.0691466600401327
+    },
+    {
+      "total_s": 0.09580515103880316,
+      "support": 13107,
+      "fwd_s": 0.025296033010818064,
+      "bwd_s": 0.0705091180279851
+    },
+    {
+      "total_s": 0.09496300702448934,
+      "support": 13107,
+      "fwd_s": 0.02534829592332244,
+      "bwd_s": 0.0696147111011669
+    },
+    {
+      "total_s": 0.1199007909744978,
+      "support": 13107,
+      "fwd_s": 0.025285704992711544,
+      "bwd_s": 0.09461508598178625
+    },
+    {
+      "total_s": 0.1387768309796229,
+      "support": 13107,
+      "fwd_s": 0.040677263983525336,
+      "bwd_s": 0.09809956699609756
+    },
+    {
+      "total_s": 0.16483091609552503,
+      "support": 13107,
+      "fwd_s": 0.04307055601384491,
+      "bwd_s": 0.12176036008168012
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 1.239412322989665,
+      "support": 13107
+    },
+    {
+      "total_s": 0.1748208279022947,
+      "support": 13107
+    },
+    {
+      "total_s": 0.14969603798817843,
+      "support": 13107
+    }
+  ]
+}

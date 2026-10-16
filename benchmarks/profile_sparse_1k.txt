@@ -1,0 +1,40 @@
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg    # of Calls  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                            aten::copy_         9.94%       4.229ms         9.94%       4.229ms       4.342us           974  
+                                         AddmmBackward0         9.07%       3.859ms        32.09%      13.647ms     227.456us            60  
+                                            aten::addmm         6.05%       2.575ms         6.37%       2.708ms      22.565us           120  
+                                          _ELUAttention         4.55%       1.937ms         5.48%       2.332ms      97.164us            24  
+                                  _ELUAttentionBackward         4.53%       1.927ms        18.71%       7.959ms     663.249us            12  
+                                    aten::empty_strided         3.49%       1.486ms         3.49%       1.486ms       1.819us           817  
+                                            aten::empty         3.15%       1.342ms         3.15%       1.342ms       1.727us           777  
+                                               aten::mm         3.00%       1.275ms         3.00%       1.275ms      10.624us           120  
+                                aten::native_layer_norm         2.91%       1.236ms         3.79%       1.613ms      33.606us            48  
+                                              aten::div         2.79%       1.188ms         2.79%       1.188ms      32.110us            37  
+                                         aten::_to_copy         2.57%       1.094ms        12.04%       5.120ms       7.398us           692  
+                                              aten::mul         2.56%       1.087ms         2.58%       1.096ms       6.448us           170  
+                                              aten::sum         2.43%       1.032ms         2.44%       1.036ms      10.362us           100  
+                                           aten::linear         1.82%     774.252us        24.50%      10.422ms      43.425us           240  
+                                              aten::add         1.70%     724.741us         1.70%     724.741us       6.248us           116  
+                                  aten::_fused_rms_norm         1.70%     723.523us         3.24%       1.380ms      28.752us            48  
+                                              aten::bmm         1.62%     690.110us         1.62%     690.110us      11.502us            60  
+                                             aten::view         1.36%     578.678us         1.36%     578.678us       0.765us           756  
+                               _RoutedAttentionBackward         1.36%     578.503us         2.06%     877.145us     219.286us             4  
+                                               aten::to         1.16%     492.011us        13.19%       5.612ms       7.472us           751  
+                                        aten::transpose         1.14%     485.194us         1.62%     689.778us       1.223us           564  
+                                            aten::fill_         1.08%     457.494us         1.08%     457.494us       4.316us           106  
+                                             aten::add_         0.98%     418.003us         0.98%     418.003us       4.750us            88  
+                                       _RoutedAttention         0.97%     411.414us         1.28%     543.511us      67.939us             8  
+autograd::engine::evaluate_function: ToCopyBackward0...         0.93%     396.225us         4.80%       2.040ms      11.085us           184  
+                                               aten::ge         0.92%     393.064us         0.92%     393.064us       6.142us            64  
+                                       aten::as_strided         0.90%     381.468us         0.90%     381.468us       0.364us          1048  
+autograd::engine::evaluate_function: torch::autograd...         0.87%     370.468us         1.66%     707.868us       3.826us           185  
+                                                aten::t         0.86%     364.944us         1.69%     720.742us       2.002us           360  
+     autograd::engine::evaluate_function: ViewBackward0         0.82%     350.667us         2.45%       1.042ms       5.788us           180  
+    autograd::engine::evaluate_function: AddmmBackward0         0.80%     338.806us        34.50%      14.674ms     244.562us            60  
+                                          aten::reshape         0.77%     329.323us         2.34%     993.954us       2.367us           420  
+                                             _FusedGate         0.75%     318.015us         0.86%     365.029us      45.629us             8  
+autograd::engine::evaluate_function: NativeLayerNorm...         0.72%     305.021us         2.30%     979.451us      40.810us            24  
+                                            aten::clone         0.67%     286.903us         3.90%       1.660ms       8.644us           192  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 42.531ms

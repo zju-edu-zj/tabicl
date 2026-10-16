@@ -1,0 +1,78 @@
+{
+  "attention": "global",
+  "rows": 16384,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_global_16384.json",
+  "benchmark_version": 5,
+  "support": 13107,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "40 %, 13790 MiB, 2887 MHz, 303.77 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.9187688827514648,
+  "peak_reserved_gib": 1.078125,
+  "median_fwd_s": 0.012460491969250143,
+  "min_fwd_s": 0.011371743050403893,
+  "max_fwd_s": 0.012915080995298922,
+  "median_bwd_s": 0.03938324295450002,
+  "min_bwd_s": 0.032934298971667886,
+  "max_bwd_s": 0.06793844408821315,
+  "median_total_s": 0.05184373492375016,
+  "min_total_s": 0.04430604202207178,
+  "max_total_s": 0.08085352508351207,
+  "records": [
+    {
+      "total_s": 0.08085352508351207,
+      "support": 13107,
+      "fwd_s": 0.012915080995298922,
+      "bwd_s": 0.06793844408821315
+    },
+    {
+      "total_s": 0.05184373492375016,
+      "support": 13107,
+      "fwd_s": 0.012460491969250143,
+      "bwd_s": 0.03938324295450002
+    },
+    {
+      "total_s": 0.04430604202207178,
+      "support": 13107,
+      "fwd_s": 0.011371743050403893,
+      "bwd_s": 0.032934298971667886
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 27.59036606294103,
+      "support": 13107
+    },
+    {
+      "total_s": 0.09282960800919682,
+      "support": 13107
+    }
+  ]
+}

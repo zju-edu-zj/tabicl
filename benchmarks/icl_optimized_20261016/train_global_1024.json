@@ -1,0 +1,78 @@
+{
+  "attention": "global",
+  "rows": 1024,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_global_1024.json",
+  "benchmark_version": 5,
+  "support": 819,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "91 %, 13790 MiB, 2857 MHz, 284.05 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.23337936401367188,
+  "peak_reserved_gib": 0.341796875,
+  "median_fwd_s": 0.0033742489758878946,
+  "min_fwd_s": 0.0033614489948377013,
+  "max_fwd_s": 0.003382825991138816,
+  "median_bwd_s": 0.008890835917554796,
+  "min_bwd_s": 0.008855032036080956,
+  "max_bwd_s": 0.011296520940959454,
+  "median_total_s": 0.012273661908693612,
+  "min_total_s": 0.012229281011968851,
+  "max_total_s": 0.014657969935797155,
+  "records": [
+    {
+      "total_s": 0.012229281011968851,
+      "support": 819,
+      "fwd_s": 0.0033742489758878946,
+      "bwd_s": 0.008855032036080956
+    },
+    {
+      "total_s": 0.012273661908693612,
+      "support": 819,
+      "fwd_s": 0.003382825991138816,
+      "bwd_s": 0.008890835917554796
+    },
+    {
+      "total_s": 0.014657969935797155,
+      "support": 819,
+      "fwd_s": 0.0033614489948377013,
+      "bwd_s": 0.011296520940959454
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 25.944879023940302,
+      "support": 819
+    },
+    {
+      "total_s": 0.011849434929899871,
+      "support": 819
+    }
+  ]
+}

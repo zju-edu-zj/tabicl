@@ -83,6 +83,12 @@ def build_parser():
     )
     parser.add_argument("--np_seed", type=int, default=42, help="Random seed for numpy")
     parser.add_argument("--torch_seed", type=int, default=42, help="Random seed for torch")
+    parser.add_argument("--initial_weights", type=str, default=None,
+                        help="Common untrained dense initialization for controlled ICL screening.")
+    parser.add_argument("--prior_seed_by_step", type=str2bool, default=False,
+                        help="Seed each online batch by optimizer step/rank, including exact data replay on resume.")
+    parser.add_argument("--eval_data", type=str, default=None, help="Fixed held-out screening cases (.pt).")
+    parser.add_argument("--eval_every", type=int, default=2000, help="Screen validation interval; also step 0 and final.")
     parser.add_argument("--max_steps", type=int, default=60000, help="Training steps")
     parser.add_argument("--batch_size", type=int, default=512, help="Batch size")
     parser.add_argument(
@@ -293,7 +299,7 @@ def build_parser():
         "--col_ssmax",
         default=False,
         type=str2bool,
-        help="Whether to use SSMax in the column embedder (the variant is chosen by --ssmax_type)",
+        help="Whether to use SSMax in the column embedder (variant: --col_ssmax_type)",
     )
     parser.add_argument("--freeze_col", default=False, type=str2bool, help="Whether to freeze the column embedder")
 
@@ -326,6 +332,8 @@ def build_parser():
     parser.add_argument("--icl_query_chunk_size", type=int, default=64,
                         help="Query chunk size for the portable gathered-attention fallback.")
     parser.add_argument("--icl_router", choices=("centroid", "hierarchical"), default="centroid")
+    parser.add_argument("--icl_partition", choices=("projection", "content_tree"), default="projection",
+                        help="Support-only leaf construction, independently of centroid/beam search.")
     parser.add_argument("--icl_router_beam", type=int, default=16,
                         help="Hierarchy search width, independently of the final selected block budget.")
     parser.add_argument("--icl_diagnostics_every", type=int, default=200,
@@ -340,15 +348,26 @@ def build_parser():
         "--icl_ssmax",
         default=False,
         type=str2bool,
-        help="Whether to use SSMax in the ICL predictor (the variant is chosen by --ssmax_type)",
+        help="Whether to use legacy SSMax in dense ICL (variant: --icl_ssmax_type)",
+    )
+    parser.add_argument(
+        "--icl_qk_norm",
+        default=False,
+        type=str2bool,
+        help="Apply per-head Q/K RMSNorm and bounded length scaling in ICL attention.",
     )
     parser.add_argument("--freeze_icl", default=False, type=str2bool, help="Whether to freeze the ICL predictor")
     parser.add_argument(
-        "--ssmax_type",
+        "--col_ssmax_type",
         default="ssmax",
         type=str,
-        help="SSMax variant used where --col_ssmax/--icl_ssmax is True: 'ssmax', 'ssmax-mlp', "
-        "'ssmax-mlp-elementwise', 'qassmax-mlp', or 'qassmax-mlp-elementwise' (TabICLv2).",
+        help="Column SSMax variant: use qassmax-mlp-elementwise for TabICLv2.",
+    )
+    parser.add_argument(
+        "--icl_ssmax_type",
+        default="ssmax",
+        type=str,
+        help="Legacy dense-ICL SSMax variant. It is independent of column scaling.",
     )
 
     # Shared Architecture Config

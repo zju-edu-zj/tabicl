@@ -1,0 +1,78 @@
+{
+  "attention": "global_sparse_alternating",
+  "rows": 4096,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_global_sparse_alternating_4096.json",
+  "benchmark_version": 5,
+  "support": 3276,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "1 %, 13790 MiB, 2872 MHz, 292.46 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.3575472831726074,
+  "peak_reserved_gib": 0.40625,
+  "median_fwd_s": 0.008016002015210688,
+  "min_fwd_s": 0.007849287008866668,
+  "max_fwd_s": 0.00865459197666496,
+  "median_bwd_s": 0.022852643975056708,
+  "min_bwd_s": 0.02271036896854639,
+  "max_bwd_s": 0.029540337971411645,
+  "median_total_s": 0.030868645990267396,
+  "min_total_s": 0.03055965597741306,
+  "max_total_s": 0.038194929948076606,
+  "records": [
+    {
+      "total_s": 0.038194929948076606,
+      "support": 3276,
+      "fwd_s": 0.00865459197666496,
+      "bwd_s": 0.029540337971411645
+    },
+    {
+      "total_s": 0.03055965597741306,
+      "support": 3276,
+      "fwd_s": 0.007849287008866668,
+      "bwd_s": 0.02271036896854639
+    },
+    {
+      "total_s": 0.030868645990267396,
+      "support": 3276,
+      "fwd_s": 0.008016002015210688,
+      "bwd_s": 0.022852643975056708
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 1.1148893990321085,
+      "support": 3276
+    },
+    {
+      "total_s": 0.06703357503283769,
+      "support": 3276
+    }
+  ]
+}

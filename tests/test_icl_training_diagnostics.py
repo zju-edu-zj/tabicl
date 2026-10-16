@@ -109,6 +109,7 @@ def test_ssmax_per_row_lengths_preserve_scalar_dense_behavior(variant):
     "setting,value",
     [
         ("icl_router", "hierarchical"),
+        ("icl_partition", "content_tree"),
         ("icl_block_size", 64),
         ("icl_num_selected_blocks", 8),
         ("icl_sparse_every", 2),
@@ -120,7 +121,8 @@ def test_resume_rejects_silent_architecture_changes(tmp_path, setting, value):
     trainer.config = build_parser().parse_args(["--device", "cpu", "--only_load_model", "True"])
     trainer.config.checkpoint_path = str(tmp_path / "attention.ckpt")
     trainer.raw_model = torch.nn.Linear(2, 2)
-    original = {"icl_attention": "global_sparse", "icl_attention_impl_version": 3, "icl_router": "centroid"}
+    original = {"icl_attention": "global_sparse", "icl_attention_impl_version": 4,
+                "icl_router": "centroid", "icl_qk_norm": False}
     torch.save({"config": original, "state_dict": trainer.raw_model.state_dict()}, trainer.config.checkpoint_path)
     trainer.model_config = dict(original)
     trainer.load_checkpoint()

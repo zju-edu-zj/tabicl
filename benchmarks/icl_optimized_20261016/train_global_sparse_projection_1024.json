@@ -1,0 +1,78 @@
+{
+  "attention": "global_sparse",
+  "rows": 1024,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_global_sparse_projection_1024.json",
+  "benchmark_version": 5,
+  "support": 819,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "87 %, 13790 MiB, 2887 MHz, 272.37 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.24463272094726562,
+  "peak_reserved_gib": 0.265625,
+  "median_fwd_s": 0.00836844404693693,
+  "min_fwd_s": 0.00802115595433861,
+  "max_fwd_s": 0.008561058901250362,
+  "median_bwd_s": 0.02011885098181665,
+  "min_bwd_s": 0.01928662008140236,
+  "max_bwd_s": 0.025683747022412717,
+  "median_total_s": 0.02848729502875358,
+  "min_total_s": 0.02730777603574097,
+  "max_total_s": 0.03424480592366308,
+  "records": [
+    {
+      "total_s": 0.02730777603574097,
+      "support": 819,
+      "fwd_s": 0.00802115595433861,
+      "bwd_s": 0.01928662008140236
+    },
+    {
+      "total_s": 0.02848729502875358,
+      "support": 819,
+      "fwd_s": 0.00836844404693693,
+      "bwd_s": 0.02011885098181665
+    },
+    {
+      "total_s": 0.03424480592366308,
+      "support": 819,
+      "fwd_s": 0.008561058901250362,
+      "bwd_s": 0.025683747022412717
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 1.1012071860022843,
+      "support": 819
+    },
+    {
+      "total_s": 0.029003091040067375,
+      "support": 819
+    }
+  ]
+}

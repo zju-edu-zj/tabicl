@@ -1,0 +1,124 @@
+{
+  "attention": "global_sparse",
+  "rows": 65536,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "routing",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "content_tree",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 10,
+  "warmup": 3,
+  "dtype": "bfloat16",
+  "recompute": false,
+  "compile": false,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8,
+  "query_rows": 256,
+  "profile": null,
+  "output": "benchmarks/route_content_tree_stable_64k.json",
+  "benchmark_version": 5,
+  "support": 52428,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "54 %, 13790 MiB, 2895 MHz, 265.84 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.2082080841064453,
+  "peak_reserved_gib": 0.28515625,
+  "median_fwd_s": 0.024372229527216405,
+  "min_fwd_s": 0.011831496027298272,
+  "max_fwd_s": 0.024647364974953234,
+  "median_bwd_s": 3.697990905493498e-06,
+  "min_bwd_s": 3.234017640352249e-06,
+  "max_bwd_s": 4.130997695028782e-06,
+  "median_total_s": 0.02437607600586489,
+  "min_total_s": 0.011834730044938624,
+  "max_total_s": 0.024651239975355566,
+  "records": [
+    {
+      "total_s": 0.024367669015191495,
+      "support": 52428,
+      "fwd_s": 0.024363538017496467,
+      "bwd_s": 4.130997695028782e-06
+    },
+    {
+      "total_s": 0.024630917934700847,
+      "support": 52428,
+      "fwd_s": 0.024627238977700472,
+      "bwd_s": 3.678957000374794e-06
+    },
+    {
+      "total_s": 0.02438448299653828,
+      "support": 52428,
+      "fwd_s": 0.024380921036936343,
+      "bwd_s": 3.5619596019387245e-06
+    },
+    {
+      "total_s": 0.02439612103626132,
+      "support": 52428,
+      "fwd_s": 0.02439268701709807,
+      "bwd_s": 3.434019163250923e-06
+    },
+    {
+      "total_s": 0.024651239975355566,
+      "support": 52428,
+      "fwd_s": 0.024647364974953234,
+      "bwd_s": 3.875000402331352e-06
+    },
+    {
+      "total_s": 0.02446295798290521,
+      "support": 52428,
+      "fwd_s": 0.024459017091430724,
+      "bwd_s": 3.940891474485397e-06
+    },
+    {
+      "total_s": 0.015116870985366404,
+      "support": 52428,
+      "fwd_s": 0.015113631030544639,
+      "bwd_s": 3.239954821765423e-06
+    },
+    {
+      "total_s": 0.011834730044938624,
+      "support": 52428,
+      "fwd_s": 0.011831496027298272,
+      "bwd_s": 3.234017640352249e-06
+    },
+    {
+      "total_s": 0.015276344027370214,
+      "support": 52428,
+      "fwd_s": 0.015272627002559602,
+      "bwd_s": 3.7170248106122017e-06
+    },
+    {
+      "total_s": 0.01780165801756084,
+      "support": 52428,
+      "fwd_s": 0.01779783598612994,
+      "bwd_s": 3.822031430900097e-06
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 0.39166766696143895,
+      "support": 52428
+    },
+    {
+      "total_s": 0.024283191072754562,
+      "support": 52428
+    },
+    {
+      "total_s": 0.024477288010530174,
+      "support": 52428
+    }
+  ]
+}

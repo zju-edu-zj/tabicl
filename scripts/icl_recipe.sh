@@ -7,8 +7,10 @@ ICL_NUM_SELECTED_BLOCKS=${ICL_NUM_SELECTED_BLOCKS:-4}
 ICL_QUERY_CHUNK_SIZE=${ICL_QUERY_CHUNK_SIZE:-64}
 ICL_ROUTER=${ICL_ROUTER:-centroid}
 ICL_ROUTER_BEAM=${ICL_ROUTER_BEAM:-16}
+ICL_PARTITION=${ICL_PARTITION:-projection}
 ICL_SSMAX=${ICL_SSMAX:-False}
-SSMAX_TYPE=${SSMAX_TYPE:-qassmax-mlp-elementwise}
+ICL_QK_NORM=${ICL_QK_NORM:-True}
+COL_SSMAX_TYPE=${COL_SSMAX_TYPE:-${SSMAX_TYPE:-qassmax-mlp-elementwise}}
 ICL_DIAGNOSTICS_EVERY=${ICL_DIAGNOSTICS_EVERY:-200}
 ICL_DIAGNOSTIC_QUERIES=${ICL_DIAGNOSTIC_QUERIES:-16}
 ICL_DIAGNOSTIC_TOPK=${ICL_DIAGNOSTIC_TOPK:-32}
@@ -20,12 +22,14 @@ ICL_ARGS=(
     --icl_attention "$ICL_ATTENTION"
     --icl_router "$ICL_ROUTER"
     --icl_router_beam "$ICL_ROUTER_BEAM"
+    --icl_partition "$ICL_PARTITION"
     --icl_sparse_every "$ICL_SPARSE_EVERY"
     --icl_block_size "$ICL_BLOCK_SIZE"
     --icl_num_selected_blocks "$ICL_NUM_SELECTED_BLOCKS"
     --icl_query_chunk_size "$ICL_QUERY_CHUNK_SIZE"
     --icl_ssmax "$ICL_SSMAX"
-    --ssmax_type "$SSMAX_TYPE"
+    --icl_qk_norm "$ICL_QK_NORM"
+    --col_ssmax_type "$COL_SSMAX_TYPE"
     --icl_diagnostics_every "$ICL_DIAGNOSTICS_EVERY"
     --icl_diagnostic_queries "$ICL_DIAGNOSTIC_QUERIES"
     --icl_diagnostic_topk "$ICL_DIAGNOSTIC_TOPK"

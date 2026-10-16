@@ -1,0 +1,78 @@
+{
+  "attention": "dense",
+  "rows": 65536,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_dense_65536.json",
+  "benchmark_version": 5,
+  "support": 52428,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "92 %, 13790 MiB, 2857 MHz, 275.25 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 3.4261794090270996,
+  "peak_reserved_gib": 3.748046875,
+  "median_fwd_s": 0.7443911948939785,
+  "min_fwd_s": 0.5493196010356769,
+  "max_fwd_s": 0.7488976849708706,
+  "median_bwd_s": 1.938477172050625,
+  "min_bwd_s": 1.900457637035288,
+  "max_bwd_s": 2.101710677961819,
+  "median_total_s": 2.6510302789974958,
+  "min_total_s": 2.6493553220061585,
+  "max_total_s": 2.6828683669446036,
+  "records": [
+    {
+      "total_s": 2.6510302789974958,
+      "support": 52428,
+      "fwd_s": 0.5493196010356769,
+      "bwd_s": 2.101710677961819
+    },
+    {
+      "total_s": 2.6493553220061585,
+      "support": 52428,
+      "fwd_s": 0.7488976849708706,
+      "bwd_s": 1.900457637035288
+    },
+    {
+      "total_s": 2.6828683669446036,
+      "support": 52428,
+      "fwd_s": 0.7443911948939785,
+      "bwd_s": 1.938477172050625
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 42.0092029949883,
+      "support": 52428
+    },
+    {
+      "total_s": 2.7834716320503503,
+      "support": 52428
+    }
+  ]
+}

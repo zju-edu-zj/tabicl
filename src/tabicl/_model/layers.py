@@ -9,6 +9,7 @@ from .ssmax import create_ssmax_layer
 from .rope import RotaryEmbedding
 from .attention import multi_head_attention_forward
 from .kv_cache import KVCacheEntry, KVCache
+from .qk_norm import ICLQKNorm
 
 
 class ClassNode:
@@ -181,11 +182,13 @@ class MultiheadAttention(nn.MultiheadAttention):
            https://arxiv.org/abs/2501.19399
     """
 
-    def __init__(self, embed_dim: int, num_heads: int, dropout: float = 0.0, ssmax: Union[bool, str] = False):
+    def __init__(self, embed_dim: int, num_heads: int, dropout: float = 0.0,
+                 ssmax: Union[bool, str] = False, qk_norm: bool = False):
         super().__init__(embed_dim, num_heads, dropout, batch_first=True)
         if isinstance(ssmax, bool):
             ssmax = "qassmax-mlp-elementwise" if ssmax else "none"
         self.ssmax_layer = create_ssmax_layer(ssmax_type=ssmax, num_heads=num_heads, embed_dim=embed_dim)
+        self.qk_norm = ICLQKNorm(embed_dim // num_heads, num_heads) if qk_norm else None
 
     def forward(
         self,
@@ -282,6 +285,7 @@ class MultiheadAttention(nn.MultiheadAttention):
             attn_mask=attn_mask,
             rope=rope,
             ssmax_layer=self.ssmax_layer,
+            qk_norm=self.qk_norm,
             need_kv=need_kv,
         )
 
@@ -289,7 +293,7 @@ class MultiheadAttention(nn.MultiheadAttention):
 class SupportAttention(nn.Module):
     """Shared projections and support-prefix cache for non-dense ICL operators."""
 
-    def __init__(self, embed_dim, num_heads, dropout=0.0, ssmax=False):
+    def __init__(self, embed_dim, num_heads, dropout=0.0, ssmax=False, qk_norm=False):
         super().__init__()
         if embed_dim % num_heads:
             raise ValueError("embed_dim must be divisible by num_heads")
@@ -303,6 +307,7 @@ class SupportAttention(nn.Module):
         if isinstance(ssmax, bool):
             ssmax = "qassmax-mlp-elementwise" if ssmax else "none"
         self.ssmax_layer = create_ssmax_layer(ssmax, num_heads, embed_dim)
+        self.qk_norm = ICLQKNorm(self.head_dim, num_heads) if qk_norm else None
         nn.init.xavier_uniform_(self.in_proj_weight)
         nn.init.xavier_uniform_(self.out_proj.weight)
         nn.init.zeros_(self.out_proj.bias)
@@ -319,6 +324,9 @@ class SupportAttention(nn.Module):
         if rope is not None:
             q = rope.rotate_queries_or_keys(q)
             k = rope.rotate_queries_or_keys(k)
+        if self.qk_norm is not None:
+            q = self.qk_norm.normalize_q(q)
+            k = self.qk_norm.normalize_k(k)
         return q, k, v
 
     def forward(
@@ -344,6 +352,8 @@ class SupportAttention(nn.Module):
             q = q.view(*bshape, tgt_len, self.num_heads, self.head_dim).transpose(-3, -2)
             if rope is not None:
                 q = rope.rotate_queries_or_keys(q)
+            if self.qk_norm is not None:
+                q = self.qk_norm.normalize_q(q)
             return self._hybrid_attention(q, cached_kv.key, cached_kv.value)
         if key_padding_mask is not None or attn_mask is not None:
             raise NotImplementedError(
@@ -371,6 +381,7 @@ class GlobalLinearAttention(SupportAttention):
         super().__init__(*args, **kwargs)
         self.diagnostics_enabled = False
         self.diagnostic_queries = 16
+        self.diagnostic_query_start = 0
         self.diagnostic_topk = 32
         self.last_diagnostics = {}
         self.recompute_kernel_backward = True
@@ -383,8 +394,9 @@ class GlobalLinearAttention(SupportAttention):
     def _global_attention(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
         # Positive ELU features make the denominator well-defined. Accumulate
         # in fp32 to avoid long-context cancellation under AMP.
-        if (self.recompute_kernel_backward
-                and k.shape[-2] > self.kernel_recompute_min_support):
+        if self.recompute_kernel_backward and (
+            q.is_cuda or k.shape[-2] > self.kernel_recompute_min_support
+        ):
             from ._elu_kernel import elu_kernel_attention
             out = elu_kernel_attention(q, k, v)
             if self.diagnostics_enabled:
@@ -493,6 +505,8 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         query_chunk_size: int = 64,
         router: str = "centroid",
         router_beam: int = 16,
+        partition: str = "projection",
+        qk_norm: bool = False,
     ):
         super().__init__(
             d_model, nhead, dim_feedforward, dropout, activation=activation, norm_first=norm_first, batch_first=True
@@ -503,18 +517,19 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
 
         del self.self_attn
         if attention_type == "dense":
-            self.attn = MultiheadAttention(d_model, nhead, dropout, ssmax)
+            self.attn = MultiheadAttention(d_model, nhead, dropout, ssmax, qk_norm=qk_norm)
         elif attention_type == "global":
             self.attn = GlobalLinearAttention(
-                d_model, nhead, dropout, False,
+                d_model, nhead, dropout, False, qk_norm=qk_norm,
             )
         elif attention_type in ("sparse", "fused_sparse", "fused_full"):
             from .icl_attention import SetRetrievalAttention
 
             self.attn = SetRetrievalAttention(
-                d_model, nhead, dropout, False, mode=attention_type,
+                d_model, nhead, dropout, False, mode=attention_type, qk_norm=qk_norm,
                 block_size=block_size, num_selected_blocks=num_selected_blocks,
                 query_chunk_size=query_chunk_size, router=router, router_beam=router_beam,
+                partition=partition,
             )
         else:
             raise ValueError(f"Unknown attention_type: {attention_type}")

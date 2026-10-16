@@ -146,6 +146,7 @@ def multi_head_attention_forward(
     attn_mask: Optional[Tensor] = None,
     rope: Optional[RotaryEmbedding] = None,
     ssmax_layer: Optional[nn.Module] = None,
+    qk_norm: Optional[nn.Module] = None,
     need_kv: bool = False,
 ) -> Union[Tensor, Tuple[Tensor, Tensor, Tensor]]:
     """Multi-head attention with support for rotary position embeddings.
@@ -257,6 +258,12 @@ def multi_head_attention_forward(
         q = q.view(*batch_shape, tgt_len, num_heads, head_dim).transpose(-3, -2)
         if rope is not None:
             q = rope.rotate_queries_or_keys(q)
+
+    if qk_norm is not None:
+        q = qk_norm.normalize_q(q)
+        if cached_kv is None:
+            k = qk_norm.normalize_k(k)
+        q = qk_norm.scale_query(q, src_len)
 
     # Disable dropout during evaluation
     if not training:

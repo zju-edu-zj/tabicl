@@ -1,0 +1,78 @@
+{
+  "attention": "global_sparse",
+  "rows": 16384,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "content_tree",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_global_sparse_content_tree_16384.json",
+  "benchmark_version": 5,
+  "support": 13107,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "77 %, 13790 MiB, 2865 MHz, 353.30 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 1.0649785995483398,
+  "peak_reserved_gib": 1.21484375,
+  "median_fwd_s": 0.04076548293232918,
+  "min_fwd_s": 0.03228388901334256,
+  "max_fwd_s": 0.06754289800301194,
+  "median_bwd_s": 0.07685571804177016,
+  "min_bwd_s": 0.07647352106869221,
+  "max_bwd_s": 0.17104145791381598,
+  "median_total_s": 0.11723900400102139,
+  "min_total_s": 0.10913960705511272,
+  "max_total_s": 0.23858435591682792,
+  "records": [
+    {
+      "total_s": 0.23858435591682792,
+      "support": 13107,
+      "fwd_s": 0.06754289800301194,
+      "bwd_s": 0.17104145791381598
+    },
+    {
+      "total_s": 0.11723900400102139,
+      "support": 13107,
+      "fwd_s": 0.04076548293232918,
+      "bwd_s": 0.07647352106869221
+    },
+    {
+      "total_s": 0.10913960705511272,
+      "support": 13107,
+      "fwd_s": 0.03228388901334256,
+      "bwd_s": 0.07685571804177016
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 2.7923870680388063,
+      "support": 13107
+    },
+    {
+      "total_s": 0.23825846600811929,
+      "support": 13107
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "attention": "dense",
+  "rows": 4096,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_dense_4096.json",
+  "benchmark_version": 5,
+  "support": 3276,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "92 %, 13790 MiB, 2857 MHz, 263.04 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.34055089950561523,
+  "peak_reserved_gib": 0.447265625,
+  "median_fwd_s": 0.005335899069905281,
+  "min_fwd_s": 0.005213275901041925,
+  "max_fwd_s": 0.005843781982548535,
+  "median_bwd_s": 0.019033035961911082,
+  "min_bwd_s": 0.018228711909614503,
+  "max_bwd_s": 0.03291295107919723,
+  "median_total_s": 0.024876817944459617,
+  "min_total_s": 0.023564610979519784,
+  "max_total_s": 0.03812622698023915,
+  "records": [
+    {
+      "total_s": 0.03812622698023915,
+      "support": 3276,
+      "fwd_s": 0.005213275901041925,
+      "bwd_s": 0.03291295107919723
+    },
+    {
+      "total_s": 0.024876817944459617,
+      "support": 3276,
+      "fwd_s": 0.005843781982548535,
+      "bwd_s": 0.019033035961911082
+    },
+    {
+      "total_s": 0.023564610979519784,
+      "support": 3276,
+      "fwd_s": 0.005335899069905281,
+      "bwd_s": 0.018228711909614503
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 37.423990522976965,
+      "support": 3276
+    },
+    {
+      "total_s": 0.042168423999100924,
+      "support": 3276
+    }
+  ]
+}

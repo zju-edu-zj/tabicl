@@ -1,0 +1,6 @@
+job,status,scope,phase,rows,attention,partition,router,blocks,portable,compiled,median_ms,min_ms,max_ms,peak_gib
+train_dense_65536,ok,encoder,train,65536,dense,projection,centroid,12,False,True,2681.6521590808406,2643.195398966782,2813.3831820450723,3.4278173446655273
+train_global_65536,ok,encoder,train,65536,global,projection,centroid,12,False,True,224.7297529829666,198.53434001561254,369.27084892522544,3.0400562286376953
+train_global_sparse_alternating_65536,ok,encoder,train,65536,global_sparse_alternating,projection,centroid,12,False,True,623.1022230349481,433.609441970475,742.3368969466537,3.3502092361450195
+train_global_sparse_projection_65536,ok,encoder,train,65536,global_sparse,projection,centroid,12,False,True,585.7338350033388,493.7793000135571,830.1377989118919,3.4654555320739746
+train_global_sparse_content_tree_65536,ok,encoder,train,65536,global_sparse,content_tree,centroid,12,False,True,772.5265009794384,498.7298829946667,900.3883000696078,3.4658946990966797

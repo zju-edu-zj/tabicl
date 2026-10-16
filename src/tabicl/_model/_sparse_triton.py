@@ -12,16 +12,17 @@ import triton
 import triton.language as tl
 
 
-@triton.jit
+@triton.jit(do_not_specialize=["N", "S"])
 def _forward(
     Q,
     K,
     V,
     I,
+    ORDER,
     O,
     LSE,
-    N: tl.constexpr,
-    S: tl.constexpr,
+    N,
+    S,
     H: tl.constexpr,
     D: tl.constexpr,
     BS: tl.constexpr,
@@ -35,13 +36,15 @@ def _forward(
     r = tl.arange(0, C)
     d = tl.arange(0, D)
     blocks = tl.load(I + ((b * H + h) * N + t) * NC + r // BS, r < NC * BS, other=0)
-    pos = blocks * BS + r % BS
+    sorted_pos = blocks * BS + r % BS
+    valid_row = (r < NC * BS) & (sorted_pos < S)
+    pos = tl.load(ORDER + (b * H + h) * S + sorted_pos, valid_row, other=0)
     off = ((b * H + h) * S + pos[:, None]) * D + d[None, :]
-    key = tl.load(K + off, (r[:, None] < NC * BS) & (pos[:, None] < S), other=0).to(tl.float32)
-    value = tl.load(V + off, (r[:, None] < NC * BS) & (pos[:, None] < S), other=0).to(tl.float32)
+    key = tl.load(K + off, valid_row[:, None], other=0).to(tl.float32)
+    value = tl.load(V + off, valid_row[:, None], other=0).to(tl.float32)
     q = tl.load(Q + (((b * H + h) * N + t) * D + d)).to(tl.float32)
     logits = tl.sum(key * q[None, :], 1) * SCALE
-    logits = tl.where((r < NC * BS) & (pos < S), logits, -float("inf"))
+    logits = tl.where(valid_row, logits, -float("inf"))
     m = tl.max(logits, 0)
     ex = tl.exp(logits - m)
     z = tl.sum(ex, 0)
@@ -51,20 +54,21 @@ def _forward(
     tl.store(LSE + (b * H + h) * N + t, m + tl.log(z))
 
 
-@triton.jit
+@triton.jit(do_not_specialize=["N", "S"])
 def _backward(
     Q,
     K,
     V,
     I,
+    ORDER,
     O,
     LSE,
     DO,
     DQ,
     DK,
     DV,
-    N: tl.constexpr,
-    S: tl.constexpr,
+    N,
+    S,
     H: tl.constexpr,
     D: tl.constexpr,
     BS: tl.constexpr,
@@ -79,9 +83,11 @@ def _backward(
     r = tl.arange(0, C)
     d = tl.arange(0, D)
     blocks = tl.load(I + ((b * H + h) * N + t) * NC + r // BS, r < NC * BS, other=0)
-    pos = blocks * BS + r % BS
+    sorted_pos = blocks * BS + r % BS
+    valid_row = (r < NC * BS) & (sorted_pos < S)
+    pos = tl.load(ORDER + (b * H + h) * S + sorted_pos, valid_row, other=0)
     off = ((b * H + h) * S + pos[:, None]) * D + d[None, :]
-    valid = (r[:, None] < NC * BS) & (pos[:, None] < S)
+    valid = valid_row[:, None]
     key = tl.load(K + off, valid, other=0).to(tl.float32)
     value = tl.load(V + off, valid, other=0).to(tl.float32)
     qo = ((b * H + h) * N + t) * D + d
@@ -90,7 +96,7 @@ def _backward(
     out = tl.load(O + qo).to(tl.float32)
     lse = tl.load(LSE + (b * H + h) * N + t)
     score = tl.sum(key * q[None, :], 1) * SCALE
-    p = tl.where((r < NC * BS) & (pos < S), tl.exp(score - lse), 0.0)
+    p = tl.where(valid_row, tl.exp(score - lse), 0.0)
     dp = tl.sum(value * dout[None, :], 1)
     delta = tl.sum(out * dout, 0)
     ds = p * (dp - delta) * SCALE
@@ -101,9 +107,9 @@ def _backward(
         tl.atomic_add(DV + off, p[:, None] * dout[None, :], valid, sem="relaxed")
 
 
-@triton.jit
+@triton.jit(do_not_specialize=["EDGES", "N", "NK"])
 def _edge_count(
-    I, COUNTS, EDGES: tl.constexpr, N: tl.constexpr, NC: tl.constexpr, NK: tl.constexpr, TILE: tl.constexpr
+    I, COUNTS, EDGES, N, NC: tl.constexpr, NK, TILE: tl.constexpr
 ):
     edge = tl.program_id(0) * TILE + tl.arange(0, TILE)
     block = tl.load(I + edge, edge < EDGES, other=0)
@@ -111,16 +117,16 @@ def _edge_count(
     tl.atomic_add(COUNTS + key, 1, edge < EDGES, sem="relaxed")
 
 
-@triton.jit
+@triton.jit(do_not_specialize=["EDGES", "N", "NK"])
 def _edge_scatter(
     I,
     STARTS,
     CURSOR,
     REVERSE,
-    EDGES: tl.constexpr,
-    N: tl.constexpr,
+    EDGES,
+    N,
     NC: tl.constexpr,
-    NK: tl.constexpr,
+    NK,
     TILE: tl.constexpr,
 ):
     edge = tl.program_id(0) * TILE + tl.arange(0, TILE)
@@ -131,7 +137,7 @@ def _edge_scatter(
     tl.store(REVERSE + start + slot, edge // NC % N, edge < EDGES)
 
 
-@triton.jit
+@triton.jit(do_not_specialize=["N", "S", "NK"])
 def _backward_kv(
     Q,
     K,
@@ -141,12 +147,13 @@ def _backward_kv(
     DO,
     STARTS,
     REVERSE,
+    ORDER,
     DK,
     DV,
-    N: tl.constexpr,
-    S: tl.constexpr,
+    N,
+    S,
     D: tl.constexpr,
-    NK: tl.constexpr,
+    NK,
     BS: tl.constexpr,
     SCALE: tl.constexpr,
     BT: tl.constexpr = 32,
@@ -155,9 +162,11 @@ def _backward_kv(
     leaf, bh, tile = tl.program_id(0), tl.program_id(1), tl.program_id(2)
     r = leaf * BS + tile * BT + tl.arange(0, BT)
     d = tl.arange(0, D)
-    ko = (bh * S + r[:, None]) * D + d[None, :]
-    key = tl.load(K + ko, r[:, None] < S, other=0)
-    value = tl.load(V + ko, r[:, None] < S, other=0)
+    valid_row = r < S
+    original = tl.load(ORDER + bh * S + r, valid_row, other=0)
+    ko = (bh * S + original[:, None]) * D + d[None, :]
+    key = tl.load(K + ko, valid_row[:, None], other=0)
+    value = tl.load(V + ko, valid_row[:, None], other=0)
     start = tl.load(STARTS + bh * NK + leaf)
     end = tl.load(STARTS + bh * NK + leaf + 1)
     dk = tl.full((BT, D), 0, tl.float32)
@@ -172,19 +181,19 @@ def _backward_kv(
         lse = tl.load(LSE + bh * N + qi, offset < end, other=0)
         score = tl.dot(key, tl.trans(q)) * SCALE
         p = tl.exp(score - lse[None, :])
-        p = tl.where((r[:, None] < S) & (offset[None, :] < end), p, 0.0)
+        p = tl.where(valid_row[:, None] & (offset[None, :] < end), p, 0.0)
         dp = tl.dot(value, tl.trans(dout))
         delta = tl.sum(out * dout.to(tl.float32), axis=1)
         ds = p * (dp - delta[None, :]) * SCALE
         dk += tl.dot(ds.to(q.dtype), q)
         dv += tl.dot(p.to(dout.dtype), dout)
-    tl.store(DK + ko, dk, r[:, None] < S)
-    tl.store(DV + ko, dv, r[:, None] < S)
+    tl.store(DK + ko, dk, valid_row[:, None])
+    tl.store(DV + ko, dv, valid_row[:, None])
 
 
 class _RoutedAttention(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, q, k, v, indices, block_size):
+    def forward(ctx, q, k, v, order, indices, block_size):
         b, h, n, d = q.shape
         s = k.shape[2]
         nc = indices.shape[-1]
@@ -194,18 +203,19 @@ class _RoutedAttention(torch.autograd.Function):
         k = k.contiguous()
         v = v.contiguous()
         indices = indices.contiguous()
+        order = order.contiguous()
         output = torch.empty_like(q)
         lse = torch.empty((b, h, n), device=q.device, dtype=torch.float32)
         scale = d**-0.5
-        _forward[(n, h, b)](q, k, v, indices, output, lse, n, s, h, d, block_size, nc, c, scale, num_warps=8)
-        ctx.save_for_backward(q, k, v, indices, output, lse)
+        _forward[(n, h, b)](q, k, v, indices, order, output, lse, n, s, h, d, block_size, nc, c, scale, num_warps=8)
+        ctx.save_for_backward(q, k, v, order, indices, output, lse)
         ctx.args = (block_size, nc, c, scale)
         return output
 
     @staticmethod
     @once_differentiable
     def backward(ctx, dout):
-        q, k, v, indices, out, lse = ctx.saved_tensors
+        q, k, v, order, indices, out, lse = ctx.saved_tensors
         bs, nc, c, scale = ctx.args
         b, h, n, d = q.shape
         s = k.shape[2]
@@ -232,26 +242,28 @@ class _RoutedAttention(torch.autograd.Function):
             _edge_scatter[(triton.cdiv(edges, 256),)](indices, starts, cursor, reverse, edges, n, nc, nk, 256)
             dk, dv = torch.empty_like(k), torch.empty_like(v)
             _backward[(n, h, b)](
-                q, k, v, indices, out, lse, dout, dq, dk, dv, n, s, h, d, bs, nc, c, scale, True, num_warps=8
+                q, k, v, indices, order, out, lse, dout, dq, dk, dv, n, s, h, d, bs, nc, c, scale, True, num_warps=8
             )
             _backward_kv[(nk, b * h, triton.cdiv(bs, 32))](
-                q, k, v, out, lse, dout, starts, reverse, dk, dv, n, s, d, nk, bs, scale, num_warps=4
+                q, k, v, out, lse, dout, starts, reverse, order, dk, dv, n, s, d, nk, bs, scale, num_warps=4
             )
         else:
             accumulation_dtype = torch.float64 if k.dtype == torch.bfloat16 and s <= 512 else torch.float32
             dk = torch.zeros(k.shape, device=k.device, dtype=accumulation_dtype)
             dv = torch.zeros(v.shape, device=v.device, dtype=accumulation_dtype)
             _backward[(n, h, b)](
-                q, k, v, indices, out, lse, dout, dq, dk, dv, n, s, h, d, bs, nc, c, scale, num_warps=8
+                q, k, v, indices, order, out, lse, dout, dq, dk, dv, n, s, h, d, bs, nc, c, scale, num_warps=8
             )
-        return dq, dk.to(k.dtype), dv.to(v.dtype), None, None
+        return dq, dk.to(k.dtype), dv.to(v.dtype), None, None, None
 
 
-def routed_attention(q, k, v, indices, block_size):
+def routed_attention(q, k, v, order, indices, block_size):
     if q.shape[-1] not in (16, 32, 64, 128):
         raise ValueError("Triton routed attention supports head dimensions 16/32/64/128")
     if indices.ndim != 4 or indices.shape[:3] != q.shape[:3]:
         raise ValueError("Expected per-query/per-head block indices [B,H,N,K]")
     if indices.shape[-1] * block_size > 2048:
         raise ValueError("Triton routed attention supports at most 2048 candidate tokens")
-    return _RoutedAttention.apply(q, k, v, indices, block_size)
+    if order.dtype != torch.int32 or indices.dtype != torch.int32:
+        raise ValueError("Routing metadata must use int32")
+    return _RoutedAttention.apply(q, k, v, order, indices, block_size)

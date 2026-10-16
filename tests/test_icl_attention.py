@@ -12,18 +12,20 @@ from tabicl._model.kv_cache import KVCache
 
 
 @pytest.mark.parametrize("router", ["centroid", "hierarchical"])
+@pytest.mark.parametrize("partition", ["projection", "content_tree"])
 @pytest.mark.parametrize("mode", ["sparse", "fused_sparse", "fused_full"])
-@pytest.mark.parametrize("device,dtype", [("cpu", torch.float32), ("cuda", torch.float32), ("cuda", torch.bfloat16)])
-def test_selected_dense_mask_output_and_all_gradients(router, mode, device, dtype):
+@pytest.mark.parametrize("device,dtype", [("cpu", torch.float32), ("cuda", torch.float32),
+                                         ("cuda", torch.bfloat16), ("cuda", torch.float16)])
+def test_selected_dense_mask_output_and_all_gradients(router, partition, mode, device, dtype):
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")
     torch.manual_seed(454)
     module = SetRetrievalAttention(
-        64, 2, block_size=32, num_selected_blocks=2, router=router, router_beam=4, mode=mode
+        64, 2, block_size=32, num_selected_blocks=2, router=router, router_beam=4, mode=mode, partition=partition
     ).to(device)
     query = torch.randn(2, 37, 64, device=device, requires_grad=True)
     support = torch.randn(2, 193, 64, device=device, requires_grad=True)
-    with torch.autocast(device, dtype=torch.bfloat16, enabled=dtype == torch.bfloat16):
+    with torch.autocast(device, dtype=dtype, enabled=dtype != torch.float32):
         actual = module(query, support, support)
         q, k, v = module._project(query, support, support, None)
         order, chosen = module.route(q, k)
@@ -44,7 +46,7 @@ def test_selected_dense_mask_output_and_all_gradients(router, mode, device, dtyp
                 ).to(q.dtype)[..., None]
             sparse = gate * sparse + (1 - gate) * global_heads
         reference = module.out_proj(sparse.transpose(1, 2).reshape_as(query))
-    tolerance = 4e-3 if dtype == torch.bfloat16 else 4e-5
+    tolerance = 4e-3 if dtype == torch.bfloat16 else 1e-3 if dtype == torch.float16 else 4e-5
     torch.testing.assert_close(actual, reference, atol=tolerance, rtol=tolerance)
     variables = (query, support, *module.parameters())
     upstream = torch.randn_like(actual) / actual.numel() ** 0.5
@@ -54,19 +56,21 @@ def test_selected_dense_mask_output_and_all_gradients(router, mode, device, dtyp
         torch.testing.assert_close(
             grad,
             target,
-            atol=7e-4 if dtype == torch.bfloat16 else 3e-6,
-            rtol=0.04 if dtype == torch.bfloat16 else 3e-4,
+            atol=7e-4 if dtype == torch.bfloat16 else 2e-4 if dtype == torch.float16 else 3e-6,
+            rtol=0.04 if dtype == torch.bfloat16 else 0.01 if dtype == torch.float16 else 3e-4,
         )
 
 
 @pytest.mark.parametrize("router", ["centroid", "hierarchical"])
+@pytest.mark.parametrize("partition", ["projection", "content_tree"])
 @pytest.mark.parametrize("support", [1, 65, 193, 1025])
 @pytest.mark.parametrize("beam", [4, 5, 16])
-def test_cuda_routing_matches_portable_reference(router, support, beam):
+def test_cuda_routing_matches_portable_reference(router, partition, support, beam):
     if not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")
     torch.manual_seed(88)
-    module = SetRetrievalAttention(64, 2, block_size=32, num_selected_blocks=2, router=router, router_beam=beam).cuda()
+    module = SetRetrievalAttention(64, 2, block_size=32, num_selected_blocks=2, router=router,
+                                   router_beam=beam, partition=partition).cuda()
     q = torch.randn(2, 2, 67, 32, device="cuda")
     k = torch.randn(2, 2, support, 32, device="cuda")
     order, selected = module.route(q, k)
@@ -79,24 +83,42 @@ def test_cuda_routing_matches_portable_reference(router, support, beam):
 
 
 @pytest.mark.parametrize("router", ["centroid", "hierarchical"])
-def test_routing_permutations_and_query_batching(router):
+@pytest.mark.parametrize("partition", ["projection", "content_tree"])
+def test_routing_permutations_and_query_batching(router, partition):
     torch.manual_seed(89)
-    module = SetRetrievalAttention(32, 2, block_size=32, num_selected_blocks=2, router=router, router_beam=4)
+    module = SetRetrievalAttention(32, 2, block_size=32, num_selected_blocks=2, router=router,
+                                   router_beam=4, partition=partition)
     q, k = torch.randn(1, 2, 37, 16), torch.randn(1, 2, 193, 16)
     order, chosen = module.route(q, k)
     perm = torch.randperm(k.shape[2])
     order_perm, chosen_perm = module.route(q, k[:, :, perm])
-    torch.testing.assert_close(order, perm[order_perm])
+    torch.testing.assert_close(order, perm[order_perm.long()].to(order.dtype))
     torch.testing.assert_close(chosen, chosen_perm)
     pieces = [module.route(part, k)[1] for part in q.split([13, 24], dim=2)]
     torch.testing.assert_close(chosen, torch.cat(pieces, 2))
 
 
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+def test_nonfinite_content_scores_never_turn_padding_into_key_indices(device):
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA unavailable")
+    module = SetRetrievalAttention(32, 2, block_size=32, num_selected_blocks=2,
+                                   partition="content_tree").to(device)
+    k = torch.full((1, 2, 65, 16), float("nan"), device=device)
+    q = torch.randn(1, 2, 7, 16, device=device)
+    order, _ = module.route(q, k)
+    torch.testing.assert_close(
+        order.sort(-1).values,
+        torch.arange(65, device=device, dtype=torch.int32).expand_as(order),
+    )
+
+
 @pytest.mark.parametrize("mode", ICL_ATTENTION_TYPES)
+@pytest.mark.parametrize("partition", ["projection", "content_tree"])
 @pytest.mark.parametrize("norm_first", [True, False])
 @pytest.mark.parametrize("router", ["centroid", "hierarchical"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
-def test_multilayer_visibility_cache_and_permutations(mode, norm_first, router, device):
+def test_multilayer_visibility_cache_and_permutations(mode, partition, norm_first, router, device):
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")
     torch.manual_seed(90)
@@ -112,6 +134,7 @@ def test_multilayer_visibility_cache_and_permutations(mode, norm_first, router, 
             num_selected_blocks=2,
             router_beam=4,
             router=router,
+            partition=partition,
             norm_first=norm_first,
             zero_init=False,
         )
@@ -145,9 +168,11 @@ def test_hierarchy_exhaustive_beam_is_exact_centroid_topk():
 
 
 @pytest.mark.parametrize("mode", ICL_ATTENTION_TYPES)
-def test_checkpoint_replay_matches_uncheckpointed(mode):
+@pytest.mark.parametrize("partition", ["projection", "content_tree"])
+def test_checkpoint_replay_matches_uncheckpointed(mode, partition):
     torch.manual_seed(92)
-    m = Encoder(3, 32, 2, 64, attention_type=mode, block_size=32, num_selected_blocks=2, zero_init=False)
+    m = Encoder(3, 32, 2, 64, attention_type=mode, block_size=32, num_selected_blocks=2,
+                zero_init=False, partition=partition)
     other = copy.deepcopy(m)
     other.recompute = True
     x = torch.randn(1, 137, 32, requires_grad=True)
@@ -180,8 +205,10 @@ def test_grouped_sparse_backward_matches_masked_dense(dtype, head_dim, hotspot):
             (torch.full_like(ids[..., 0], 6), torch.zeros_like(ids[..., 0]), torch.ones_like(ids[..., 0])), -1
         )
     mask = (ids[..., None] == torch.arange(193, device="cuda") // 32).any(-2)
-    actual = routed_attention(q, k, v, ids, 32)
-    reference = F.scaled_dot_product_attention(q, k, v, attn_mask=mask)
+    order = torch.rand(2, 2, k.shape[-2], device="cuda").argsort(-1).to(torch.int32)
+    actual = routed_attention(q, k, v, order, ids.to(torch.int32), 32)
+    gather = order.long()[..., None].expand_as(k)
+    reference = F.scaled_dot_product_attention(q, k.gather(2, gather), v.gather(2, gather), attn_mask=mask)
     tolerance = 0.008 if dtype == torch.bfloat16 else 0.001
     torch.testing.assert_close(actual, reference, atol=tolerance, rtol=tolerance)
     upstream = torch.randn_like(actual) / 10
@@ -201,7 +228,7 @@ def test_long_support_checkpoint_preserves_sampled_diagnostics(router):
     q = torch.randn(1, 17, 32, requires_grad=True)
     k = torch.randn(1, 4101, 32, requires_grad=True)
     m.diagnostics_enabled = True
-    out = checkpoint(m, q, k, k, use_reentrant=False)
+    out = checkpoint(m, q, k, k, use_reentrant=False, context_fn=m.checkpoint_contexts)
     sampled = dict(m.last_diagnostics)
     out.square().mean().backward()
     assert sampled and m.last_diagnostics.keys() == sampled.keys()

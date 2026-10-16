@@ -1,0 +1,78 @@
+{
+  "attention": "global",
+  "rows": 4096,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "projection",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_global_4096.json",
+  "benchmark_version": 5,
+  "support": 3276,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "89 %, 13790 MiB, 2880 MHz, 257.89 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.3256974220275879,
+  "peak_reserved_gib": 0.447265625,
+  "median_fwd_s": 0.0068307589972391725,
+  "min_fwd_s": 0.006794353015720844,
+  "max_fwd_s": 0.007431152975186706,
+  "median_bwd_s": 0.017455591005273163,
+  "min_bwd_s": 0.01713684992864728,
+  "max_bwd_s": 0.021259544068016112,
+  "median_total_s": 0.024249944020994008,
+  "min_total_s": 0.023967608925886452,
+  "max_total_s": 0.028690697043202817,
+  "records": [
+    {
+      "total_s": 0.024249944020994008,
+      "support": 3276,
+      "fwd_s": 0.006794353015720844,
+      "bwd_s": 0.017455591005273163
+    },
+    {
+      "total_s": 0.023967608925886452,
+      "support": 3276,
+      "fwd_s": 0.0068307589972391725,
+      "bwd_s": 0.01713684992864728
+    },
+    {
+      "total_s": 0.028690697043202817,
+      "support": 3276,
+      "fwd_s": 0.007431152975186706,
+      "bwd_s": 0.021259544068016112
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 26.918878036085516,
+      "support": 3276
+    },
+    {
+      "total_s": 0.027690629940479994,
+      "support": 3276
+    }
+  ]
+}

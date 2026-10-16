@@ -1,0 +1,124 @@
+{
+  "attention": "global_sparse",
+  "rows": 16384,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "routing",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "content_tree",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 10,
+  "warmup": 3,
+  "dtype": "bfloat16",
+  "recompute": false,
+  "compile": false,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8,
+  "query_rows": 256,
+  "profile": null,
+  "output": "benchmarks/route_content_tree_radix_16k.json",
+  "benchmark_version": 5,
+  "support": 13107,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "83 %, 13790 MiB, 2865 MHz, 275.80 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.08981704711914062,
+  "peak_reserved_gib": 0.11328125,
+  "median_fwd_s": 0.0012018175330013037,
+  "min_fwd_s": 0.0011671721003949642,
+  "max_fwd_s": 0.001237203017808497,
+  "median_bwd_s": 3.4365220926702023e-06,
+  "min_bwd_s": 3.053923137485981e-06,
+  "max_bwd_s": 3.526918590068817e-06,
+  "median_total_s": 0.001205266045872122,
+  "min_total_s": 0.0011704110074788332,
+  "max_total_s": 0.0012403869768604636,
+  "records": [
+    {
+      "total_s": 0.001217470970004797,
+      "support": 13107,
+      "fwd_s": 0.0012139440514147282,
+      "bwd_s": 3.526918590068817e-06
+    },
+    {
+      "total_s": 0.0012403869768604636,
+      "support": 13107,
+      "fwd_s": 0.001237203017808497,
+      "bwd_s": 3.183959051966667e-06
+    },
+    {
+      "total_s": 0.0012018850538879633,
+      "support": 13107,
+      "fwd_s": 0.0011983970180153847,
+      "bwd_s": 3.488035872578621e-06
+    },
+    {
+      "total_s": 0.0011886860011145473,
+      "support": 13107,
+      "fwd_s": 0.0011856320779770613,
+      "bwd_s": 3.053923137485981e-06
+    },
+    {
+      "total_s": 0.0011704110074788332,
+      "support": 13107,
+      "fwd_s": 0.0011671721003949642,
+      "bwd_s": 3.2389070838689804e-06
+    },
+    {
+      "total_s": 0.0011996360262855887,
+      "support": 13107,
+      "fwd_s": 0.0011961680138483644,
+      "bwd_s": 3.468012437224388e-06
+    },
+    {
+      "total_s": 0.0012281719828024507,
+      "support": 13107,
+      "fwd_s": 0.0012248900020495057,
+      "bwd_s": 3.2819807529449463e-06
+    },
+    {
+      "total_s": 0.0011976539390161633,
+      "support": 13107,
+      "fwd_s": 0.001194161013700068,
+      "bwd_s": 3.492925316095352e-06
+    },
+    {
+      "total_s": 0.0012086470378562808,
+      "support": 13107,
+      "fwd_s": 0.0012052380479872227,
+      "bwd_s": 3.408989869058132e-06
+    },
+    {
+      "total_s": 0.0012211150024086237,
+      "support": 13107,
+      "fwd_s": 0.0012176509480923414,
+      "bwd_s": 3.4640543162822723e-06
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 0.35724560800008476,
+      "support": 13107
+    },
+    {
+      "total_s": 0.0015783420531079173,
+      "support": 13107
+    },
+    {
+      "total_s": 0.0012769639724865556,
+      "support": 13107
+    }
+  ]
+}

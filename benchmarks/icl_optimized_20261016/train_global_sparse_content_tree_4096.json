@@ -1,0 +1,78 @@
+{
+  "attention": "global_sparse",
+  "rows": 4096,
+  "blocks": 12,
+  "nhead": 8,
+  "scope": "encoder",
+  "phase": "train",
+  "router": "centroid",
+  "router_beam": 16,
+  "partition": "content_tree",
+  "block_size": 128,
+  "selected_blocks": 4,
+  "sparse_every": 3,
+  "repeat": 3,
+  "warmup": 2,
+  "dtype": "bfloat16",
+  "recompute": true,
+  "compile": true,
+  "portable": false,
+  "vary_support": false,
+  "memory_limit_gib": 8.0,
+  "query_rows": 256,
+  "profile": null,
+  "output": "/home/zj/table_foundation/exploration/repos/tabicl/benchmarks/icl_optimized_20261016/train_global_sparse_content_tree_4096.json",
+  "benchmark_version": 5,
+  "support": 3276,
+  "torch": "2.9.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "memory_free_gib": 17.8896484375,
+  "allow_tf32": true,
+  "seed": 123,
+  "optimizer_step": false,
+  "flash_attn3_available": false,
+  "gpu_state": "91 %, 13790 MiB, 2865 MHz, 328.03 W",
+  "status": "ok",
+  "finite": true,
+  "peak_allocated_gib": 0.3688521385192871,
+  "peak_reserved_gib": 0.41015625,
+  "median_fwd_s": 0.014402306056581438,
+  "min_fwd_s": 0.011935746995732188,
+  "max_fwd_s": 0.016506363986991346,
+  "median_bwd_s": 0.030019387020729482,
+  "min_bwd_s": 0.026548405061475933,
+  "max_bwd_s": 0.039861632976680994,
+  "median_total_s": 0.04652575100772083,
+  "min_total_s": 0.03848415205720812,
+  "max_total_s": 0.05426393903326243,
+  "records": [
+    {
+      "total_s": 0.05426393903326243,
+      "support": 3276,
+      "fwd_s": 0.014402306056581438,
+      "bwd_s": 0.039861632976680994
+    },
+    {
+      "total_s": 0.04652575100772083,
+      "support": 3276,
+      "fwd_s": 0.016506363986991346,
+      "bwd_s": 0.030019387020729482
+    },
+    {
+      "total_s": 0.03848415205720812,
+      "support": 3276,
+      "fwd_s": 0.011935746995732188,
+      "bwd_s": 0.026548405061475933
+    }
+  ],
+  "warmup_records": [
+    {
+      "total_s": 1.217796940007247,
+      "support": 3276
+    },
+    {
+      "total_s": 0.04797237797174603,
+      "support": 3276
+    }
+  ]
+}

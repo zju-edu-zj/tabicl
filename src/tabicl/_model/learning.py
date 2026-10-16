@@ -92,6 +92,8 @@ class ICLearning(nn.Module):
         query_chunk_size: int = 64,
         router: str = "centroid",
         router_beam: int = 16,
+        partition: str = "projection",
+        qk_norm: bool = False,
     ):
         super().__init__()
 
@@ -117,6 +119,8 @@ class ICLearning(nn.Module):
             query_chunk_size=query_chunk_size,
             router=router,
             router_beam=router_beam,
+            partition=partition,
+            qk_norm=qk_norm,
         )
         if self.norm_first:
             self.ln = nn.LayerNorm(d_model, bias=not bias_free_ln)

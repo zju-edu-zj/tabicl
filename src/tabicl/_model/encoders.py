@@ -96,6 +96,8 @@ class Encoder(nn.Module):
         query_chunk_size: int = 64,
         router: str = "centroid",
         router_beam: int = 16,
+        partition: str = "projection",
+        qk_norm: bool = False,
     ):
         super().__init__()
 
@@ -109,6 +111,8 @@ class Encoder(nn.Module):
             raise ValueError(f"attention_type must be one of {ICL_ATTENTION_TYPES}; got {attention_type!r}")
         if attention_type != "dense" and ssmax not in (False, "none"):
             raise ValueError("Non-dense ICL experiments require ssmax=False")
+        if qk_norm and ssmax not in (False, "none"):
+            raise ValueError("ICL QK normalization and SSMax cannot be enabled together")
         if attention_type != "dense" and dropout:
             raise ValueError("Non-dense ICL experiments currently require dropout=0")
         self.attention_type = attention_type
@@ -142,6 +146,8 @@ class Encoder(nn.Module):
                     query_chunk_size=query_chunk_size,
                     router=router,
                     router_beam=router_beam,
+                    partition=partition,
+                    qk_norm=qk_norm,
                 )
                 for layer_attention in self.block_types
             ]
@@ -175,7 +181,10 @@ class Encoder(nn.Module):
         for block in self.blocks:
             if self.recompute:
                 kwargs = {"train_size": train_size, "rope": self.rope}
-                out = checkpoint(partial(block, **kwargs), out, use_reentrant=False)
+                checkpoint_args = {}
+                if hasattr(block.attn, "checkpoint_contexts"):
+                    checkpoint_args["context_fn"] = block.attn.checkpoint_contexts
+                out = checkpoint(partial(block, **kwargs), out, use_reentrant=False, **checkpoint_args)
             else:
                 out = block(q=out, train_size=train_size, rope=self.rope)
 
