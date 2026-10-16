@@ -1,10 +1,9 @@
 import pytest
 import torch
 from tabicl._model.layers import GlobalLinearAttention
-from tabicl._model.icl_alternatives import PerformerLinearAttention
 
 
-@pytest.mark.parametrize("cls", [GlobalLinearAttention, PerformerLinearAttention])
+@pytest.mark.parametrize("cls", [GlobalLinearAttention])
 def test_kernel_attention_matches_explicit_kernel_and_gradients(cls):
     torch.manual_seed(42)
     module = cls(32, 4, ssmax=True)
@@ -24,7 +23,7 @@ def test_kernel_attention_matches_explicit_kernel_and_gradients(cls):
         assert torch.allclose(actual, expected, atol=1e-6, rtol=1e-4)
 
 
-@pytest.mark.parametrize("cls", [GlobalLinearAttention, PerformerLinearAttention])
+@pytest.mark.parametrize("cls", [GlobalLinearAttention])
 def test_kernel_diagnostics_and_support_permutation(cls):
     torch.manual_seed(43)
     module = cls(32, 4).eval()
@@ -36,16 +35,3 @@ def test_kernel_diagnostics_and_support_permutation(cls):
     assert not module.diagnostics_enabled
     permutation = torch.randperm(k.shape[1])
     assert torch.allclose(output, module(q, k[:, permutation], k[:, permutation]), atol=1e-5, rtol=1e-4)
-
-
-def test_performer_additional_features_have_independent_directions():
-    torch.manual_seed(44)
-    module = PerformerLinearAttention(32, 4, num_features=24)
-    directions = torch.nn.functional.normalize(module.feature_matrix, dim=-1)
-    identity = torch.eye(8).expand(4, -1, -1)
-    assert torch.allclose(directions[:, :8] @ directions[:, :8].transpose(-1, -2),
-                          identity, atol=1e-5)
-    # The second block is neither repeated nor just a permutation of the first.
-    overlap = (directions[:, :8] @ directions[:, 8:16].transpose(-1, -2)).abs()
-    assert overlap.max() < 0.99
-    assert module.feature_matrix.norm(dim=-1).std() > 0.1

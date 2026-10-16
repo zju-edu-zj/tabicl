@@ -358,7 +358,6 @@ class SupportAttention(nn.Module):
             return output, k, v
         return output
 
-
 class GlobalLinearAttention(SupportAttention):
     """Pure non-causal kernel attention without a sparse residual."""
 
@@ -374,6 +373,8 @@ class GlobalLinearAttention(SupportAttention):
         self.diagnostic_queries = 16
         self.diagnostic_topk = 32
         self.last_diagnostics = {}
+        self.recompute_kernel_backward = True
+        self.kernel_recompute_min_support = 4096
 
     @staticmethod
     def _feature_map(x):
@@ -382,6 +383,26 @@ class GlobalLinearAttention(SupportAttention):
     def _global_attention(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
         # Positive ELU features make the denominator well-defined. Accumulate
         # in fp32 to avoid long-context cancellation under AMP.
+        if (self.recompute_kernel_backward
+                and k.shape[-2] > self.kernel_recompute_min_support):
+            from ._elu_kernel import elu_kernel_attention
+            out = elu_kernel_attention(q, k, v)
+            if self.diagnostics_enabled:
+                # Diagnostics must not switch the autograd implementation:
+                # checkpoint replay consumes the flag after the first forward.
+                with torch.no_grad(), torch.autocast(device_type=q.device.type, enabled=False):
+                    phi_q, phi_k = self._feature_map(q), self._feature_map(k)
+                    raw_normalizer = (phi_q * phi_k.sum(-2).unsqueeze(-2)).sum(-1)
+                    self.last_diagnostics = {
+                        "denominator_min": raw_normalizer.min(),
+                        "denominator_clamp_fraction": (raw_normalizer < 1e-6).float().mean(),
+                        "feature_min": torch.minimum(phi_q.min(), phi_k.min()),
+                        "feature_max": torch.maximum(phi_q.max(), phi_k.max()),
+                        "output_rms": out.float().square().mean().sqrt(),
+                        "nonfinite_fraction": (~torch.isfinite(out)).float().mean(),
+                    }
+                self.diagnostics_enabled = False
+            return out
         with torch.autocast(device_type=q.device.type, enabled=False):
             phi_q = self._feature_map(q)
             phi_k = self._feature_map(k)
@@ -467,12 +488,11 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         ssmax: Union[bool, str] = False,
         zero_init: bool = True,
         attention_type: str = "dense",
-        induced_num_slots: int = 64,
-        flex_block_size: int = 128,
-        flex_num_kv_blocks: int = 4,
-        flex_qk_norm: bool = False,
-        flex_scale_mode: str = "auto",
-        linear_num_features: int = 64,
+        block_size: int = 128,
+        num_selected_blocks: int = 4,
+        query_chunk_size: int = 64,
+        router: str = "centroid",
+        router_beam: int = 16,
     ):
         super().__init__(
             d_model, nhead, dim_feedforward, dropout, activation=activation, norm_first=norm_first, batch_first=True
@@ -484,30 +504,18 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         del self.self_attn
         if attention_type == "dense":
             self.attn = MultiheadAttention(d_model, nhead, dropout, ssmax)
-        elif attention_type == "linear":
-            from .icl_alternatives import PerformerLinearAttention
-
-            self.attn = PerformerLinearAttention(
-                d_model, nhead, dropout, False, num_features=linear_num_features,
-            )
-        elif attention_type == "elu_linear":
+        elif attention_type == "global":
             self.attn = GlobalLinearAttention(
                 d_model, nhead, dropout, False,
             )
-        elif attention_type in ("induced", "flex_sparse"):
-            # Lazy import avoids a module cycle: both implementations reuse the
-            # projection and support-prefix logic defined above.
-            from .icl_alternatives import FlexBlockSparseAttention, InducedSetAttention
+        elif attention_type in ("sparse", "fused_sparse", "fused_full"):
+            from .icl_attention import SetRetrievalAttention
 
-            cls = InducedSetAttention if attention_type == "induced" else FlexBlockSparseAttention
-            if attention_type == "induced":
-                self.attn = cls(d_model, nhead, dropout, ssmax, num_slots=induced_num_slots)
-            else:
-                self.attn = cls(
-                    d_model, nhead, dropout, ssmax,
-                    block_size=flex_block_size, num_kv_blocks=flex_num_kv_blocks,
-                    qk_norm=flex_qk_norm, scale_mode=flex_scale_mode,
-                )
+            self.attn = SetRetrievalAttention(
+                d_model, nhead, dropout, False, mode=attention_type,
+                block_size=block_size, num_selected_blocks=num_selected_blocks,
+                query_chunk_size=query_chunk_size, router=router, router_beam=router_beam,
+            )
         else:
             raise ValueError(f"Unknown attention_type: {attention_type}")
         if zero_init:
@@ -637,7 +645,7 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
                 )
             else:
                 attn_result = self._attn_block(
-                    q, k, v, key_padding_mask=key_padding_mask, attn_mask=attn_mask, rope=rope, need_kv=need_kv
+                    q, k, v, key_padding_mask=key_padding_mask, attn_mask=attn_mask, rope=rope, need_kv=need_kv,
                 )
 
                 if need_kv and isinstance(attn_result, tuple):

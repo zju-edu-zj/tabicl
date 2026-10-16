@@ -14,7 +14,7 @@ def _logn(n: int | torch.Tensor, device: torch.device, dtype: torch.dtype) -> to
 
 
 def _length_input(q, n):
-    """Scalar or per-row (B,T) log-length input for length MLPs."""
+    """Scalar, per-row (B,T), or per-head/row (B,H,T) log lengths."""
     logn = _logn(n, q.device, q.dtype)
     return logn.reshape(1, 1) if logn.ndim == 0 else logn.unsqueeze(-1)
 
@@ -23,6 +23,12 @@ def _head_scales(scales, q, num_heads, elementwise):
     width = q.shape[-1] if elementwise else 1
     if scales.ndim == 2:
         return scales.view(1, num_heads, 1, width)
+    if scales.ndim == 4:
+        # Each length produces all head outputs; take the output belonging to
+        # that length's head, preserving gradients into the existing MLP.
+        scales = scales.reshape(q.shape[0], num_heads, q.shape[-2], num_heads, width)
+        heads = torch.arange(num_heads, device=q.device).view(1, num_heads, 1, 1, 1)
+        return scales.gather(3, heads.expand(q.shape[0], num_heads, q.shape[-2], 1, width)).squeeze(3)
     return scales.view(q.shape[0], q.shape[-2], num_heads, width).transpose(1, 2)
 
 
@@ -60,7 +66,9 @@ class SSMax(nn.Module):
             Scaled query tensor, same shape as ``q``.
         """
         logn = _logn(n, q.device, q.dtype)
-        if logn.ndim:
+        if logn.ndim == 3:
+            logn = logn[..., None]
+        elif logn.ndim:
             logn = logn[:, None, :, None]
         scales = self.scales.view(1, -1, 1, 1) * logn
         return q * scales

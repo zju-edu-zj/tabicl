@@ -87,12 +87,11 @@ class ICLearning(nn.Module):
         recompute: bool = False,
         attention_type: str = "dense",
         sparse_every: int = 3,
-        induced_num_slots: int = 64,
-        flex_block_size: int = 128,
-        flex_num_kv_blocks: int = 4,
-        flex_qk_norm: bool = False,
-        flex_scale_mode: str = "auto",
-        linear_num_features: int = 64,
+        block_size: int = 128,
+        num_selected_blocks: int = 4,
+        query_chunk_size: int = 64,
+        router: str = "centroid",
+        router_beam: int = 16,
     ):
         super().__init__()
 
@@ -113,12 +112,11 @@ class ICLearning(nn.Module):
             recompute=recompute,
             attention_type=attention_type,
             sparse_every=sparse_every,
-            induced_num_slots=induced_num_slots,
-            flex_block_size=flex_block_size,
-            flex_num_kv_blocks=flex_num_kv_blocks,
-            flex_qk_norm=flex_qk_norm,
-            flex_scale_mode=flex_scale_mode,
-            linear_num_features=linear_num_features,
+            block_size=block_size,
+            num_selected_blocks=num_selected_blocks,
+            query_chunk_size=query_chunk_size,
+            router=router,
+            router_beam=router_beam,
         )
         if self.norm_first:
             self.ln = nn.LayerNorm(d_model, bias=not bias_free_ln)

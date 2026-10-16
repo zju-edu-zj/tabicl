@@ -314,44 +314,28 @@ def build_parser():
     # ICL Config
     parser.add_argument("--icl_num_blocks", type=int, default=12, help="Number of transformer blocks in ICL predictor")
     parser.add_argument("--icl_nhead", type=int, default=4, help="Number of attention heads in ICL predictor")
-    parser.add_argument(
-        "--icl_attention",
-        type=str,
-        default="elu_linear_flex",
-        choices=("dense", "linear", "elu_linear", "linear_flex", "elu_linear_flex", "induced", "linear_induced", "flex_sparse", "induced_flex"),
-        help="ICL attention: pure linear; alternating linear/induced-set softmax; "
-        "induced-set/FlexAttention hybrid; or experimental content-sorted FlexAttention block sparsity. "
-        "linear_flex alternates Performer linear and Flex block-sparse layers; "
-        "elu_linear_flex alternates the normalized ELU+1 linear kernel and Flex. "
-        "Linear operators ignore icl_ssmax; Flex scaling has separate controls.",
-    )
-    parser.add_argument(
-        "--icl_sparse_every",
-        type=int,
-        default=3,
-        help="For linear_induced, linear_flex, elu_linear_flex or induced_flex, replace every Nth ICL layer.",
-    )
-    parser.add_argument("--icl_induced_num_slots", type=int, default=64,
-                        help="Number of learned support summary slots in induced attention.")
-    parser.add_argument("--icl_flex_block_size", type=int, default=128,
-                        help="FlexAttention query/KV block size; CUDA kernels generally require 128 alignment.")
-    parser.add_argument("--icl_flex_num_kv_blocks", type=int, default=4,
-                        help="Number of sorted support blocks selected independently by each query in FlexAttention.")
-    parser.add_argument("--icl_flex_qk_norm", type=str2bool, default=True,
-                        help="Normalize each Flex Q/K head by RMS (V is unchanged).")
-    parser.add_argument("--icl_flex_scale_mode", choices=("auto", "none", "ssmax", "bounded"), default="bounded",
-                        help="Flex temperature: bounded positive per-head log(candidate count) scaling; "
-                             "ssmax uses icl_ssmax/ssmax_type; auto follows icl_ssmax.")
+    from tabicl._model.icl_attention import ICL_ATTENTION_TYPES
+    parser.add_argument("--icl_attention", choices=ICL_ATTENTION_TYPES, default="global_sparse",
+                        help="Dense, ELU global, or global with periodic full/sparse retrieval layers.")
+    parser.add_argument("--icl_sparse_every", type=int, default=3,
+                        help="Every Nth hybrid layer uses retrieval (1-based).")
+    parser.add_argument("--icl_block_size", type=int, default=128,
+                        help="Power-of-two support leaf size.")
+    parser.add_argument("--icl_num_selected_blocks", type=int, default=4,
+                        help="Selected support leaves per query and head.")
+    parser.add_argument("--icl_query_chunk_size", type=int, default=64,
+                        help="Query chunk size for the portable gathered-attention fallback.")
+    parser.add_argument("--icl_router", choices=("centroid", "hierarchical"), default="centroid")
+    parser.add_argument("--icl_router_beam", type=int, default=16,
+                        help="Hierarchy search width, independently of the final selected block budget.")
     parser.add_argument("--icl_diagnostics_every", type=int, default=200,
                         help="Diagnose first microbatch every N steps; 0 disables sampling.")
     parser.add_argument("--icl_diagnostic_queries", type=int, default=16,
                         help="Sampled rows in one dataset per attention layer for diagnostics.")
     parser.add_argument("--icl_diagnostic_topk", type=int, default=32,
-                        help="Exact per-head top-k used for Flex candidate recall diagnostics.")
+                        help="Exact per-head top-k used for retrieval candidate recall diagnostics.")
     parser.add_argument("--fail_fast", type=str2bool, default=False,
                         help="Stop on OOM, non-finite loss/gradients/diagnostics instead of skipping bad microbatches.")
-    parser.add_argument("--icl_linear_num_features", type=int, default=64,
-                        help="Number of fixed positive random features used by FAVOR+ linear attention.")
     parser.add_argument(
         "--icl_ssmax",
         default=False,

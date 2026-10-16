@@ -148,6 +148,23 @@ class TabICL(nn.Module):
 
     recompute : bool, default=False
         If True, uses gradient checkpointing to save memory at the cost of additional computation.
+
+    icl_attention : str, default="dense"
+        One of dense, global, global_full, global_sparse_alternating, global_sparse.
+        Non-dense recipes require icl_ssmax=False and dropout=0. See docs/icl_attention.md.
+
+    icl_sparse_every : int, default=3
+        Every Nth hybrid layer uses full or sparse retrieval; other layers use the global summary.
+
+    icl_block_size, icl_num_selected_blocks : int, default=128, 4
+        Content-sorted support leaf size and selected leaves per query/head.
+
+    icl_router, icl_router_beam : str, int, default="centroid", 16
+        Exact leaf-centroid top-k or approximate hierarchical beam search.
+        The beam controls search width independently of the selected leaf budget.
+
+    icl_query_chunk_size : int, default=64
+        Query workspace chunk size for the portable gathered-SDPA fallback.
     """
 
     def __init__(
@@ -200,12 +217,12 @@ class TabICL(nn.Module):
         recompute: bool = False,
         icl_attention: str = "dense",
         icl_sparse_every: int = 3,
-        icl_induced_num_slots: int = 64,
-        icl_flex_block_size: int = 128,
-        icl_flex_num_kv_blocks: int = 4,
-        icl_flex_qk_norm: bool = False,
-        icl_flex_scale_mode: str = "auto",
-        icl_linear_num_features: int = 64,
+        icl_block_size: int = 128,
+        icl_num_selected_blocks: int = 4,
+        icl_query_chunk_size: int = 64,
+        icl_router: str = "centroid",
+        icl_router_beam: int = 16,
+        icl_attention_impl_version: int = 3,
     ):
         super().__init__()
         icl_dim = embed_dim * row_num_cls  # CLS tokens are concatenated for ICL
@@ -245,13 +262,14 @@ class TabICL(nn.Module):
         self.bias_free_ln = bias_free_ln
         self.zero_init = zero_init
         self.icl_attention = icl_attention
+        if icl_attention != "dense" and icl_attention_impl_version != 3:
+            raise ValueError("ICL experiments require implementation version 3; start a new experimental run")
         self.icl_sparse_every = icl_sparse_every
-        self.icl_induced_num_slots = icl_induced_num_slots
-        self.icl_flex_block_size = icl_flex_block_size
-        self.icl_flex_num_kv_blocks = icl_flex_num_kv_blocks
-        self.icl_flex_qk_norm = icl_flex_qk_norm
-        self.icl_flex_scale_mode = icl_flex_scale_mode
-        self.icl_linear_num_features = icl_linear_num_features
+        self.icl_block_size = icl_block_size
+        self.icl_num_selected_blocks = icl_num_selected_blocks
+        self.icl_query_chunk_size = icl_query_chunk_size
+        self.icl_router = icl_router
+        self.icl_router_beam = icl_router_beam
 
         self.col_embedder = ColEmbedding(
             embed_dim=embed_dim,
@@ -306,12 +324,11 @@ class TabICL(nn.Module):
             recompute=recompute,
             attention_type=icl_attention,
             sparse_every=icl_sparse_every,
-            induced_num_slots=icl_induced_num_slots,
-            flex_block_size=icl_flex_block_size,
-            flex_num_kv_blocks=icl_flex_num_kv_blocks,
-            flex_qk_norm=icl_flex_qk_norm,
-            flex_scale_mode=icl_flex_scale_mode,
-            linear_num_features=icl_linear_num_features,
+            block_size=icl_block_size,
+            num_selected_blocks=icl_num_selected_blocks,
+            query_chunk_size=icl_query_chunk_size,
+            router=icl_router,
+            router_beam=icl_router_beam,
         )
 
         # KV cache for efficient inference

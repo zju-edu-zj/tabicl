@@ -276,13 +276,13 @@ class Trainer:
             "icl_num_blocks": self.config.icl_num_blocks,
             "icl_nhead": self.config.icl_nhead,
             "icl_attention": self.config.icl_attention,
+            "icl_attention_impl_version": 3,
             "icl_sparse_every": self.config.icl_sparse_every,
-            "icl_induced_num_slots": self.config.icl_induced_num_slots,
-            "icl_flex_block_size": self.config.icl_flex_block_size,
-            "icl_flex_num_kv_blocks": self.config.icl_flex_num_kv_blocks,
-            "icl_flex_qk_norm": self.config.icl_flex_qk_norm,
-            "icl_flex_scale_mode": self.config.icl_flex_scale_mode,
-            "icl_linear_num_features": self.config.icl_linear_num_features,
+            "icl_block_size": self.config.icl_block_size,
+            "icl_num_selected_blocks": self.config.icl_num_selected_blocks,
+            "icl_query_chunk_size": self.config.icl_query_chunk_size,
+            "icl_router": self.config.icl_router,
+            "icl_router_beam": self.config.icl_router_beam,
             "icl_ssmax": self.config.ssmax_type if self.config.icl_ssmax else False,
             "ff_factor": self.config.ff_factor,
             "dropout": self.config.dropout,
@@ -514,23 +514,26 @@ class Trainer:
         if "state_dict" not in checkpoint:
             raise ValueError("Checkpoint does not contain model state")
 
-        # Normalization/routing flags can alter behavior without changing any
-        # parameter shape. Reject accidental changes during curriculum resumes.
+        # Reject semantic architecture changes even when parameter shapes match.
         stored = checkpoint.get("config", {})
-        defaults = {"icl_attention": "dense", "icl_flex_qk_norm": False,
-                    "icl_flex_scale_mode": "auto", "icl_sparse_every": 3,
-                    "icl_flex_block_size": 128, "icl_flex_num_kv_blocks": 4}
-        keys = ["icl_attention"]
-        if "flex" in self.model_config["icl_attention"]:
-            keys.extend(k for k in defaults if k != "icl_attention")
+        mode = self.model_config["icl_attention"]
+        if mode != "dense" and stored.get("icl_attention_impl_version") != 3:
+            raise ValueError("Experimental checkpoint requires ICL implementation version 3; "
+                             "start a new checkpoint directory")
+        defaults = {"icl_attention": "dense", "icl_sparse_every": 3,
+                    "icl_block_size": 128, "icl_num_selected_blocks": 4,
+                    "icl_router": "centroid", "icl_router_beam": 16,
+                    "icl_ssmax": False}
+        keys = ["icl_attention", "icl_ssmax"]
+        if mode in ("global_full", "global_sparse", "global_sparse_alternating"):
+            keys.append("icl_sparse_every")
+        if mode in ("global_sparse", "global_sparse_alternating"):
+            keys.extend(("icl_block_size", "icl_num_selected_blocks", "icl_router"))
+            if self.model_config.get("icl_router") == "hierarchical":
+                keys.append("icl_router_beam")
         for key in keys:
             previous = stored.get(key, defaults[key])
-            requested = self.model_config[key]
-            if key == "icl_flex_scale_mode":
-                if previous == "auto":
-                    previous = "ssmax" if stored.get("icl_ssmax", False) else "none"
-                if requested == "auto":
-                    requested = "ssmax" if self.model_config.get("icl_ssmax", False) else "none"
+            requested = self.model_config.get(key, defaults[key])
             if previous != requested:
                 raise ValueError(f"Checkpoint {key}={previous!r}, requested {requested!r}; "
                                  "resume with the same architecture or use a new checkpoint directory")

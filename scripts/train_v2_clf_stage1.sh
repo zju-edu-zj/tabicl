@@ -21,8 +21,8 @@ set -euo pipefail
 # unlike the regressor, which uses bias-free LayerNorm (--norm_type layernorm_nobias).
 # v2 uses standard residual init (--zero_init False; v1 zero-initializes residual
 # branches) and enables FlashAttention-3 only in stages 2 & 3 (--use_flash_attn3).
-# Experimental recipe: ELU+1 global layers, every third layer Flex sparse.
-# See docs/icl_attention.md for normalization, diagnostics and ablations.
+# Experimental recipe: ELU+1 global layers; every third layer fuses global
+# and per-query/per-head selected-row softmax. See docs/icl_attention.md.
 #
 # Adjust the placeholder paths and --nproc_per_node / --n_jobs for your hardware.
 
