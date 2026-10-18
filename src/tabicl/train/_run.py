@@ -337,6 +337,11 @@ class Trainer:
             for param in model.icl_predictor.parameters():
                 param.requires_grad = False
 
+        # Keep the eager module as the canonical model for checkpoints and
+        # rank-zero validation. The compiled wrapper shares the same parameters
+        # but prefixes state_dict keys with ``_orig_mod.``.
+        self.raw_model = model
+
         # Compile model if requested
         if self.config.model_compile:
             model = torch.compile(model, dynamic=True)
@@ -346,10 +351,8 @@ class Trainer:
         # Wrap model into DDP container if using distributed training
         if self.ddp:
             self.model = DDP(model, device_ids=[self.ddp_local_rank], broadcast_buffers=False)
-            self.raw_model = self.model.module
         else:
             self.model = model
-            self.raw_model = model
 
     def configure_prior(self):
         """Set up a tabular dataset generator for synthetic data during training."""
@@ -567,7 +570,15 @@ class Trainer:
             if previous != requested:
                 raise ValueError(f"Checkpoint {key}={previous!r}, requested {requested!r}; "
                                  "resume with the same architecture or use a new checkpoint directory")
-        self.raw_model.load_state_dict(checkpoint["state_dict"])
+        state_dict = checkpoint["state_dict"]
+        if state_dict and all(name.startswith("_orig_mod.") for name in state_dict):
+            # Checkpoints written by older compiled runs used the wrapper's
+            # state_dict. Accept them while writing canonical eager keys below.
+            state_dict = {
+                name.removeprefix("_orig_mod."): value
+                for name, value in state_dict.items()
+            }
+        self.raw_model.load_state_dict(state_dict)
 
         # Optionally load optimizer and scheduler state
         if self.config.only_load_model:
@@ -853,6 +864,7 @@ class Trainer:
         diagnose = (self.master_process and micro_batch_idx == 0 and interval > 0
                     and (self.curr_step == 0 or (self.curr_step + 1) % interval == 0))
         core_model = self.model.module if self.ddp else self.model
+        core_model = getattr(core_model, "_orig_mod", core_model)
         diagnostic_modules = []
         for name, module in core_model.icl_predictor.named_modules():
             if hasattr(module, "diagnostics_enabled"):

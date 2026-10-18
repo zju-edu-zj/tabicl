@@ -293,7 +293,15 @@ class MultiheadAttention(nn.MultiheadAttention):
 class SupportAttention(nn.Module):
     """Shared projections and support-prefix cache for non-dense ICL operators."""
 
-    def __init__(self, embed_dim, num_heads, dropout=0.0, ssmax=False, qk_norm=False):
+    def __init__(
+        self,
+        embed_dim,
+        num_heads,
+        dropout=0.0,
+        ssmax=False,
+        qk_norm=False,
+        qk_length_scale=True,
+    ):
         super().__init__()
         if embed_dim % num_heads:
             raise ValueError("embed_dim must be divisible by num_heads")
@@ -307,7 +315,15 @@ class SupportAttention(nn.Module):
         if isinstance(ssmax, bool):
             ssmax = "qassmax-mlp-elementwise" if ssmax else "none"
         self.ssmax_layer = create_ssmax_layer(ssmax, num_heads, embed_dim)
-        self.qk_norm = ICLQKNorm(self.head_dim, num_heads) if qk_norm else None
+        self.qk_norm = (
+            ICLQKNorm(
+                self.head_dim,
+                num_heads,
+                trainable_length_scale=qk_length_scale,
+            )
+            if qk_norm
+            else None
+        )
         nn.init.xavier_uniform_(self.in_proj_weight)
         nn.init.xavier_uniform_(self.out_proj.weight)
         nn.init.zeros_(self.out_proj.bias)
@@ -563,7 +579,12 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
             self.attn = MultiheadAttention(d_model, nhead, dropout, ssmax, qk_norm=qk_norm)
         elif attention_type == "global":
             self.attn = GlobalLinearAttention(
-                d_model, nhead, dropout, False, qk_norm=qk_norm,
+                d_model,
+                nhead,
+                dropout,
+                False,
+                qk_norm=qk_norm,
+                qk_length_scale=global_type != "elu",
                 global_type=global_type, num_induced_slots=num_induced_slots,
             )
         elif attention_type in ("sparse", "fused_sparse", "fused_full"):

@@ -19,6 +19,7 @@ class ICLQKNorm(nn.Module):
         reference_length: int = 512,
         max_log_slope: float = 0.5,
         eps: float = 1e-6,
+        trainable_length_scale: bool = True,
     ):
         super().__init__()
         if reference_length < 1:
@@ -32,9 +33,17 @@ class ICLQKNorm(nn.Module):
         self.eps = eps
         self.q_weight = nn.Parameter(torch.ones(head_dim))
         self.k_weight = nn.Parameter(torch.ones(head_dim))
-        self.base_log_scale = nn.Parameter(torch.zeros(num_heads))
+        # ELU kernel attention uses RMS-normalized Q/K but has no softmax
+        # temperature. Keep these tensors in the state dict for architecture-
+        # independent initialization, while excluding them from DDP/optimizers
+        # in pure ELU-global layers where scale_query is never called.
+        self.base_log_scale = nn.Parameter(
+            torch.zeros(num_heads), requires_grad=trainable_length_scale
+        )
         # sigmoid(-4) ~= 0.018: long-context scaling starts close to identity.
-        self.log_slope_logit = nn.Parameter(torch.full((num_heads,), -4.0))
+        self.log_slope_logit = nn.Parameter(
+            torch.full((num_heads,), -4.0), requires_grad=trainable_length_scale
+        )
 
     def normalize_q(self, q: torch.Tensor) -> torch.Tensor:
         return F.rms_norm(q, (self.head_dim,), self.q_weight.to(q.dtype), self.eps)

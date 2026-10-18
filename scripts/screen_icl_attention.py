@@ -60,6 +60,12 @@ def arguments():
     p.add_argument("--variants", nargs="+", choices=VARIANTS, default=list(DEFAULT_VARIANTS))
     p.add_argument("--seeds", type=int, nargs="+", default=[42])
     p.add_argument("--num-gpus", type=int, default=1)
+    p.add_argument(
+        "--model-compile",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Compile formal training by default; use --no-model-compile for eager/DDP diagnosis.",
+    )
     p.add_argument("--batch-size", type=int)
     p.add_argument("--micro-batch-size", type=int, default=1)
     p.add_argument("--workers", type=int, default=4)
@@ -188,7 +194,7 @@ def train_options(args, variant, seed):
         norm_first=True,
         zero_init=False,
         use_flash_attn3=False,
-        model_compile=not pilot,
+        model_compile=(not pilot if args.model_compile is None else args.model_compile),
         recompute=not pilot,
         fail_fast=True,
         icl_diagnostics_every=200,

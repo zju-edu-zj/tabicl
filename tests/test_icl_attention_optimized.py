@@ -56,6 +56,25 @@ def test_all_screening_branches_train_with_qk_norm(mode):
     for block in model.blocks:
         assert block.attn.qk_norm.q_weight.grad is not None
         assert block.attn.qk_norm.k_weight.grad is not None
+    missing = [name for name, parameter in model.named_parameters()
+               if parameter.requires_grad and parameter.grad is None]
+    assert missing == []
+
+
+def test_elu_global_only_disables_unused_softmax_length_scale():
+    from tabicl._model.encoders import Encoder
+
+    elu = Encoder(3, 32, 2, 64, attention_type="global_sparse", sparse_every=3,
+                  qk_norm=True, global_type="elu")
+    induced = Encoder(3, 32, 2, 64, attention_type="global_sparse", sparse_every=3,
+                      qk_norm=True, global_type="induced")
+    for block in elu.blocks[:2]:
+        assert not block.attn.qk_norm.base_log_scale.requires_grad
+        assert not block.attn.qk_norm.log_slope_logit.requires_grad
+    assert elu.blocks[2].attn.qk_norm.base_log_scale.requires_grad
+    assert elu.blocks[2].attn.qk_norm.log_slope_logit.requires_grad
+    assert all(block.attn.qk_norm.base_log_scale.requires_grad for block in induced.blocks)
+    assert all(block.attn.qk_norm.log_slope_logit.requires_grad for block in induced.blocks)
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")

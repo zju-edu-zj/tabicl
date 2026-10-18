@@ -55,6 +55,23 @@ def test_formal_screen_compiles_training_model(monkeypatch, tmp_path):
     args = module.arguments()
     assert module.train_options(args, "global_induced", 42)["model_compile"] == "True"
 
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            str(script),
+            "plan",
+            "--output",
+            str(tmp_path),
+            "--steps",
+            "20000",
+            "--variants",
+            "global_induced",
+            "--no-model-compile",
+        ],
+    )
+    args = module.arguments()
+    assert module.train_options(args, "global_induced", 42)["model_compile"] == "False"
+
 
 def test_all_screening_variants_share_every_common_parameter(tmp_path):
     config = small_config(icl_attention="dense")

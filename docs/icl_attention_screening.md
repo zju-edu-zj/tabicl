@@ -31,7 +31,7 @@ PYTHONPATH=src conda run -n stdplm python scripts/screen_icl_attention.py plan \
 OMP_NUM_THREADS=4 PYTHONPATH=src conda run --no-capture-output -n stdplm \
   python scripts/screen_icl_attention.py run \
   --output /home/zj/table_foundation/sparse/results/icl_global_screen20k \
-  --steps 20000 --seeds 42 --memory-limit-gib 0
+  --steps 20000 --seeds 42 --num-gpus 4 --memory-limit-gib 0
 
 # 原始 fixed-1024 stage-1 分布对照，使用单独目录。
 OMP_NUM_THREADS=4 PYTHONPATH=src conda run --no-capture-output -n stdplm \
@@ -40,7 +40,7 @@ OMP_NUM_THREADS=4 PYTHONPATH=src conda run --no-capture-output -n stdplm \
   --steps 20000 --seeds 42 --memory-limit-gib 0
 ```
 
-`--num-gpus` 控制每组 DDP 进程数；`--batch-size` 是全局 batch，默认 routing=16、stage1=64。`--micro-batch-size` 默认 1，可按显存调整，但每个对比分支必须一致；要求全局 batch 能被 GPU 数和 microbatch 整除。`--workers` 默认 4。同一条 run 命令可恢复 optimizer/scheduler 和 step 对应的数据序列；改变训练预算、初始化或验证集会拒绝复用现有 recipe。`prepare` 只生成共享输入，`summarize` 只重算对比报告，`--variants` 支持单独运行未完成的分支。
+`--num-gpus` 控制每组 DDP 进程数；`--batch-size` 是全局 batch，默认 routing=16、stage1=64。`--micro-batch-size` 默认 1，可按显存调整，但每个对比分支必须一致；要求全局 batch 能被 GPU 数和 microbatch 整除。`--workers` 默认 4。正式 preset 默认启用 dynamic `torch.compile`；排查编译器或 DDP 问题时可在新输出目录传 `--no-model-compile`，不要在已有 recipe 中途切换。同一条 run 命令可恢复 optimizer/scheduler 和 step 对应的数据序列；改变训练预算、初始化、GPU 数、compile 设置或验证集会拒绝复用现有 recipe。`prepare` 只生成共享输入，`summarize` 只重算对比报告，`--variants` 支持单独运行未完成的分支。
 
 默认每进程显存分配器上限 8 GiB；上面专用 GPU 命令用 0 关闭上限。这个选项不限制其他进程。当前的共享 RTX 5090 测试使用较低上限，不应把该上限理解成完整配方的显存需求。
 
@@ -50,7 +50,7 @@ OMP_NUM_THREADS=4 PYTHONPATH=src conda run --no-capture-output -n stdplm \
 
 `stage1` preset 保留总行数 1024、support 比例 [0.3,0.9)、batch=64。约三分之一的表 support≤512，直接走 full SDPA；其余也只有 5–8 个叶块，选 4 块。这种分布适合检查短上下文学习能力，但不能单独判断长上下文路由优劣。建议先以 routing 的结果淘汰明显失效结构，再结合 stage1 对照选择进入完整 curriculum 的模型。
 
-两种正式 preset 均采用原尺寸网络：column 3 层、row 3 层、ICL 12 层、ICL d=512/8 heads、B=128/k=4、每第三层检索；BF16 + activation checkpoint + dynamic `torch.compile`，Muon、LR=8e-4、1% warmup、完整筛选预算内单周期 cosine。PyTorch 2.9 的 compiled wrapper 在 `no_grad` 验证中追踪 row RoPE 嵌套 non-reentrant checkpoint 会触发内部断言，因此固定验证解包到共享同一参数的 eager 原模型；训练前向和反向仍保持 compiled。所有组关闭 ICL SSMax、dropout、FlashAttention-3，启用 bounded ICL QK norm；column 固定 `qassmax-mlp-elementwise`。两个 preset 的 batch/长度不同，不能跨 preset 直接比较原始 wall time 或 loss。不同预算也必须各自重新运行，不能用更长 cosine schedule 的中途点冒充 20K 完整实验。
+两种正式 preset 均采用原尺寸网络：column 3 层、row 3 层、ICL 12 层、ICL d=512/8 heads、B=128/k=4、每第三层检索；BF16 + activation checkpoint + dynamic `torch.compile`，Muon、LR=8e-4、1% warmup、完整筛选预算内单周期 cosine。DDP 使用每 rank 独立 prior 流、梯度累积期间仅在最后一个 microbatch 同步；固定验证由 rank 0 执行，前后均有 barrier。PyTorch 2.9 的 compiled wrapper 在 `no_grad` 验证中追踪 row RoPE 嵌套 non-reentrant checkpoint 会触发内部断言，因此验证使用共享同一参数的 eager 原模型；训练前向和反向仍保持 compiled，checkpoint 也始终保存无 `_orig_mod.` 前缀的 eager key。所有组关闭 ICL SSMax、dropout、FlashAttention-3，启用 bounded ICL QK norm；纯 ELU-global 层只训练 Q/K RMS 权重，不注册无语义的 softmax 长度温度为可训练参数。column 固定 `qassmax-mlp-elementwise`。两个 preset 的 batch/长度不同，不能跨 preset 直接比较原始 wall time或 loss。不同预算也必须各自重新运行，不能用更长 cosine schedule 的中途点冒充 20K 完整实验。
 
 ## 控制条件与记录
 
