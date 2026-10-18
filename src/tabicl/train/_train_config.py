@@ -334,6 +334,10 @@ def build_parser():
     parser.add_argument("--icl_router", choices=("centroid", "hierarchical"), default="centroid")
     parser.add_argument("--icl_partition", choices=("projection", "content_tree"), default="projection",
                         help="Support-only leaf construction, independently of centroid/beam search.")
+    parser.add_argument("--icl_global_type", choices=("elu", "induced"), default="elu",
+                        help="Global support memory used alone and inside hybrid retrieval layers.")
+    parser.add_argument("--icl_num_induced_slots", type=int, default=128,
+                        help="Number of learned slots when --icl_global_type=induced.")
     parser.add_argument("--icl_router_beam", type=int, default=16,
                         help="Hierarchy search width, independently of the final selected block budget.")
     parser.add_argument("--icl_diagnostics_every", type=int, default=200,

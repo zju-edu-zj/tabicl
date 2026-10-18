@@ -62,6 +62,8 @@ def main():
     p.add_argument(
         "--partition", choices=("projection", "content_tree"), default="projection"
     )
+    p.add_argument("--global-type", choices=("elu", "induced"), default="elu")
+    p.add_argument("--induced-slots", type=int, default=128)
     p.add_argument("--block-size", type=int, default=128)
     p.add_argument("--selected-blocks", type=int, default=4)
     p.add_argument("--sparse-every", type=int, default=3)
@@ -143,6 +145,8 @@ def main():
             router=args.router,
             router_beam=args.router_beam,
             partition=args.partition,
+            global_type=args.global_type,
+            num_induced_slots=args.induced_slots,
             qk_norm=True,
             recompute=args.recompute,
             zero_init=False,
@@ -189,6 +193,8 @@ def main():
                 icl_router=args.router,
                 icl_router_beam=args.router_beam,
                 icl_partition=args.partition,
+                icl_global_type=args.global_type,
+                icl_num_induced_slots=args.induced_slots,
                 icl_qk_norm=True,
                 recompute=args.recompute,
                 zero_init=False,

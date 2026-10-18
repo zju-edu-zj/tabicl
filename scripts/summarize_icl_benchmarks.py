@@ -23,6 +23,7 @@ def main():
                 dict(
                     file=path.name,
                     attention=result["attention"],
+                    global_type=result.get("global_type", "elu"),
                     partition=result.get("partition", "projection"),
                     scope=result.get("scope", "encoder"),
                     phase=result.get("phase", "train"),
@@ -46,13 +47,14 @@ def main():
         writer.writeheader()
         writer.writerows(records)
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.4), layout="constrained")
-    variants = sorted(set((r["attention"], r["partition"]) for r in records))
-    for attention, partition in variants:
+    variants = sorted(set((r["attention"], r["global_type"], r["partition"]) for r in records))
+    for attention, global_type, partition in variants:
         selected = sorted(
             (
                 row
                 for row in records
                 if row["file"].startswith(("matrix_", "train_")) and row["attention"] == attention
+                and row["global_type"] == global_type
                 and row["partition"] == partition and row["scope"] == "encoder" and row["phase"] == "train"
                 and row["blocks"] == 12 and row["dtype"] == "bfloat16" and row["recompute"] and not row["portable"]
             ),
@@ -62,7 +64,7 @@ def main():
             continue
         x = [row["rows"] for row in selected]
         y = [row["median_ms"] for row in selected]
-        label = attention + ("/" + partition if attention == "global_sparse" else "")
+        label = attention + "/" + global_type + ("/" + partition if attention == "global_sparse" else "")
         axes[0].plot(x, y, ".-", label=label)
         axes[0].fill_between(x, [r["min_ms"] for r in selected], [r["max_ms"] for r in selected], alpha=0.12)
         axes[1].plot(x, [row["peak_allocated_gib"] for row in selected], ".-", label=label)

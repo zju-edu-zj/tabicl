@@ -369,9 +369,13 @@ class SupportAttention(nn.Module):
         return output
 
 class GlobalLinearAttention(SupportAttention):
-    """Pure non-causal kernel attention without a sparse residual."""
+    """Support-only global memory using an ELU state or inducing slots."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, global_type="elu", num_induced_slots=128, **kwargs):
+        if global_type not in ("elu", "induced"):
+            raise ValueError("global_type must be elu or induced")
+        if num_induced_slots < 1:
+            raise ValueError("num_induced_slots must be positive")
         # There is no softmax denominator to compensate in a kernel operator.
         kwargs.pop("ssmax", None)
         if len(args) >= 4:
@@ -379,6 +383,13 @@ class GlobalLinearAttention(SupportAttention):
         else:
             kwargs["ssmax"] = False
         super().__init__(*args, **kwargs)
+        self.global_type = global_type
+        self.num_induced_slots = num_induced_slots
+        if global_type == "induced":
+            self.inducing_points = nn.Parameter(
+                torch.empty(self.num_heads, num_induced_slots, self.head_dim)
+            )
+            nn.init.trunc_normal_(self.inducing_points, std=0.02)
         self.diagnostics_enabled = False
         self.diagnostic_queries = 16
         self.diagnostic_query_start = 0
@@ -391,7 +402,37 @@ class GlobalLinearAttention(SupportAttention):
     def _feature_map(x):
         return (F.elu(x.float(), alpha=1.0) + 1.0).clamp_min(1e-6)
 
+    def _induced_attention(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
+        batch = q.shape[0]
+        slots = self.inducing_points[None].expand(batch, -1, -1, -1).to(q.dtype)
+        if self.qk_norm is not None:
+            slot_queries = self.qk_norm.scale_query(
+                self.qk_norm.normalize_q(slots), k.shape[-2]
+            )
+        else:
+            slot_queries = slots
+        slot_values = F.scaled_dot_product_attention(slot_queries, k, v)
+        if self.qk_norm is not None:
+            read_queries = self.qk_norm.scale_query(q, self.num_induced_slots)
+            slot_keys = self.qk_norm.normalize_k(slot_values)
+        else:
+            read_queries, slot_keys = q, slot_values
+        out = F.scaled_dot_product_attention(read_queries, slot_keys, slot_values)
+        if self.diagnostics_enabled:
+            with torch.no_grad():
+                self.last_diagnostics = {
+                    "induced_slot_count": torch.tensor(
+                        self.num_induced_slots, device=q.device, dtype=torch.float32
+                    ),
+                    "output_rms": out.detach().float().square().mean().sqrt(),
+                    "nonfinite_fraction": (~torch.isfinite(out.detach())).float().mean(),
+                }
+            self.diagnostics_enabled = False
+        return out
+
     def _global_attention(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
+        if self.global_type == "induced":
+            return self._induced_attention(q, k, v)
         # Positive ELU features make the denominator well-defined. Accumulate
         # in fp32 to avoid long-context cancellation under AMP.
         if self.recompute_kernel_backward and (
@@ -507,6 +548,8 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         router_beam: int = 16,
         partition: str = "projection",
         qk_norm: bool = False,
+        global_type: str = "elu",
+        num_induced_slots: int = 128,
     ):
         super().__init__(
             d_model, nhead, dim_feedforward, dropout, activation=activation, norm_first=norm_first, batch_first=True
@@ -521,6 +564,7 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         elif attention_type == "global":
             self.attn = GlobalLinearAttention(
                 d_model, nhead, dropout, False, qk_norm=qk_norm,
+                global_type=global_type, num_induced_slots=num_induced_slots,
             )
         elif attention_type in ("sparse", "fused_sparse", "fused_full"):
             from .icl_attention import SetRetrievalAttention
@@ -529,7 +573,8 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
                 d_model, nhead, dropout, False, mode=attention_type, qk_norm=qk_norm,
                 block_size=block_size, num_selected_blocks=num_selected_blocks,
                 query_chunk_size=query_chunk_size, router=router, router_beam=router_beam,
-                partition=partition,
+                partition=partition, global_type=global_type,
+                num_induced_slots=num_induced_slots,
             )
         else:
             raise ValueError(f"Unknown attention_type: {attention_type}")

@@ -3,6 +3,7 @@ import shlex
 import subprocess
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import torch
 import pytest
@@ -11,6 +12,37 @@ from tabicl._model.tabicl import TabICL
 from tabicl.train._run import Trainer
 from tabicl.train._train_config import build_parser
 from tabicl._model.ssmax import create_ssmax_layer
+
+
+def test_screen_validation_bypasses_compiled_wrapper(monkeypatch):
+    from tabicl.train import _run
+
+    eager_model = object()
+    compiled_wrapper = SimpleNamespace(_orig_mod=eager_model)
+    trainer = Trainer.__new__(Trainer)
+    trainer.config = SimpleNamespace(
+        eval_data=True,
+        device="cpu",
+        icl_diagnostic_queries=0,
+    )
+    trainer.ddp = False
+    trainer.master_process = True
+    trainer.raw_model = compiled_wrapper
+    trainer.eval_cases = {}
+    trainer.amp_ctx = nullcontext()
+    trainer.curr_step = 0
+    trainer.local_log_dir = None
+    trainer._sdpa_ctx = nullcontext
+    trainer.log_local_metrics = lambda *args: None
+    seen = []
+
+    def evaluate(model, *args):
+        seen.append(model)
+        return {}, []
+
+    monkeypatch.setattr(_run, "evaluate_cases", evaluate)
+    trainer.validate_screen()
+    assert seen == [eager_model]
 
 
 def test_all_v2_launchers_expand_to_valid_default_and_ablation_arguments(tmp_path):
@@ -30,7 +62,14 @@ def test_all_v2_launchers_expand_to_valid_default_and_ablation_arguments(tmp_pat
     tokens = shlex.split(text)
     config = build_parser().parse_args(tokens[tokens.index("--wandb_log") :])
     assert config.icl_attention == "global"
+    assert config.icl_global_type == "elu"
     assert config.icl_diagnostics_every == 0
+    env.update(ICL_GLOBAL_TYPE="induced", ICL_NUM_INDUCED_SLOTS="64")
+    text = subprocess.check_output(["bash", str(root / "scripts/train_v2_clf_stage1.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    config = build_parser().parse_args(tokens[tokens.index("--wandb_log") :])
+    assert config.icl_global_type == "induced"
+    assert config.icl_num_induced_slots == 64
 
 
 @pytest.mark.parametrize("regression", [False, True])
@@ -114,6 +153,7 @@ def test_ssmax_per_row_lengths_preserve_scalar_dense_behavior(variant):
         ("icl_num_selected_blocks", 8),
         ("icl_sparse_every", 2),
         ("icl_attention", "global_full"),
+        ("icl_global_type", "induced"),
     ],
 )
 def test_resume_rejects_silent_architecture_changes(tmp_path, setting, value):

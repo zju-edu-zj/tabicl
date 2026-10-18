@@ -254,6 +254,45 @@ def test_full_budget_fast_path_skips_routing(mode):
     torch.testing.assert_close(result, m.out_proj(heads.transpose(1, 2).reshape_as(q)))
 
 
+@pytest.mark.parametrize("mode", ["global", "global_sparse"])
+def test_induced_global_support_isolation_cache_and_gradients(mode):
+    torch.manual_seed(95)
+    model = Encoder(
+        3,
+        32,
+        2,
+        64,
+        attention_type=mode,
+        global_type="induced",
+        num_induced_slots=8,
+        sparse_every=2,
+        block_size=16,
+        num_selected_blocks=2,
+        qk_norm=True,
+        zero_init=False,
+    )
+    x, support = torch.randn(1, 73, 32, requires_grad=True), 49
+    full = model(x, train_size=support)
+    changed = x.detach().clone()
+    changed[:, support:] *= 7
+    torch.testing.assert_close(
+        model(changed, train_size=support)[:, :support], full[:, :support]
+    )
+    cache = KVCache()
+    model.forward_with_cache(x[:, :support], cache, train_size=support, store_cache=True)
+    cached = model.forward_with_cache(
+        x[:, support:], cache, use_cache=True, store_cache=False
+    )
+    torch.testing.assert_close(cached, full[:, support:], atol=3e-6, rtol=3e-5)
+    full[:, support:].square().mean().backward()
+    slots = [
+        module.inducing_points.grad
+        for module in model.modules()
+        if hasattr(module, "inducing_points")
+    ]
+    assert slots and all(grad is not None and torch.isfinite(grad).all() for grad in slots)
+
+
 def test_tail_centroid_and_weighted_tree():
     # The last, one-token leaf must not be divided by the padded block size.
     m = SetRetrievalAttention(32, 2, block_size=32, num_selected_blocks=1, router_beam=4)

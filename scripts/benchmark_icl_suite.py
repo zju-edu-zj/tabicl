@@ -1,4 +1,4 @@
-"""Run the five-branch latency/memory matrix sequentially on one CUDA GPU.
+"""Run the global-memory and retrieval latency/memory matrix on one CUDA GPU.
 
 Includes 12-layer training, full TabICL, prefill, cached queries, variable
 support, flat vs beam routing and portable vs fused implementations.
@@ -16,11 +16,12 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 VARIANTS = {
-    "dense": ("dense", "projection"),
-    "global": ("global", "projection"),
-    "global_sparse_alternating": ("global_sparse_alternating", "projection"),
-    "global_sparse_projection": ("global_sparse", "projection"),
-    "global_sparse_content_tree": ("global_sparse", "content_tree"),
+    "dense": ("dense", "elu", "projection"),
+    "global_elu": ("global", "elu", "projection"),
+    "global_induced": ("global", "induced", "projection"),
+    "global_full_elu": ("global_full", "elu", "projection"),
+    "global_sparse_elu": ("global_sparse", "elu", "projection"),
+    "global_sparse_induced": ("global_sparse", "induced", "projection"),
 }
 
 
@@ -38,13 +39,15 @@ def main():
     args.output = args.output.resolve()
     jobs = []
 
-    def add(label, rows, attention, partition="projection", **options):
+    def add(label, rows, attention, global_type="elu", partition="projection", **options):
         stem = f"{label}_{rows}"
         cli = [
             "--attention",
             attention,
             "--partition",
             partition,
+            "--global-type",
+            global_type,
             "--rows",
             str(rows),
             "--repeat",
@@ -65,30 +68,32 @@ def main():
         jobs.append((stem, [sys.executable, str(ROOT / "scripts/benchmark_icl_attention.py"), *cli]))
 
     for rows in args.rows:
-        for label, (attention, partition) in VARIANTS.items():
-            add("train_" + label, rows, attention, partition, recompute=True, compile=args.compile)
+        for label, (attention, global_type, partition) in VARIANTS.items():
+            add("train_" + label, rows, attention, global_type, partition, recompute=True, compile=args.compile)
     if not args.matrix_only:
-        for label, (attention, partition) in VARIANTS.items():
+        for label, (attention, global_type, partition) in VARIANTS.items():
             for phase in ("prefill", "query"):
-                add(phase + "_" + label, 16384, attention, partition, phase=phase)
+                add(phase + "_" + label, 16384, attention, global_type, partition, phase=phase)
             for rows in (1024, 4096):
-                add("tabicl_" + label, rows, attention, partition, scope="tabicl", recompute=True)
+                add("tabicl_" + label, rows, attention, global_type, partition, scope="tabicl", recompute=True)
             add(
                 "variable_" + label,
                 16384,
                 attention,
+                global_type,
                 partition,
                 recompute=True,
                 vary_support=True,
                 warmup=max(5, args.warmup),
                 repeat=max(10, args.repeat),
             )
-            add("compiled_" + label, 4096, attention, partition, recompute=True, compile=True)
+            add("compiled_" + label, 4096, attention, global_type, partition, recompute=True, compile=True)
         for partition in ("projection", "content_tree"):
             for router in ("centroid", "hierarchical"):
                 for rows in (16384, 65536):
                     add(
-                        f"route_{partition}_{router}", rows, "global_sparse", partition, scope="routing", router=router
+                        f"route_{partition}_{router}", rows, "global_sparse", "elu", partition,
+                        scope="routing", router=router
                     )
             for portable in (False, True):
                 options = dict(blocks=3, recompute=True)
@@ -98,6 +103,7 @@ def main():
                     f"kernel_{partition}_{'portable' if portable else 'fused'}",
                     4096,
                     "global_sparse",
+                    "elu",
                     partition,
                     **options,
                 )
@@ -140,6 +146,7 @@ def main():
                 phase=result["phase"],
                 rows=result["rows"],
                 attention=result["attention"],
+                global_type=result["global_type"],
                 partition=result["partition"],
                 router=result["router"],
                 blocks=result["blocks"],

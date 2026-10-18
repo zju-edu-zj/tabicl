@@ -1,6 +1,19 @@
-# ICL attention 筛选与 content_tree
+# ICL attention 20K 筛选
 
-实现入口是 `scripts/screen_icl_attention.py`。默认运行 dense、global、global_sparse_alternating、global_sparse/projection、global_sparse/content_tree 五组，默认 30K optimizer steps；正式预算限制为 20K–50K。分类和回归分别运行、分别建立 checkpoint。
+实现入口是 `scripts/screen_icl_attention.py`。默认使用一个 seed 运行六组、每组 20K optimizer steps；正式预算限制为 20K–50K。分类和回归分别运行、分别建立 checkpoint。
+
+默认六组固定 projection partition、centroid router、B=128/k=4，避免把 global memory 和 router 变化混在一次比较里：
+
+| 名称 | 层组织 | global | 用途 |
+| --- | --- | --- | --- |
+| `dense` | 每层 full softmax | - | 质量基准 |
+| `global_elu` | 每层 global | ELU+1 | 固定状态线性摘要 |
+| `global_induced` | 每层 global | 128 learned slots/head | 数据依赖 bottleneck |
+| `global_full_elu` | 每第 3 层融合 full retrieval | ELU+1 | 判断退化是否来自缺少原始 support |
+| `global_sparse_elu` | 每第 3 层融合 sparse retrieval | ELU+1 | 线性摘要加稀疏残差 |
+| `global_sparse_induced` | 每第 3 层融合 sparse retrieval | 128 learned slots/head | induced memory 加稀疏残差 |
+
+`global_sparse_alternating` 和 `global_sparse_content_tree` 仍可通过 `--variants` 单独运行，但不进入第一轮。只有当 sparse 组合本身有效后，才比较 alternating/same-layer fusion、projection/content_tree、centroid/hierarchical。
 
 实现审计、正确性检查和实际测量结果见 [2026-10-16 测试报告](icl_content_tree_results_20261016.md)。
 
@@ -11,20 +24,20 @@
 ```bash
 # 查看全部参数，不创建训练任务。
 PYTHONPATH=src conda run -n stdplm python scripts/screen_icl_attention.py plan \
-  --output /home/zj/table_foundation/exploration/results/icl_screen30k \
-  --steps 30000 --seeds 42 43 44
+  --output /home/zj/table_foundation/sparse/results/icl_global_screen20k \
+  --steps 20000 --seeds 42
 
-# 生成共同初始化、固定验证集，随后顺序运行五组 × 三个种子。
+# 生成共同初始化、固定验证集，随后顺序运行六组 × 一个 seed。
 OMP_NUM_THREADS=4 PYTHONPATH=src conda run --no-capture-output -n stdplm \
   python scripts/screen_icl_attention.py run \
-  --output /home/zj/table_foundation/exploration/results/icl_screen30k \
-  --steps 30000 --seeds 42 43 44 --memory-limit-gib 0
+  --output /home/zj/table_foundation/sparse/results/icl_global_screen20k \
+  --steps 20000 --seeds 42 --memory-limit-gib 0
 
 # 原始 fixed-1024 stage-1 分布对照，使用单独目录。
 OMP_NUM_THREADS=4 PYTHONPATH=src conda run --no-capture-output -n stdplm \
   python scripts/screen_icl_attention.py run --preset stage1 \
-  --output /home/zj/table_foundation/exploration/results/icl_screen30k_1024 \
-  --steps 30000 --seeds 42 43 44 --memory-limit-gib 0
+  --output /home/zj/table_foundation/sparse/results/icl_global_screen20k_1024 \
+  --steps 20000 --seeds 42 --memory-limit-gib 0
 ```
 
 `--num-gpus` 控制每组 DDP 进程数；`--batch-size` 是全局 batch，默认 routing=16、stage1=64。`--micro-batch-size` 默认 1，可按显存调整，但每个对比分支必须一致；要求全局 batch 能被 GPU 数和 microbatch 整除。`--workers` 默认 4。同一条 run 命令可恢复 optimizer/scheduler 和 step 对应的数据序列；改变训练预算、初始化或验证集会拒绝复用现有 recipe。`prepare` 只生成共享输入，`summarize` 只重算对比报告，`--variants` 支持单独运行未完成的分支。
@@ -37,11 +50,11 @@ OMP_NUM_THREADS=4 PYTHONPATH=src conda run --no-capture-output -n stdplm \
 
 `stage1` preset 保留总行数 1024、support 比例 [0.3,0.9)、batch=64。约三分之一的表 support≤512，直接走 full SDPA；其余也只有 5–8 个叶块，选 4 块。这种分布适合检查短上下文学习能力，但不能单独判断长上下文路由优劣。建议先以 routing 的结果淘汰明显失效结构，再结合 stage1 对照选择进入完整 curriculum 的模型。
 
-两种正式 preset 均采用原尺寸网络：column 3 层、row 3 层、ICL 12 层、ICL d=512/8 heads、B=128/k=4、每第三层检索；BF16 + activation checkpoint + dynamic `torch.compile`，Muon、LR=8e-4、1% warmup、完整筛选预算内单周期 cosine。所有组关闭 ICL SSMax、dropout、FlashAttention-3，启用 bounded ICL QK norm；column 固定 `qassmax-mlp-elementwise`。两个 preset 的 batch/长度不同，不能跨 preset 直接比较原始 wall time 或 loss。不同预算也必须各自重新运行，不能用 30K cosine 的中途点冒充 20K 完整实验。
+两种正式 preset 均采用原尺寸网络：column 3 层、row 3 层、ICL 12 层、ICL d=512/8 heads、B=128/k=4、每第三层检索；BF16 + activation checkpoint + dynamic `torch.compile`，Muon、LR=8e-4、1% warmup、完整筛选预算内单周期 cosine。PyTorch 2.9 的 compiled wrapper 在 `no_grad` 验证中追踪 row RoPE 嵌套 non-reentrant checkpoint 会触发内部断言，因此固定验证解包到共享同一参数的 eager 原模型；训练前向和反向仍保持 compiled。所有组关闭 ICL SSMax、dropout、FlashAttention-3，启用 bounded ICL QK norm；column 固定 `qassmax-mlp-elementwise`。两个 preset 的 batch/长度不同，不能跨 preset 直接比较原始 wall time 或 loss。不同预算也必须各自重新运行，不能用更长 cosine schedule 的中途点冒充 20K 完整实验。
 
 ## 控制条件与记录
 
-公共权重来自同一份未训练 dense 初始化，包括 column/row、QKV、输出投影、FFN 和预测头；混合模型只新增初始化为 0 的融合门和固定 route buffer。sparse 两种 partition 的投影方向也按模块名和种子固定。禁止把已训练 dense checkpoint 当共同初始化，以免比较变成不同程度的权重迁移。
+公共权重来自同一份未训练 dense 初始化，包括 column/row、QKV、输出投影、FFN 和预测头；混合模型新增初始化为 0 的融合门和固定 route buffer。induced-only 与 induced+sparse 的 slots 按模块名和 seed 确定性初始化，因此两组从完全相同的 induced memory 出发。sparse partition 的投影方向同样按模块名和 seed 固定。禁止把已训练 dense checkpoint 当共同初始化，以免比较变成不同程度的权重迁移。
 
 在线 prior 的种子由 `(seed, optimizer_step, DDP rank)` 决定，每个 step 包括完整本 rank batch；DataLoader worker 数、预取和断点恢复不改变相同 world size 下的样本流。改变 GPU 数会改变批次分片，recipe 会拒绝该变更。硬路由及 GPU 归约存在正常浮点差异，不保证模型训练逐 bit 相同。
 
@@ -55,7 +68,7 @@ OMP_NUM_THREADS=4 PYTHONPATH=src conda run --no-capture-output -n stdplm \
 
 `content_tree` 在每个检索层/head 上根据当前 support K 重建平衡树，节点从 16 个按内容排序的代表点估计远点分割轴，CUDA 直接索引原 K 做打分，只排序标量和行索引。它没有行号窗口、训练码本、路由蒸馏和辅助 loss。候选仍是原始 K/V，候选内只做一次标准 softmax；global、融合门、预算与 projection 对照完全相同。
 
-建树和搜索分开：正式五组均使用精确 centroid top-k，之后再比较 hierarchical beam。centroid 对所有叶打分仍有 O(N S/B) 项；content_tree 的多层分割也有排序成本，因此不宣称整个算法严格线性。分割采用精确的非稳定 radix argsort；投影碰撞、完全相同 K 的样本跨叶边界时仍可能依赖输入顺序，现有连续输入置换测试不能证明任意重复样本的严格集合不变性。缓存当前保存原始 K/V，cached query 会重新建派生索引。
+建树和搜索分开：第一轮六组均固定 projection；其中 sparse 组使用精确 centroid top-k。胜出结构再比较 content_tree 与 hierarchical beam。centroid 对所有叶打分仍有 O(N S/B) 项；content_tree 的多层分割也有排序成本，因此不宣称整个算法严格线性。分割采用精确的非稳定 radix argsort；投影碰撞、完全相同 K 的样本跨叶边界时仍可能依赖输入顺序，现有连续输入置换测试不能证明任意重复样本的严格集合不变性。缓存当前保存原始 K/V，cached query 会重新建派生索引。
 
 ```bash
 # 12 层 ICL、完整模型路径、prefill/query、动态 support、路由与参考实现。

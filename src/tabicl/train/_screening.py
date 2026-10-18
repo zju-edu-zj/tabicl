@@ -48,7 +48,12 @@ def load_common_initialization(model, path, model_config, seed):
         if saved["config"].get(key) != model_config[key]:
             raise ValueError(f"Initial model architecture differs: {key}")
     result = model.load_state_dict(saved["state_dict"], strict=False)
-    allowed = (".fusion_gate_weight", ".fusion_gate_bias", ".route_direction")
+    allowed = (
+        ".fusion_gate_weight",
+        ".fusion_gate_bias",
+        ".route_direction",
+        ".inducing_points",
+    )
     if result.unexpected_keys or any(not name.endswith(allowed) for name in result.missing_keys):
         raise ValueError(f"Incomplete common initialization: {result}")
     # Route buffers must also agree across sparse variants and DDP ranks.
@@ -58,6 +63,16 @@ def load_common_initialization(model, path, model_config, seed):
             gen = torch.Generator().manual_seed(value % 2**63)
             direction = torch.randn(module.head_dim, generator=gen)
             module.route_direction.copy_(F.normalize(direction, dim=0))
+        if hasattr(module, "inducing_points"):
+            value = int.from_bytes(
+                hashlib.sha256(f"{seed}/{name}/inducing_points".encode()).digest()[:8],
+                "little",
+            )
+            gen = torch.Generator().manual_seed(value % 2**63)
+            points = torch.empty_like(module.inducing_points, device="cpu")
+            points.normal_(std=0.02, generator=gen).clamp_(-0.04, 0.04)
+            with torch.no_grad():
+                module.inducing_points.copy_(points.to(module.inducing_points.device))
 
 
 @torch.no_grad()

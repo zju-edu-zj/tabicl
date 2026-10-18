@@ -94,6 +94,8 @@ class ICLearning(nn.Module):
         router_beam: int = 16,
         partition: str = "projection",
         qk_norm: bool = False,
+        global_type: str = "elu",
+        num_induced_slots: int = 128,
     ):
         super().__init__()
 
@@ -121,6 +123,8 @@ class ICLearning(nn.Module):
             router_beam=router_beam,
             partition=partition,
             qk_norm=qk_norm,
+            global_type=global_type,
+            num_induced_slots=num_induced_slots,
         )
         if self.norm_first:
             self.ln = nn.LayerNorm(d_model, bias=not bias_free_ln)

@@ -1,6 +1,7 @@
 """Plan/run controlled 20K–50K-step ICL screening in the current Python environment.
 
-Default: 30K steps, log-uniform 1K–8K retrieval screening, five architectures.
+Default: 20K steps, log-uniform 1K–8K screening of two global memories and
+their same-layer sparse residuals, plus dense and a full-retrieval diagnostic.
 The stage1 preset retains the original fixed-1024 data distribution.
 The explicit pilot preset uses a small model and is NOT a pretraining ranking.
 """
@@ -25,12 +26,24 @@ from tabicl.train._train_config import build_parser
 
 ROOT = Path(__file__).resolve().parents[1]
 VARIANTS = {
-    "dense": ("dense", "projection"),
-    "global": ("global", "projection"),
-    "global_sparse_alternating": ("global_sparse_alternating", "projection"),
-    "global_sparse_projection": ("global_sparse", "projection"),
-    "global_sparse_content_tree": ("global_sparse", "content_tree"),
+    "dense": ("dense", "elu", "projection"),
+    "global_elu": ("global", "elu", "projection"),
+    "global_induced": ("global", "induced", "projection"),
+    "global_full_elu": ("global_full", "elu", "projection"),
+    "global_sparse_elu": ("global_sparse", "elu", "projection"),
+    "global_sparse_induced": ("global_sparse", "induced", "projection"),
+    # Optional follow-ups. They are excluded from the default causal screen.
+    "global_sparse_alternating": ("global_sparse_alternating", "elu", "projection"),
+    "global_sparse_content_tree": ("global_sparse", "elu", "content_tree"),
 }
+DEFAULT_VARIANTS = (
+    "dense",
+    "global_elu",
+    "global_induced",
+    "global_full_elu",
+    "global_sparse_elu",
+    "global_sparse_induced",
+)
 
 
 def sha256(path):
@@ -44,7 +57,7 @@ def arguments():
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--preset", choices=("stage1", "routing", "pilot"), default="routing")
     p.add_argument("--steps", type=int)
-    p.add_argument("--variants", nargs="+", choices=VARIANTS, default=list(VARIANTS))
+    p.add_argument("--variants", nargs="+", choices=VARIANTS, default=list(DEFAULT_VARIANTS))
     p.add_argument("--seeds", type=int, nargs="+", default=[42])
     p.add_argument("--num-gpus", type=int, default=1)
     p.add_argument("--batch-size", type=int)
@@ -65,7 +78,7 @@ def arguments():
     )
     args = p.parse_args()
     args.output = args.output.resolve()
-    args.steps = args.steps if args.steps is not None else (200 if args.preset == "pilot" else 30000)
+    args.steps = args.steps if args.steps is not None else (200 if args.preset == "pilot" else 20000)
     args.batch_size = (
         args.batch_size
         if args.batch_size is not None
@@ -102,7 +115,7 @@ def arguments():
 
 
 def train_options(args, variant, seed):
-    attention, partition = VARIANTS[variant]
+    attention, global_type, partition = VARIANTS[variant]
     job = args.output / f"seed_{seed}" / variant
     pilot = args.preset == "pilot"
     options = dict(
@@ -162,6 +175,8 @@ def train_options(args, variant, seed):
         icl_num_blocks=3 if pilot else 12,
         icl_nhead=8,
         icl_attention=attention,
+        icl_global_type=global_type,
+        icl_num_induced_slots=128,
         icl_partition=partition,
         icl_router="centroid",
         icl_sparse_every=3,
@@ -243,6 +258,8 @@ def initialization_config(options):
         icl_router="centroid",
         icl_router_beam=16,
         icl_partition="projection",
+        icl_global_type="elu",
+        icl_num_induced_slots=128,
     )
     return config
 

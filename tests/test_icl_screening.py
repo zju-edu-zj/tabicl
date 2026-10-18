@@ -1,5 +1,7 @@
 from contextlib import nullcontext
+import importlib.util
 import random
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -32,6 +34,28 @@ def small_config(**overrides):
     )
 
 
+def test_formal_screen_compiles_training_model(monkeypatch, tmp_path):
+    script = Path(__file__).resolve().parents[1] / "scripts/screen_icl_attention.py"
+    spec = importlib.util.spec_from_file_location("screen_icl_attention", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            str(script),
+            "plan",
+            "--output",
+            str(tmp_path),
+            "--steps",
+            "20000",
+            "--variants",
+            "global_induced",
+        ],
+    )
+    args = module.arguments()
+    assert module.train_options(args, "global_induced", 42)["model_compile"] == "True"
+
+
 def test_all_screening_variants_share_every_common_parameter(tmp_path):
     config = small_config(icl_attention="dense")
     reference = TabICL(**config)
@@ -44,15 +68,23 @@ def test_all_screening_variants_share_every_common_parameter(tmp_path):
         ),
         path,
     )
-    routes = []
-    for attention, partition in [
-        ("dense", "projection"),
-        ("global", "projection"),
-        ("global_sparse_alternating", "projection"),
-        ("global_sparse", "projection"),
-        ("global_sparse", "content_tree"),
+    routes, slots = [], []
+    for attention, global_type, partition in [
+        ("dense", "elu", "projection"),
+        ("global", "elu", "projection"),
+        ("global_sparse_alternating", "elu", "projection"),
+        ("global_sparse", "elu", "projection"),
+        ("global_sparse", "elu", "content_tree"),
+        ("global", "induced", "projection"),
+        ("global_sparse", "induced", "projection"),
     ]:
-        changed = dict(config, icl_attention=attention, icl_partition=partition)
+        changed = dict(
+            config,
+            icl_attention=attention,
+            icl_global_type=global_type,
+            icl_num_induced_slots=8,
+            icl_partition=partition,
+        )
         torch.manual_seed(983)  # Constructor RNG consumption differs across variants.
         model = TabICL(**changed)
         load_common_initialization(model, path, changed, seed=42)
@@ -65,9 +97,19 @@ def test_all_screening_variants_share_every_common_parameter(tmp_path):
                 if name.endswith("route_direction")
             }
         )
-    for name, value in routes[-1].items():
-        assert torch.equal(value, routes[-2][name])
+        slots.append(
+            {
+                name: value
+                for name, value in model.state_dict().items()
+                if name.endswith("inducing_points")
+            }
+        )
+    for name, value in routes[4].items():
+        assert torch.equal(value, routes[3][name])
         assert torch.equal(value, routes[2][name])
+    assert slots[-2]
+    for name, value in slots[-1].items():
+        assert torch.equal(value, slots[-2][name])
     bad = dict(changed, icl_ssmax=True)
     with pytest.raises(ValueError, match="icl_ssmax"):
         load_common_initialization(model, path, bad, 42)

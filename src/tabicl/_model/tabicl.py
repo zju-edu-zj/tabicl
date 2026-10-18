@@ -172,6 +172,14 @@ class TabICL(nn.Module):
         in ICL attention. Experimental long-context recipes enable this instead
         of ICL SSMax; column SSMax is configured independently.
 
+    icl_global_type : {"elu", "induced"}, default="elu"
+        Global support-memory operator used by non-dense ICL attention. ``elu``
+        uses a linear ELU+1 kernel state. ``induced`` first lets learned per-head
+        slots read the support and then lets every row read those slots.
+
+    icl_num_induced_slots : int, default=128
+        Number of learned slots per head when ``icl_global_type="induced"``.
+
     icl_query_chunk_size : int, default=64
         Query workspace chunk size for the portable gathered-SDPA fallback.
     """
@@ -233,6 +241,8 @@ class TabICL(nn.Module):
         icl_router_beam: int = 16,
         icl_partition: str = "projection",
         icl_qk_norm: bool = False,
+        icl_global_type: str = "elu",
+        icl_num_induced_slots: int = 128,
         icl_attention_impl_version: int = 4,
     ):
         super().__init__()
@@ -267,6 +277,12 @@ class TabICL(nn.Module):
         self.icl_nhead = icl_nhead
         self.icl_ssmax = icl_ssmax
         self.icl_qk_norm = icl_qk_norm
+        if icl_global_type not in ("elu", "induced"):
+            raise ValueError("icl_global_type must be elu or induced")
+        if icl_num_induced_slots < 1:
+            raise ValueError("icl_num_induced_slots must be positive")
+        self.icl_global_type = icl_global_type
+        self.icl_num_induced_slots = icl_num_induced_slots
         self.ff_factor = ff_factor
         self.dropout = dropout
         self.activation = activation
@@ -346,6 +362,8 @@ class TabICL(nn.Module):
             router_beam=icl_router_beam,
             partition=icl_partition,
             qk_norm=icl_qk_norm,
+            global_type=icl_global_type,
+            num_induced_slots=icl_num_induced_slots,
         )
 
         # KV cache for efficient inference

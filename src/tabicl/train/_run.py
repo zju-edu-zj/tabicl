@@ -299,6 +299,8 @@ class Trainer:
             "icl_router": self.config.icl_router,
             "icl_router_beam": self.config.icl_router_beam,
             "icl_partition": self.config.icl_partition,
+            "icl_global_type": self.config.icl_global_type,
+            "icl_num_induced_slots": self.config.icl_num_induced_slots,
             "icl_ssmax": self.config.icl_ssmax_type if self.config.icl_ssmax else False,
             "icl_qk_norm": self.config.icl_qk_norm,
             "ff_factor": self.config.ff_factor,
@@ -546,8 +548,13 @@ class Trainer:
                     "icl_block_size": 128, "icl_num_selected_blocks": 4,
                     "icl_router": "centroid", "icl_router_beam": 16,
                     "icl_partition": "projection",
+                    "icl_global_type": "elu", "icl_num_induced_slots": 128,
                     "icl_ssmax": False, "icl_qk_norm": False}
         keys = ["icl_attention", "icl_ssmax", "icl_qk_norm"]
+        if mode != "dense":
+            keys.append("icl_global_type")
+            if self.model_config.get("icl_global_type") == "induced":
+                keys.append("icl_num_induced_slots")
         if mode in ("global_full", "global_sparse", "global_sparse_alternating"):
             keys.append("icl_sparse_every")
         if mode in ("global_sparse", "global_sparse_alternating"):
@@ -700,8 +707,12 @@ class Trainer:
         if self.ddp:
             torch.distributed.barrier()
         if self.master_process:
+            # PyTorch 2.9 can fail while tracing non-reentrant row checkpoints
+            # under no_grad. Validation shares the same parameters, so bypass
+            # only the compiled wrapper while keeping training compiled.
+            validation_model = getattr(self.raw_model, "_orig_mod", self.raw_model)
             with self._sdpa_ctx():
-                metrics, records = evaluate_cases(self.raw_model, self.eval_cases, self.config.device,
+                metrics, records = evaluate_cases(validation_model, self.eval_cases, self.config.device,
                                                   self.amp_ctx, self.config.icl_diagnostic_queries)
             self.log_local_metrics(self.curr_step, metrics)
             if self.local_log_dir:

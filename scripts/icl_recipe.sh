@@ -8,6 +8,8 @@ ICL_QUERY_CHUNK_SIZE=${ICL_QUERY_CHUNK_SIZE:-64}
 ICL_ROUTER=${ICL_ROUTER:-centroid}
 ICL_ROUTER_BEAM=${ICL_ROUTER_BEAM:-16}
 ICL_PARTITION=${ICL_PARTITION:-projection}
+ICL_GLOBAL_TYPE=${ICL_GLOBAL_TYPE:-elu}
+ICL_NUM_INDUCED_SLOTS=${ICL_NUM_INDUCED_SLOTS:-128}
 ICL_SSMAX=${ICL_SSMAX:-False}
 ICL_QK_NORM=${ICL_QK_NORM:-True}
 COL_SSMAX_TYPE=${COL_SSMAX_TYPE:-${SSMAX_TYPE:-qassmax-mlp-elementwise}}
@@ -23,6 +25,8 @@ ICL_ARGS=(
     --icl_router "$ICL_ROUTER"
     --icl_router_beam "$ICL_ROUTER_BEAM"
     --icl_partition "$ICL_PARTITION"
+    --icl_global_type "$ICL_GLOBAL_TYPE"
+    --icl_num_induced_slots "$ICL_NUM_INDUCED_SLOTS"
     --icl_sparse_every "$ICL_SPARSE_EVERY"
     --icl_block_size "$ICL_BLOCK_SIZE"
     --icl_num_selected_blocks "$ICL_NUM_SELECTED_BLOCKS"
