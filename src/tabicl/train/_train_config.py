@@ -96,7 +96,9 @@ def build_parser():
     )
 
     # Optimization Config
-    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=1e-4, help="Muon matrix LR, or LR for all-AdamW training")
+    parser.add_argument("--adamw_lr", type=float, default=None,
+                        help="AdamW LR inside hybrid Muon (default: lr / 4). Ignored when muon=False.")
     parser.add_argument(
         "--scheduler", type=str, default="cosine_warmup", help="Learning rate scheduler: see optim.py for options."
     )
@@ -119,12 +121,12 @@ def build_parser():
         "--muon",
         default=False,
         type=str2bool,
-        help="If True, use the Muon optimizer instead of AdamW. All parameters are placed in a "
-        "single Muon group and updated via Newton-Schulz orthogonalization (non-2D parameters "
-        "are reshaped to 2D for this).",
+        help="If True, use hybrid Muon: transformer attention/FFN matrices use Muon; all other "
+        "parameters use AdamW (norms and biases have no weight decay). False uses all-AdamW. "
+        "Legacy all-Muon checkpoints require only_load_model=True and a new checkpoint directory.",
     )
     parser.add_argument("--beta1", type=float, default=0.9, help="First moment decay (AdamW beta1 / Muon momentum)")
-    parser.add_argument("--beta2", type=float, default=0.999, help="Second moment decay for AdamW (not used by Muon)")
+    parser.add_argument("--beta2", type=float, default=0.999, help="Second moment decay for AdamW, including hybrid groups")
     parser.add_argument(
         "--use_cautious_wd",
         default=False,

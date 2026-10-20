@@ -14,7 +14,6 @@ import psutil
 
 import torch
 from torch import nn
-from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 try:
@@ -34,7 +33,7 @@ from tabicl.prior._dataset import PriorDataset
 from tabicl.prior._genload import LoadPriorDataset, seed_worker
 from tabicl.prior.graph_lib._config import PriorConfig
 from tabicl.train._optim import get_scheduler
-from tabicl.train._muon import Muon
+from tabicl.train._optimizer import build_optimizer, optimizer_spec, validate_optimizer_checkpoint
 from tabicl.train._train_config import build_parser
 from tabicl.train._screening import StepSeededPrior, evaluate_cases, load_common_initialization
 
@@ -207,6 +206,16 @@ class Trainer:
         self.local_log_dir.mkdir(parents=True, exist_ok=True)
         (self.local_log_dir / "config.json").write_text(
             json.dumps(vars(self.config), indent=2, default=str) + "\n"
+        )
+        (self.local_log_dir / "optimizer_groups.json").write_text(
+            json.dumps(dict(
+                **optimizer_spec(self.optimizer),
+                hyperparameters=[dict(
+                    initial_lr=g.get("initial_lr", g["lr"]),
+                    weight_decay=g["weight_decay"],
+                    numel=sum(p.numel() for p in g["params"]),
+                ) for g in self.optimizer.param_groups],
+            ), indent=2) + "\n"
         )
         self.metrics_file = (self.local_log_dir / "metrics.jsonl").open("a", buffering=1)
         if getattr(self.config, "tensorboard_log", False):
@@ -425,28 +434,13 @@ class Trainer:
     def configure_optimizer(self):
         """Configure optimizer and scheduler."""
 
-        if self.config.muon:
-            if self.master_process:
-                print("Using Muon optimizer.")
-            self.optimizer = Muon(
-                param_groups=[dict(params=list(self.raw_model.parameters()), use_muon=True)],
-                lr=self.config.lr,
-                weight_decay=self.config.weight_decay,
-                matched_adamw_rms=0.2,
-                momentum=self.config.beta1,
-                nesterov=True,
-                ns_steps=5,
-                adamw_betas=(self.config.beta1, self.config.beta2),
-                adamw_eps=1e-8,
-                use_cautious_wd=self.config.use_cautious_wd,
-            )
-        else:
-            self.optimizer = optim.AdamW(
-                params=self.raw_model.parameters(),
-                lr=self.config.lr,
-                betas=(self.config.beta1, self.config.beta2),
-                weight_decay=self.config.weight_decay,
-            )
+        self.optimizer = build_optimizer(self.raw_model, self.config)
+        if self.master_process:
+            print(f"Using {optimizer_spec(self.optimizer)['kind']} optimizer.")
+            for group in self.optimizer.param_groups:
+                print(f"  {group.get('group_name', 'adamw')}: "
+                      f"{sum(p.numel() for p in group['params']):,} parameters, "
+                      f"lr={group['lr']:g}, weight_decay={group['weight_decay']:g}")
         self.scheduler = get_scheduler(config=self.config, optimizer=self.optimizer)
 
     def configure_amp(self):
@@ -527,6 +521,8 @@ class Trainer:
         checkpoint_path = None
         if hasattr(self.config, "checkpoint_path") and self.config.checkpoint_path:
             checkpoint_path = self.config.checkpoint_path
+            if not os.path.isfile(checkpoint_path):
+                raise FileNotFoundError(f"Explicit checkpoint_path does not exist: {checkpoint_path}")
         elif hasattr(self.config, "checkpoint_dir") and self.config.checkpoint_dir:
             checkpoint_path = self.get_latest_checkpoint()
 
@@ -582,8 +578,9 @@ class Trainer:
 
         # Optionally load optimizer and scheduler state
         if self.config.only_load_model:
-            print("Only loading model weights")
+            print("Only loading model weights; optimizer, scheduler and local step restart from zero")
         else:
+            validate_optimizer_checkpoint(self.optimizer, checkpoint)
             self.optimizer.load_state_dict(checkpoint["optimizer_state"])
             self.scheduler.load_state_dict(checkpoint["scheduler_state"])
             self.curr_step = checkpoint["curr_step"]
@@ -604,6 +601,7 @@ class Trainer:
             "config": self.model_config,
             "state_dict": self.raw_model.state_dict(),
             "optimizer_state": self.optimizer.state_dict(),
+            "optimizer_spec": optimizer_spec(self.optimizer),
             "scheduler_state": self.scheduler.state_dict(),
             "curr_step": self.curr_step,
         }
@@ -996,6 +994,8 @@ class Trainer:
 
         # Update parameters
         results["lr_used"] = self.optimizer.param_groups[0]["lr"]
+        for group in self.optimizer.param_groups:
+            results[f"lr/{group.get('group_name', 'adamw')}"] = group["lr"]
         results["oom_micro_batches"] = failed_batches
         self.scaler.step(self.optimizer)
         self.scaler.update()

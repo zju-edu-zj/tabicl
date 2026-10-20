@@ -69,9 +69,8 @@ class Muon(torch.optim.Optimizer):
     Routing is controlled purely by the per-group ``use_muon`` flag, which is the caller's
     responsibility: groups with ``use_muon=True`` are optimized with Muon (each parameter is
     reshaped to 2D before the Newton-Schulz step), and any other groups use an internal AdamW.
-    There is no automatic detection of 1D parameters -- if a 1D parameter (bias, norm scale, ...)
-    is placed in a ``use_muon=True`` group it is orthogonalized like any other. In this project all
-    parameters are intentionally put in a single ``use_muon=True`` group.
+    The trainer routes only transformer projection matrices to Muon; norms, biases,
+    embeddings, slots, gates, SSMax networks and output heads use the AdamW groups.
 
     Arguments:
         param_groups: The parameters to be optimized.
@@ -104,6 +103,7 @@ class Muon(torch.optim.Optimizer):
 
         super().__init__(param_groups, defaults)
 
+    @torch.no_grad()
     def step(self):
         # update muon momentum first
         for group in self.param_groups:
@@ -159,13 +159,6 @@ class Muon(torch.optim.Optimizer):
             if group.get('use_muon', False):
                 continue
 
-            # init step
-            if 'step' in group:
-                group['step'] += 1
-            else:
-                group['step'] = 1
-
-            step = group['step']
             params = group["params"]
             lr = group['lr']
             weight_decay = group['weight_decay']
@@ -183,21 +176,25 @@ class Muon(torch.optim.Optimizer):
                 if len(state) == 0:
                     state['adamw_exp_avg'] = torch.zeros_like(g)
                     state['adamw_exp_avg_sq'] = torch.zeros_like(g)
+                    state['step'] = 0
+
+                # Like torch AdamW, advance a parameter's clock only when it has
+                # a gradient (important for conditionally used task/SSMax paths).
+                state['step'] += 1
+                step = state['step']
 
                 buf1 = state['adamw_exp_avg']
                 buf2 = state['adamw_exp_avg_sq']
                 buf1.lerp_(g, 1 - beta1)
                 buf2.lerp_(g.square(), 1 - beta2)
 
-                g = buf1 / (eps + buf2.sqrt())
-
                 bias_correction1 = 1 - beta1 ** step
                 bias_correction2 = 1 - beta2 ** step
-                scale = bias_correction1 / bias_correction2 ** 0.5
+                g = (buf1 / bias_correction1) / (buf2.sqrt() / bias_correction2 ** 0.5 + eps)
                 # apply weight decay
                 if use_cautious_wd:
                     wd_mask = (g * p >= 0)
                     p.data.add_(p * wd_mask, alpha=-lr * weight_decay)
                 else:
                     p.data.mul_(1 - lr * weight_decay)
-                p.data.add_(g, alpha=-lr / scale)
+                p.data.add_(g, alpha=-lr)

@@ -69,6 +69,8 @@ def arguments():
     p.add_argument("--batch-size", type=int)
     p.add_argument("--micro-batch-size", type=int, default=1)
     p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--lr", type=float, default=8e-4, help="Muon matrix peak LR")
+    p.add_argument("--adamw-lr", type=float, default=1e-4, help="Hybrid AdamW peak LR")
     p.add_argument("--eval-every", type=int)
     p.add_argument("--eval-support", type=int, nargs="+", default=[256, 1024, 4096, 16384])
     p.add_argument("--eval-cases", type=int, default=16, help="Independent tables per support panel.")
@@ -133,7 +135,8 @@ def train_options(args, variant, seed):
         max_steps=args.steps,
         batch_size=args.batch_size,
         micro_batch_size=args.micro_batch_size,
-        lr=8e-4,
+        lr=args.lr,
+        adamw_lr=args.adamw_lr,
         muon=True,
         beta1=0.9,
         weight_decay=0.01,

@@ -11,7 +11,10 @@ set -euo pipefail
 #   Stage 2:  40K steps, 400-10,240 samples (log-u), 79-81% train, max LR 1e-4, grad clip 10
 #   Stage 3:  10K steps, 400-60,000 samples (log-u), 79-81% train, max LR 2e-5, grad clip  1
 #
-# Common: Muon optimizer, cautious weight decay parameter 0.01 (see note below),
+# Hybrid optimizer: transformer projection matrices use Muon; other parameters
+# use AdamW. Norms and biases have no weight decay. Legacy all-Muon checkpoints
+# must initialize a NEW run via INIT_CKPT (weights only).
+# Common: weight decay parameter 0.01 (see note below),
 # cosine schedule, per-micro-batch train/test sizes (--seq_len_per_gp),
 # up to 100 features, 8 attention heads everywhere, graph_scm prior. The default
 # dtype is float32; float16 can be used for speedup (--dtype float16 --amp True) but may lead
@@ -29,37 +32,59 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
-NUM_GPUS=${NUM_GPUS:-1}                      # the paper used 4 GPUs for pre-training
-CKPT_DIR=${CKPT_DIR:-/home/zj/table_foundation/checkpoints/tabiclv2-clf/stage1}
+NUM_GPUS=${NUM_GPUS:-16}                      # the paper used 4 GPUs for pre-training
+CKPT_DIR=${CKPT_DIR:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1}
 LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
 MAX_STEPS=${MAX_STEPS:-500000}
+LR=${LR:-8e-4}                              # Muon matrix peak LR
+ADAMW_LR=${ADAMW_LR:-1e-4}                  # hybrid AdamW peak LR
+MUON=${MUON:-True}                          # False: all-AdamW control, using LR
+BATCH_SIZE=${BATCH_SIZE:-64}                # global batch, before DDP splitting
+MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
+WARMUP_PROPORTION=${WARMUP_PROPORTION:--1}
+WARMUP_STEPS=${WARMUP_STEPS:-5000}
+INIT_CKPT=${INIT_CKPT:-}                     # first launch only; reset optimizer/step
+TENSORBOARD_LOG=${TENSORBOARD_LOG:-True}
+SAVE_TEMP_EVERY=${SAVE_TEMP_EVERY:-500}
+SAVE_PERM_EVERY=${SAVE_PERM_EVERY:-5000}
 WANDB_LOG=${WANDB_LOG:-True}
 WANDB_MODE=${WANDB_MODE:-offline}
 source "$REPO_ROOT/scripts/icl_recipe.sh"
 mkdir -p "$LOG_DIR"
 
+# Reusing the same command after interruption resumes the new hybrid run,
+# rather than repeatedly reinitializing it from the old checkpoint.
+RESUME_ARGS=()
+if compgen -G "$CKPT_DIR/step-*.ckpt" >/dev/null; then
+    : # Trainer automatically loads the latest checkpoint with optimizer/scheduler.
+elif [[ -n "$INIT_CKPT" ]]; then
+    RESUME_ARGS=(--checkpoint_path "$INIT_CKPT" --only_load_model True)
+fi
+
 run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --wandb_log "$WANDB_LOG" \
             --wandb_project TabICLv2 \
-            --wandb_name tabiclv2_clf_stage1 \
-            --wandb_dir $LOG_DIR/wandb \
+            --wandb_name "${WANDB_NAME:-tabiclv2_clf_stage1_hybrid}" \
+            --wandb_dir "$LOG_DIR/wandb" \
             --wandb_mode "$WANDB_MODE" \
-            --log_dir $LOG_DIR \
-            --tensorboard_log True \
+            --log_dir "$LOG_DIR" \
+            --tensorboard_log "$TENSORBOARD_LOG" \
             --device cuda \
             --dtype "$TRAIN_DTYPE" \
             --np_seed 42 \
             --torch_seed 42 \
             --max_steps "$MAX_STEPS" \
-            --batch_size 64 \
-            --micro_batch_size 4 \
-            --lr 8e-4 \
-            --muon True \
+            --batch_size "$BATCH_SIZE" \
+            --micro_batch_size "$MICRO_BATCH_SIZE" \
+            --lr "$LR" \
+            --adamw_lr "$ADAMW_LR" \
+            --muon "$MUON" \
             --beta1 0.9 \
             --weight_decay 0.01 \
             --use_cautious_wd False \
             --scheduler cosine_with_restarts \
-            --warmup_proportion 0.01 \
+            --warmup_proportion "$WARMUP_PROPORTION" \
+            --warmup_steps "$WARMUP_STEPS" \
             --cosine_num_cycles 1 \
             --cosine_amplitude_decay 1 \
             --cosine_lr_end 1e-7 \
@@ -104,9 +129,10 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --zero_init False \
             --use_flash_attn3 "${USE_FLASH_ATTN3:-False}" \
             --recompute "$RECOMPUTE" \
-            --checkpoint_dir $CKPT_DIR \
-            --save_temp_every 500 \
-            --save_perm_every 5000
+            --checkpoint_dir "$CKPT_DIR" \
+            "${RESUME_ARGS[@]}" \
+            --save_temp_every "$SAVE_TEMP_EVERY" \
+            --save_perm_every "$SAVE_PERM_EVERY"
 
 # JSONL and TensorBoard are written during training, including ICL diagnostics.
 
