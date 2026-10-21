@@ -124,6 +124,31 @@ def test_fused_elu_bfloat16_matches_eager_output_and_gradients():
         torch.testing.assert_close(grad, target, atol=8e-4, rtol=0.04)
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+@pytest.mark.parametrize("head_dim", [16, 32, 64, 128])
+def test_fused_elu_backward_supported_head_dims(dtype, head_dim):
+    torch.manual_seed(490 + head_dim)
+    q = torch.randn(2, 3, 67, head_dim, device="cuda", dtype=dtype, requires_grad=True)
+    k = torch.randn(2, 3, 53, head_dim, device="cuda", dtype=dtype, requires_grad=True)
+    v = torch.randn_like(k, requires_grad=True)
+    pq = (F.elu(q.float()) + 1).clamp_min(1e-6)
+    pk = (F.elu(k.float()) + 1).clamp_min(1e-6)
+    reference = (pq @ (pk.transpose(-1, -2) @ v.float()) /
+                 (pq * pk.sum(-2).unsqueeze(-2)).sum(-1, keepdim=True).clamp_min(1e-6)).to(dtype)
+    actual = elu_kernel_attention(q, k, v)
+    tolerance = 3e-3 if dtype == torch.bfloat16 else 8e-4
+    torch.testing.assert_close(actual, reference, atol=tolerance, rtol=tolerance)
+    upstream = torch.randn_like(actual) / 10
+    expected = torch.autograd.grad(reference, (q, k, v), upstream)
+    gradients = torch.autograd.grad(actual, (q, k, v), upstream)
+    for grad, target in zip(gradients, expected):
+        torch.testing.assert_close(
+            grad, target, atol=1.5e-3 if dtype == torch.bfloat16 else 5e-4,
+            rtol=0.06 if dtype == torch.bfloat16 else 0.02,
+        )
+
+
 @pytest.mark.parametrize("saturated", [False, True])
 def test_recomputed_elu_output_and_gradients(saturated):
     torch.manual_seed(451)

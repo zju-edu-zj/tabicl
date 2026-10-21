@@ -6,8 +6,8 @@ set -euo pipefail
 # Subsequent launches: fully resume the latest checkpoint in the new directory.
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
-export INIT_CKPT="${INIT_CKPT:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1/step-35000.ckpt}"
-export CKPT_DIR="${CKPT_DIR:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1_hybrid_from35k}"
+export INIT_CKPT="${INIT_CKPT:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1/step-20000.ckpt}"
+export CKPT_DIR="${CKPT_DIR:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1_hybrid_from20k}"
 export LOG_DIR="${LOG_DIR:-$CKPT_DIR/logs}"
 
 export MUON=True
@@ -18,7 +18,7 @@ export WARMUP_PROPORTION=-1
 export WARMUP_STEPS="${WARMUP_STEPS:-500}"
 export SAVE_TEMP_EVERY="${SAVE_TEMP_EVERY:-500}"
 export SAVE_PERM_EVERY="${SAVE_PERM_EVERY:-5000}"
-export WANDB_NAME="${WANDB_NAME:-tabiclv2_clf_stage1_hybrid_from35k}"
+export WANDB_NAME="${WANDB_NAME:-tabiclv2_clf_stage1_hybrid_from20k}"
 
 # The source checkpoint need not remain mounted once a new run can resume.
 # Dry runs can also be inspected away from the training machine.

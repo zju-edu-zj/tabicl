@@ -143,8 +143,8 @@ bash scripts/train_v2_clf_stage1.sh
 
 ## 架构筛选命令
 
-screen 也使用新 hybrid 分组。新增两个显式学习率选项，不改变架构集合或初始化规则。
-必须使用新输出目录，避免自动恢复旧 all-Muon 试验。
+screen 也使用新 hybrid 分组，默认 Muon matrix LR=4e-4、AdamW LR=1e-4；
+`--optimizer adamw` 可运行全 AdamW 稳定性对照。必须使用新输出目录，避免自动恢复旧 all-Muon 试验。
 
 ```bash
 OMP_NUM_THREADS=4 PYTHONPATH=src python scripts/screen_icl_attention.py plan \
@@ -152,13 +152,17 @@ OMP_NUM_THREADS=4 PYTHONPATH=src python scripts/screen_icl_attention.py plan \
   --preset routing --steps 20000 --num-gpus 1 \
   --batch-size 16 --micro-batch-size 1 \
   --lr 4e-4 --adamw-lr 1e-4 \
-  --variants dense global_elu global_sparse_elu global_sparse_alternating \
+  --variants dense global_elu global_sparse_elu global_sparse_alternating sparse_all \
   --seeds 42 43 44 --memory-limit-gib 0
 ```
 
 将 `plan` 改成 `run` 才会生成固定验证集、公共初始化并启动训练。
 该 screen 从公共随机初始化训练；它不是从 Stage 1 checkpoint 进行恢复。
-`sparse_all` 尚未新增，本次只实现 optimizer 改动。
+screen 现在包含 `sparse_all`，并在固定 held-out tables 上记录 native、global-only、
+sparse-only 反事实目标；训练期同时记录各优化器组的未裁剪梯度，验证期记录参数
+RMS/max/nonfinite，并把 decoder、ICL attention/FFN、column/row 梯度单独拆开。
+`summary.json` 汇总 native-vs-dense、branch-vs-native 配对差值以及
+机制/参数时间序列。每个优化器配置应使用独立 `--output`，正式排序使用多 seed。
 
 ## 验证
 

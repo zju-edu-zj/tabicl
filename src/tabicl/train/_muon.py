@@ -25,22 +25,25 @@ def zeropower_via_newtonschulz5(G, steps):
     where S' is diagonal with S_{ii}' ~ Uniform(0.5, 1.5), which turns out not to hurt model
     performance at all relative to UV^T, where USV^T = G is the SVD.
     """
-    assert len(G.shape) == 2
+    if G.ndim not in (2, 3):
+        raise ValueError("Newton-Schulz expects one matrix or a batch of matrices")
     a, b, c = (3.4445, -4.7750, 2.0315)
     X = G
-    if G.size(0) > G.size(1):
-        X = X.T
+    transposed = G.size(-2) > G.size(-1)
+    if transposed:
+        X = X.transpose(-2, -1)
 
-    # Ensure spectral norm is at most 1
-    X = X / (X.norm() + 1e-7)
+    # Frobenius-normalize every matrix independently.  This also makes the
+    # batched path exactly the same algorithm as the former per-parameter path.
+    X = X / (X.norm(dim=(-2, -1), keepdim=True) + 1e-7)
     # Perform the NS iterations
     for _ in range(steps):
-        A = X @ X.T
+        A = X @ X.transpose(-2, -1)
         B = b * A + c * A @ A  # adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng
         X = a * X + B @ X
 
-    if G.size(0) > G.size(1):
-        X = X.T
+    if transposed:
+        X = X.transpose(-2, -1)
     return X
 
 
@@ -116,42 +119,47 @@ class Muon(torch.optim.Optimizer):
             weight_decay = group["weight_decay"]
             use_cautious_wd = group["use_cautious_wd"]
             momentum = group["momentum"]
+            nesterov = group["nesterov"]
             matched_adamw_rms = group["matched_adamw_rms"]
-            params = group["params"]
+            active = [p for p in group["params"] if p.grad is not None]
+            if not active:
+                continue
 
-            for p in params:
-                g = p.grad
-                if g is None:  # parameter unused this step; skip like AdamW does
-                    continue
-
-                # prepare muon buffer in state
+            grads = [p.grad for p in active]
+            buffers = []
+            for p, g in zip(active, grads):
                 state = self.state[p]
-                if not "momentum_buffer" in state:
+                if "momentum_buffer" not in state:
                     state["momentum_buffer"] = torch.zeros_like(g)
-                buf = state["momentum_buffer"]
-                buf.mul_(momentum).add_(g)
+                buffers.append(state["momentum_buffer"])
+            torch._foreach_mul_(buffers, momentum)
+            torch._foreach_add_(buffers, grads)
 
-                # momentum
-                ns_input = g.add(buf, alpha=momentum) if group['nesterov'] else buf
-                ns_input = ns_input.reshape(len(g), -1)  # reshape to 2D
-
-                # Reshape + calc update
-                assert ns_input.ndim >= 2
-                update = zeropower_via_newtonschulz5(
-                    ns_input,
-                    steps=ns_steps
-                ).view(g.shape)
-
-                # apply weight decay
-                if use_cautious_wd:
-                    wd_mask = (update * p >= 0)
-                    p.data.add_(p * wd_mask, alpha=-lr * weight_decay)
+            # Stack equal matrix shapes so the five Newton-Schulz iterations use
+            # batched GEMMs. Different transformer projections remain separate
+            # buckets, and optimizer state stays per parameter/checkpoint-compatible.
+            buckets = {}
+            for p, g, buf in zip(active, grads, buffers):
+                matrix_shape = (len(g), g.numel() // len(g))
+                key = (g.device, g.dtype, matrix_shape)
+                buckets.setdefault(key, []).append((p, g, buf))
+            for (_, _, matrix_shape), entries in buckets.items():
+                if nesterov:
+                    ns_input = torch.stack([g.add(buf, alpha=momentum).reshape(matrix_shape)
+                                            for _, g, buf in entries])
                 else:
-                    p.data.mul_(1 - lr * weight_decay)
-
-                # adjust lr and apply update
-                adjusted_lr = adjust_lr_wd_for_muon(lr, matched_adamw_rms, ns_input.shape)
-                p.data.add_(update, alpha=-adjusted_lr)
+                    ns_input = torch.stack([buf.reshape(matrix_shape) for _, _, buf in entries])
+                updates = zeropower_via_newtonschulz5(ns_input, steps=ns_steps).unbind(0)
+                params = [p for p, _, _ in entries]
+                if use_cautious_wd:
+                    for p, update in zip(params, updates):
+                        shaped = update.view_as(p)
+                        p.add_(p * (shaped * p >= 0), alpha=-lr * weight_decay)
+                elif weight_decay:
+                    torch._foreach_mul_(params, 1 - lr * weight_decay)
+                adjusted_lr = adjust_lr_wd_for_muon(lr, matched_adamw_rms, matrix_shape)
+                torch._foreach_add_(params, [u.view_as(p) for p, u in zip(params, updates)],
+                                    alpha=-adjusted_lr)
 
         # use adam for other params
         for group in self.param_groups:

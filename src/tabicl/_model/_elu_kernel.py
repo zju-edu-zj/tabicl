@@ -25,8 +25,8 @@ def _elu_state(K, V, STATE, NORMALIZER, S, D: tl.constexpr,
         raw = tl.load(K + (bh * S + row[:, None]) * D + m[None, :],
                       (row[:, None] < S) & (m[None, :] < D), other=0.0)
         raw32 = raw.to(tl.float32)
-        feature = tl.where(row[:, None] < S,
-                           tl.where(raw32 >= 0, raw32 + 1.0, tl.exp(raw32)), 0.0)
+        feature = tl.where(raw32 >= 0, raw32 + 1.0, tl.exp(raw32))
+        feature = tl.where(row[:, None] < S, tl.maximum(feature, 1e-6), 0.0)
         value = tl.load(V + (bh * S + row[:, None]) * D + n[None, :],
                         (row[:, None] < S) & (n[None, :] < D), other=0.0).to(tl.float32)
         state += tl.dot(tl.trans(feature), value, input_precision="ieee")
@@ -48,7 +48,7 @@ def _elu_apply(Q, STATE, NORMALIZER, OUT, N, D: tl.constexpr,
     raw = tl.load(Q + (bh * N + row[:, None]) * D + d[None, :],
                   (row[:, None] < N) & (d[None, :] < D), other=0.0)
     raw32 = raw.to(tl.float32)
-    feature32 = tl.where(raw32 >= 0, raw32 + 1.0, tl.exp(raw32))
+    feature32 = tl.maximum(tl.where(raw32 >= 0, raw32 + 1.0, tl.exp(raw32)), 1e-6)
     state = tl.load(STATE + (bh * D + d[:, None]) * D + n[None, :],
                     (d[:, None] < D) & (n[None, :] < D), other=0.0)
     numerator = tl.dot(feature32, state, input_precision="ieee")
@@ -73,6 +73,83 @@ def _triton_forward(q, k, v):
         q, state, normalizer, out, n, d, 32, 32, triton.next_power_of_2(d), num_warps=4
     )
     return q, k, v, state, normalizer, out
+
+
+@triton.jit(do_not_specialize=["N"])
+def _elu_backward_query(Q, GRAD_OUT, STATE, NORMALIZER, DQ, GRAD_STATE,
+                        GRAD_NORMALIZER, N, D: tl.constexpr, BT: tl.constexpr,
+                        BD: tl.constexpr):
+    row = tl.program_id(0) * BT + tl.arange(0, BT)
+    bh = tl.program_id(1)
+    d = tl.arange(0, BD)
+    valid = (row[:, None] < N) & (d[None, :] < D)
+    raw = tl.load(Q + (bh * N + row[:, None]) * D + d[None, :], valid, other=0.0).to(tl.float32)
+    raw_feature = tl.where(raw >= 0, raw + 1.0, tl.exp(raw))
+    feature = tl.where(valid, tl.maximum(raw_feature, 1e-6), 0.0)
+    state = tl.load(STATE + (bh * D + d[:, None]) * D + d[None, :],
+                    (d[:, None] < D) & (d[None, :] < D), other=0.0)
+    normalizer = tl.load(NORMALIZER + bh * D + d, d < D, other=0.0)
+    numerator = tl.dot(feature, state, input_precision="ieee")
+    raw_den = tl.sum(feature * normalizer[None, :], axis=1)
+    den = tl.maximum(raw_den, 1e-6)
+    grad = tl.load(GRAD_OUT + (bh * N + row[:, None]) * D + d[None, :], valid, other=0.0).to(tl.float32)
+    grad_num = grad / den[:, None]
+    out = numerator / den[:, None]
+    grad_den = -tl.sum(grad * out, axis=1) / den
+    grad_den = tl.where((row < N) & (raw_den >= 1e-6), grad_den, 0.0)
+    grad_feature = tl.dot(grad_num, tl.trans(state), input_precision="ieee")
+    grad_feature += grad_den[:, None] * normalizer[None, :]
+    derivative = tl.where(raw >= 0, 1.0, tl.exp(tl.minimum(raw, 0.0)))
+    derivative = tl.where(raw_feature >= 1e-6, derivative, 0.0)
+    tl.store(DQ + (bh * N + row[:, None]) * D + d[None, :],
+             grad_feature * derivative, valid)
+
+    partial_state = tl.dot(tl.trans(feature), grad_num, input_precision="ieee")
+    tl.atomic_add(GRAD_STATE + (bh * D + d[:, None]) * D + d[None, :], partial_state,
+                  (d[:, None] < D) & (d[None, :] < D))
+    partial_normalizer = tl.sum(feature * grad_den[:, None], axis=0)
+    tl.atomic_add(GRAD_NORMALIZER + bh * D + d, partial_normalizer, d < D)
+
+
+@triton.jit(do_not_specialize=["S"])
+def _elu_backward_support(K, V, GRAD_STATE, GRAD_NORMALIZER, DK, DV,
+                          S, D: tl.constexpr, BT: tl.constexpr, BD: tl.constexpr):
+    row = tl.program_id(0) * BT + tl.arange(0, BT)
+    bh = tl.program_id(1)
+    d = tl.arange(0, BD)
+    valid = (row[:, None] < S) & (d[None, :] < D)
+    raw = tl.load(K + (bh * S + row[:, None]) * D + d[None, :], valid, other=0.0).to(tl.float32)
+    raw_feature = tl.where(raw >= 0, raw + 1.0, tl.exp(raw))
+    feature = tl.where(valid, tl.maximum(raw_feature, 1e-6), 0.0)
+    value = tl.load(V + (bh * S + row[:, None]) * D + d[None, :], valid, other=0.0).to(tl.float32)
+    grad_state = tl.load(GRAD_STATE + (bh * D + d[:, None]) * D + d[None, :],
+                         (d[:, None] < D) & (d[None, :] < D), other=0.0)
+    grad_normalizer = tl.load(GRAD_NORMALIZER + bh * D + d, d < D, other=0.0)
+    grad_feature = tl.dot(value, tl.trans(grad_state), input_precision="ieee")
+    grad_feature += grad_normalizer[None, :]
+    derivative = tl.where(raw >= 0, 1.0, tl.exp(tl.minimum(raw, 0.0)))
+    derivative = tl.where(raw_feature >= 1e-6, derivative, 0.0)
+    grad_value = tl.dot(feature, grad_state, input_precision="ieee")
+    tl.store(DK + (bh * S + row[:, None]) * D + d[None, :], grad_feature * derivative, valid)
+    tl.store(DV + (bh * S + row[:, None]) * D + d[None, :], grad_value, valid)
+
+
+def _triton_backward(q, k, v, state, normalizer, grad_out):
+    b, h, n, d = q.shape
+    s = k.shape[-2]
+    dq, dk, dv = torch.empty_like(q), torch.empty_like(k), torch.empty_like(v)
+    grad_state = torch.zeros_like(state)
+    grad_normalizer = torch.zeros_like(normalizer)
+    block = 16 if d >= 128 else 32
+    padded = triton.next_power_of_2(d)
+    _elu_backward_query[(triton.cdiv(n, block), b * h)](
+        q, grad_out.contiguous(), state, normalizer, dq, grad_state, grad_normalizer,
+        n, d, block, padded, num_warps=4,
+    )
+    _elu_backward_support[(triton.cdiv(s, block), b * h)](
+        k, v, grad_state, grad_normalizer, dk, dv, s, d, block, padded, num_warps=4,
+    )
+    return dq, dk, dv
 
 
 def _features(x):
@@ -116,6 +193,9 @@ class _ELUAttention(torch.autograd.Function):
     def backward(ctx, grad_out):
         q, k, v, state, normalizer = ctx.saved_tensors
         with torch.autocast(device_type=q.device.type, enabled=False):
+            if (q.is_cuda and q.dtype in (torch.bfloat16, torch.float16)
+                    and q.shape[-1] == v.shape[-1] and q.shape[-1] <= 128):
+                return _triton_backward(q, k, v, state, normalizer, grad_out)
             dq, dk, dv = torch.empty_like(q), torch.empty_like(k), torch.empty_like(v)
             grad_state, grad_normalizer = torch.zeros_like(state), torch.zeros_like(normalizer)
             for start in range(0, q.shape[-2], ctx.chunk_size):

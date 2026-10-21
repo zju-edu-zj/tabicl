@@ -89,6 +89,12 @@ def build_parser():
                         help="Seed each online batch by optimizer step/rank, including exact data replay on resume.")
     parser.add_argument("--eval_data", type=str, default=None, help="Fixed held-out screening cases (.pt).")
     parser.add_argument("--eval_every", type=int, default=2000, help="Screen validation interval; also step 0 and final.")
+    parser.add_argument(
+        "--eval_attention_policies",
+        type=str,
+        default="native",
+        help="Comma-separated fixed-validation policies: native, global_only, sparse_only.",
+    )
     parser.add_argument("--max_steps", type=int, default=60000, help="Training steps")
     parser.add_argument("--batch_size", type=int, default=512, help="Batch size")
     parser.add_argument(
@@ -324,7 +330,7 @@ def build_parser():
     parser.add_argument("--icl_nhead", type=int, default=4, help="Number of attention heads in ICL predictor")
     from tabicl._model.icl_attention import ICL_ATTENTION_TYPES
     parser.add_argument("--icl_attention", choices=ICL_ATTENTION_TYPES, default="global_sparse",
-                        help="Dense, ELU global, or global with periodic full/sparse retrieval layers.")
+                        help="Dense, global, all-sparse, or global with periodic full/sparse retrieval layers.")
     parser.add_argument("--icl_sparse_every", type=int, default=3,
                         help="Every Nth hybrid layer uses retrieval (1-based).")
     parser.add_argument("--icl_block_size", type=int, default=128,

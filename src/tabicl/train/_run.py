@@ -35,7 +35,12 @@ from tabicl.prior.graph_lib._config import PriorConfig
 from tabicl.train._optim import get_scheduler
 from tabicl.train._optimizer import build_optimizer, optimizer_spec, validate_optimizer_checkpoint
 from tabicl.train._train_config import build_parser
-from tabicl.train._screening import StepSeededPrior, evaluate_cases, load_common_initialization
+from tabicl.train._screening import (
+    EVAL_ATTENTION_POLICIES,
+    StepSeededPrior,
+    evaluate_cases,
+    load_common_initialization,
+)
 
 warnings.filterwarnings(
     "ignore", message=".*The PyTorch API of nested tensors is in prototype stage.*", category=UserWarning
@@ -94,6 +99,12 @@ class Trainer:
         self.config = config
         if config.icl_diagnostics_every < 0 or min(config.icl_diagnostic_queries, config.icl_diagnostic_topk) < 1:
             raise ValueError("Diagnostics interval must be >= 0; query count and top-k must be positive")
+        self.eval_attention_policies = tuple(
+            item.strip() for item in config.eval_attention_policies.split(",") if item.strip()
+        )
+        invalid_policies = set(self.eval_attention_policies) - set(EVAL_ATTENTION_POLICIES)
+        if not self.eval_attention_policies or invalid_policies:
+            raise ValueError(f"Invalid eval_attention_policies: {sorted(invalid_policies)}")
         self.configure_ddp()
         self.configure_wandb()
         self.build_model()
@@ -550,13 +561,13 @@ class Trainer:
                     "icl_global_type": "elu", "icl_num_induced_slots": 128,
                     "icl_ssmax": False, "icl_qk_norm": False}
         keys = ["icl_attention", "icl_ssmax", "icl_qk_norm"]
-        if mode != "dense":
+        if mode in ("global", "global_full", "global_sparse", "global_sparse_alternating"):
             keys.append("icl_global_type")
             if self.model_config.get("icl_global_type") == "induced":
                 keys.append("icl_num_induced_slots")
         if mode in ("global_full", "global_sparse", "global_sparse_alternating"):
             keys.append("icl_sparse_every")
-        if mode in ("global_sparse", "global_sparse_alternating"):
+        if mode in ("sparse", "global_sparse", "global_sparse_alternating"):
             keys.extend(("icl_block_size", "icl_num_selected_blocks", "icl_router", "icl_partition"))
             if self.model_config.get("icl_router") == "hierarchical":
                 keys.append("icl_router_beam")
@@ -722,15 +733,89 @@ class Trainer:
             validation_model = getattr(self.raw_model, "_orig_mod", self.raw_model)
             with self._sdpa_ctx():
                 metrics, records = evaluate_cases(validation_model, self.eval_cases, self.config.device,
-                                                  self.amp_ctx, self.config.icl_diagnostic_queries)
+                                                  self.amp_ctx, self.config.icl_diagnostic_queries,
+                                                  getattr(self, "eval_attention_policies", ("native",)))
+            if isinstance(validation_model, nn.Module):
+                parameter_metrics, parameter_records = self.parameter_diagnostics(validation_model)
+            else:  # Lightweight test doubles need not implement the model parameter API.
+                parameter_metrics, parameter_records = {}, []
+            metrics.update(parameter_metrics)
             self.log_local_metrics(self.curr_step, metrics)
             if self.local_log_dir:
                 with (self.local_log_dir / "validation.jsonl").open("a") as stream:
                     stream.write(json.dumps({"step": self.curr_step, "cases": records}, allow_nan=False) + "\n")
+                with (self.local_log_dir / "parameter_validation.jsonl").open("a") as stream:
+                    stream.write(json.dumps({
+                        "step": self.curr_step,
+                        "metrics": parameter_metrics,
+                        "largest_parameters": parameter_records,
+                    }, allow_nan=False) + "\n")
             print(f"Validation step={self.curr_step}: " + json.dumps({k: v for k, v in metrics.items()
                                                                     if "/diag/" not in k}), flush=True)
         if self.ddp:
             torch.distributed.barrier()
+
+    def parameter_diagnostics(self, model, topk=25):
+        """Summarize parameter scale by component and sensitive parameter class."""
+        named = dict(model.named_parameters())
+        norm_ids = {
+            id(parameter)
+            for module in model.modules()
+            if isinstance(module, nn.LayerNorm)
+            for parameter in module.parameters(recurse=False)
+        }
+        categories = {
+            "model": list(named.values()),
+            "column": [p for name, p in named.items() if name.startswith("col_embedder.")],
+            "row": [p for name, p in named.items() if name.startswith("row_interactor.")],
+            "icl": [p for name, p in named.items() if name.startswith("icl_predictor.")],
+            "icl_attention": [p for name, p in named.items()
+                              if name.startswith("icl_predictor.tf_icl.") and ".attn." in name],
+            "icl_ffn": [p for name, p in named.items()
+                        if name.startswith("icl_predictor.tf_icl.")
+                        and (".linear1." in name or ".linear2." in name)],
+            "decoder": [p for name, p in named.items()
+                        if name.startswith("icl_predictor.decoder.")],
+            "label_encoder": [p for name, p in named.items()
+                              if name.startswith("icl_predictor.y_encoder.")],
+            "layernorm": [p for p in named.values() if id(p) in norm_ids],
+            "inducing": [p for name, p in named.items()
+                         if "ind_vectors" in name or "inducing_points" in name],
+            "fusion_gate": [p for name, p in named.items() if "fusion_gate" in name],
+            "qk_norm": [p for name, p in named.items() if "qk_norm" in name],
+        }
+        if hasattr(self, "optimizer"):
+            for group in self.optimizer.param_groups:
+                categories[f"optimizer_{group.get('group_name', 'adamw')}"] = list(group["params"])
+
+        def aggregate(parameters):
+            count = finite_count = 0
+            square_sum = maximum = 0.0
+            for parameter in parameters:
+                value = parameter.detach().float()
+                finite = torch.isfinite(value)
+                count += value.numel()
+                finite_count += int(finite.sum())
+                if finite.any():
+                    selected = value[finite]
+                    square_sum += float(selected.square().sum())
+                    maximum = max(maximum, float(selected.abs().max()))
+            return {
+                "numel": float(count),
+                "rms": math.sqrt(square_sum / max(finite_count, 1)),
+                "max_abs": maximum,
+                "nonfinite_fraction": (count - finite_count) / max(count, 1),
+            }
+
+        metrics = {}
+        for category, parameters in categories.items():
+            if not parameters:
+                continue
+            for key, value in aggregate(parameters).items():
+                metrics[f"parameter_diag/{category}/{key}"] = value
+        records = [dict(name=name, **aggregate([parameter])) for name, parameter in named.items()]
+        records.sort(key=lambda record: record["max_abs"], reverse=True)
+        return metrics, records[:topk]
 
     def validate_micro_batch(self, micro_seq_len, micro_train_size):
         """Validate consistent sequence length and train size within a micro batch.
@@ -921,6 +1006,78 @@ class Trainer:
                     raise FloatingPointError(f"Non-finite ICL projection gradient: {name}")
         return micro_results
 
+    @staticmethod
+    def _gradient_statistics(parameters):
+        """Aggregate already-unscaled gradients and account for missing grads."""
+        total = count = finite_count = 0
+        square_sum = maximum = 0.0
+        for parameter in parameters:
+            total += parameter.numel()
+            if parameter.grad is None:
+                continue
+            grad = parameter.grad.detach().float()
+            finite = torch.isfinite(grad)
+            count += grad.numel()
+            finite_count += int(finite.sum())
+            if finite.any():
+                selected = grad[finite]
+                square_sum += float(selected.square().sum())
+                maximum = max(maximum, float(selected.abs().max()))
+        return {
+            "grad_numel": float(count),
+            "grad_rms": math.sqrt(square_sum / max(finite_count, 1)),
+            "grad_max_abs": maximum,
+            "grad_nonfinite_fraction": (count - finite_count) / max(count, 1),
+            "grad_missing_fraction": (total - count) / max(total, 1),
+        }
+
+    def component_gradient_diagnostics(self):
+        """Localize gradient instability before clipping and optimizer updates."""
+        named = {
+            name: parameter
+            for name, parameter in self.raw_model.named_parameters()
+            if parameter.requires_grad
+        }
+        norm_ids = {
+            id(parameter)
+            for module in self.raw_model.modules()
+            if isinstance(module, nn.LayerNorm)
+            for parameter in module.parameters(recurse=False)
+        }
+        categories = {
+            "model": list(named.values()),
+            "column": [p for name, p in named.items() if name.startswith("col_embedder.")],
+            "row": [p for name, p in named.items() if name.startswith("row_interactor.")],
+            "icl_attention": [p for name, p in named.items()
+                              if name.startswith("icl_predictor.tf_icl.") and ".attn." in name],
+            "icl_ffn": [p for name, p in named.items()
+                        if name.startswith("icl_predictor.tf_icl.")
+                        and (".linear1." in name or ".linear2." in name)],
+            "decoder": [p for name, p in named.items()
+                        if name.startswith("icl_predictor.decoder.")],
+            "label_encoder": [p for name, p in named.items()
+                              if name.startswith("icl_predictor.y_encoder.")],
+            "layernorm": [p for p in named.values() if id(p) in norm_ids],
+            "inducing": [p for name, p in named.items()
+                         if "ind_vectors" in name or "inducing_points" in name],
+            "fusion_gate": [p for name, p in named.items() if "fusion_gate" in name],
+            "qk_norm": [p for name, p in named.items() if "qk_norm" in name],
+        }
+        return {
+            f"component_grad/{category}/{key}": value
+            for category, parameters in categories.items()
+            if parameters
+            for key, value in self._gradient_statistics(parameters).items()
+        }
+
+    def optimizer_gradient_diagnostics(self):
+        """Aggregate unscaled, pre-clipping gradients by optimizer group."""
+        return {
+            f"optimizer_diag/{group.get('group_name', 'adamw')}/{key}": value
+            for group in self.optimizer.param_groups
+            for key, value in self._gradient_statistics(group["params"]).items()
+        }
+
     def run_batch(self, batch):
         """Train the model on a batch of datasets.
 
@@ -982,9 +1139,20 @@ class Trainer:
                 f"Please check configuration to reduce memory consumption."
             )
 
-        # Clip the gradient
-        if self.config.gradient_clipping > 0:
+        diagnostic_interval = getattr(self.config, "icl_diagnostics_every", 0)
+        diagnose_optimizer = (
+            self.master_process
+            and diagnostic_interval > 0
+            and (self.curr_step == 0 or (self.curr_step + 1) % diagnostic_interval == 0)
+        )
+        if self.config.gradient_clipping > 0 or diagnose_optimizer:
             self.scaler.unscale_(self.optimizer)
+        if diagnose_optimizer:
+            results.update(self.component_gradient_diagnostics())
+            results.update(self.optimizer_gradient_diagnostics())
+
+        # Report the global norm before clipping, then bound the gradients.
+        if self.config.gradient_clipping > 0:
             grad_norm = nn.utils.clip_grad_norm_(
                 self.model.parameters(), self.config.gradient_clipping,
                 error_if_nonfinite=getattr(self.config, "fail_fast", False),

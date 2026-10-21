@@ -2,12 +2,19 @@
 
 import hashlib
 import random
+import types
 from collections import defaultdict
+from contextlib import contextmanager
 
 import numpy as np
 import torch
 from torch.nn import functional as F
 from torch.utils.data import IterableDataset, get_worker_info
+
+from tabicl._model.icl_attention import SetRetrievalAttention
+
+
+EVAL_ATTENTION_POLICIES = ("native", "global_only", "sparse_only")
 
 
 class StepSeededPrior(IterableDataset):
@@ -75,8 +82,57 @@ def load_common_initialization(model, path, model_config, seed):
                 module.inducing_points.copy_(points.to(module.inducing_points.device))
 
 
+@contextmanager
+def _attention_policy(model, policy):
+    """Temporarily replace retrieval layers by one branch for a counterfactual."""
+    if policy not in EVAL_ATTENTION_POLICIES:
+        raise ValueError(f"Unknown validation attention policy: {policy}")
+    modules = [m for m in model.icl_predictor.modules() if isinstance(m, SetRetrievalAttention)]
+    if policy == "native" or not modules:
+        yield
+        return
+    saved = []
+    for module in modules:
+        had_override = "_hybrid_attention" in module.__dict__
+        saved.append((module, had_override, module.__dict__.get("_hybrid_attention")))
+
+        def intervention(self, q, k, v, selected_policy=policy):
+            diagnose = self.diagnostics_enabled
+            if diagnose:
+                self.last_diagnostics = {}
+            if selected_policy == "global_only":
+                heads = self._global_attention(q, k, v)
+            elif self.mode == "fused_full" or k.shape[-2] <= (
+                self.block_size * self.num_selected_blocks
+            ):
+                attention_q = (
+                    self.qk_norm.scale_query(q, k.shape[-2])
+                    if self.qk_norm is not None
+                    else q
+                )
+                heads = F.scaled_dot_product_attention(attention_q, k, v)
+                if diagnose:
+                    self._diagnose(attention_q, k, v)
+            else:
+                heads = self._sparse_attention(q, k, v)
+            combined = heads.transpose(-3, -2).contiguous().view(
+                *q.shape[:-3], q.shape[-2], self.embed_dim
+            )
+            return self.out_proj(combined)
+
+        module._hybrid_attention = types.MethodType(intervention, module)
+    try:
+        yield
+    finally:
+        for module, had_override, previous in saved:
+            if had_override:
+                module._hybrid_attention = previous
+            else:
+                del module._hybrid_attention
+
+
 @torch.no_grad()
-def evaluate_cases(model, data, device, amp_ctx, diagnostic_queries=16):
+def evaluate_cases(model, data, device, amp_ctx, diagnostic_queries=16, policies=("native",)):
     """Held-out pretraining objective; no ensembling or inference calibration.
 
     Training execution path under no_grad intentionally keeps CE comparable to
@@ -85,6 +141,13 @@ def evaluate_cases(model, data, device, amp_ctx, diagnostic_queries=16):
     """
     if any(isinstance(m, torch.nn.Dropout) and m.p for m in model.modules()):
         raise ValueError("Screen validation requires dropout=0")
+    policies = tuple(dict.fromkeys(policies))
+    invalid = set(policies) - set(EVAL_ATTENTION_POLICIES)
+    if not policies or invalid:
+        raise ValueError(f"Invalid validation attention policies: {sorted(invalid)}")
+    has_retrieval = any(isinstance(m, SetRetrievalAttention) for m in model.modules())
+    if not has_retrieval:
+        policies = ("native",)
     modes = {m: m.training for m in model.modules()}
     diagnostics = [(name, m) for name, m in model.icl_predictor.named_modules() if hasattr(m, "diagnostics_enabled")]
     states = {
@@ -98,31 +161,42 @@ def evaluate_cases(model, data, device, amp_ctx, diagnostic_queries=16):
     try:
         model.train()
         with torch.random.fork_rng(devices=devices), amp_ctx:
-            for case in data["cases"]:
-                x, y, s = case["x"].to(device), case["y"].to(device), case["train_size"]
-                for _, m in diagnostics:
-                    m.diagnostics_enabled = diagnostic_queries > 0
-                    m.diagnostic_query_start = s
-                    m.diagnostic_queries = max(1, diagnostic_queries)
-                    m.last_diagnostics = {}
-                pred = model(x, y[:, :s]).float()
-                if not torch.isfinite(pred).all():
-                    raise FloatingPointError(f"Nonfinite validation predictions: {case['id']}")
-                record = {"id": case["id"], "support": s, "features": x.shape[-1]}
-                target = y[:, s:]
-                if model.max_classes > 0:
-                    record["ce"] = F.cross_entropy(pred.flatten(0, 1), target.long().flatten()).item()
-                    record["accuracy"] = (pred.argmax(-1) == target).float().mean().item()
-                else:
-                    alphas = torch.linspace(0, 1, pred.shape[-1] + 2, device=device)[1:-1]
-                    err = target[..., None] - pred
-                    record["pinball"] = torch.maximum(alphas * err, (alphas - 1) * err).mean().item()
-                    record["median_mse"] = (pred[..., pred.shape[-1] // 2] - target).square().mean().item()
-                # Aggregate each layer separately: global and retrieval differ.
-                for name, m in diagnostics:
-                    for key, value in m.last_diagnostics.items():
-                        record[f"diag/{name}/{key}"] = float(value)
-                records.append(record)
+            for policy in policies:
+                with _attention_policy(model, policy):
+                    for case in data["cases"]:
+                        x, y, s = case["x"].to(device), case["y"].to(device), case["train_size"]
+                        for _, m in diagnostics:
+                            m.diagnostics_enabled = diagnostic_queries > 0
+                            m.diagnostic_query_start = s
+                            m.diagnostic_queries = max(1, diagnostic_queries)
+                            m.last_diagnostics = {}
+                        pred = model(x, y[:, :s]).float()
+                        if not torch.isfinite(pred).all():
+                            raise FloatingPointError(
+                                f"Nonfinite validation predictions: {case['id']}, policy={policy}"
+                            )
+                        record = {
+                            "id": case["id"], "support": s, "features": x.shape[-1], "policy": policy
+                        }
+                        target = y[:, s:]
+                        if model.max_classes > 0:
+                            record["ce"] = F.cross_entropy(
+                                pred.flatten(0, 1), target.long().flatten()
+                            ).item()
+                            record["accuracy"] = (pred.argmax(-1) == target).float().mean().item()
+                        else:
+                            alphas = torch.linspace(0, 1, pred.shape[-1] + 2, device=device)[1:-1]
+                            err = target[..., None] - pred
+                            record["pinball"] = torch.maximum(
+                                alphas * err, (alphas - 1) * err
+                            ).mean().item()
+                            record["median_mse"] = (
+                                pred[..., pred.shape[-1] // 2] - target
+                            ).square().mean().item()
+                        for name, m in diagnostics:
+                            for key, value in m.last_diagnostics.items():
+                                record[f"diag/{name}/{key}"] = float(value)
+                        records.append(record)
     finally:
         for m, mode in modes.items():
             m.training = mode
@@ -132,10 +206,11 @@ def evaluate_cases(model, data, device, amp_ctx, diagnostic_queries=16):
         random.setstate(py_state)
     panels = defaultdict(list)
     for record in records:
-        panels[record["support"]].append(record)
+        panels[(record["policy"], record["support"])].append(record)
     metrics = {}
-    for support, rows in panels.items():
+    for (policy, support), rows in panels.items():
+        prefix = "val" if policy == "native" else f"val/{policy}"
         for key in rows[0]:
-            if key not in ("id", "support", "features"):
-                metrics[f"val/support_{support}/{key}"] = sum(r[key] for r in rows) / len(rows)
+            if key not in ("id", "support", "features", "policy"):
+                metrics[f"{prefix}/support_{support}/{key}"] = sum(r[key] for r in rows) / len(rows)
     return metrics, records

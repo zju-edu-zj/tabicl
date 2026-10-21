@@ -6,11 +6,12 @@
 | --- | --- | --- | --- |
 | `dense` | full softmax | full softmax | 基准 |
 | `global` | 可选全局记忆 | 可选全局记忆 | 只压缩全局信息是否足够 |
+| `sparse` | selected-row softmax | selected-row softmax | 完全移除 global 的对照 |
 | `global_full` | 全局摘要 | 摘要与 full softmax 融合 | 混合结构的完整读取对照 |
 | `global_sparse_alternating` | 全局摘要 | selected-row softmax | 同层融合是否必要 |
 | `global_sparse` | 全局摘要 | 摘要与 selected-row softmax 融合 | 全局摘要＋少量原始样本 |
 
-12 层、`icl_sparse_every=3` 时，增强层是第 3、6、9、12 层。训练 CLI 默认 `global_sparse`；`TabICL()` 默认仍为 `dense`，保留官方构造方式。实验配方固定 column 为 `qassmax-mlp-elementwise`，ICL 为 `icl_ssmax=False, icl_qk_norm=True`；二者不共享归一化选项。global_full 是完整读取对照，不是数学意义上的质量上界。
+12 层、`icl_sparse_every=3` 时，增强层是第 3、6、9、12 层；`sparse` 是例外，12 层全部使用 selected-row softmax。训练 CLI 默认 `global_sparse`；`TabICL()` 默认仍为 `dense`，保留官方构造方式。实验配方固定 column 为 `qassmax-mlp-elementwise`，ICL 为 `icl_ssmax=False, icl_qk_norm=True`；二者不共享归一化选项。global_full 是完整读取对照，不是数学意义上的质量上界。
 
 ## 计算与路由
 

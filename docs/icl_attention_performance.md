@@ -213,3 +213,11 @@ OMP_NUM_THREADS=4 PYTHONPATH=src conda run -n stdplm python -m pytest -q \
 ```
 
 其他子实验通过 `--scope routing|tabicl`、`--phase prefill|query`、`--router hierarchical --router-beam 16`、`--dtype`、`--nhead`、`--selected-blocks`、`--portable` 复现，完整命令参数保存在对应 JSON。正式选型下一步应固定训练 token、数据与种子完成五分支质量对比；本次结果只决定实现路径、可行长度和需要关注的性能瓶颈。
+
+
+
+| Rows | Dense | Global ELU | Alternating | Sparse 全层 |
+|---:|---:|---:|---:|---:|
+| 1K | 32.7 ms | 30.4 ms | 38.5 ms | 57.0 ms |
+| 4K | 79.1 ms | 55.4 ms | 91.7 ms | 164.8 ms |
+| 16K | 610.3 ms | 203.6 ms | 357.6 ms | 667.4 ms |

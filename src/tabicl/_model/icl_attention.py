@@ -16,6 +16,7 @@ from .layers import GlobalLinearAttention
 ICL_ATTENTION_TYPES = (
     "dense",
     "global",
+    "sparse",
     "global_full",
     "global_sparse_alternating",
     "global_sparse",

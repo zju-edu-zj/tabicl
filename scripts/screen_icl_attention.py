@@ -1,7 +1,8 @@
 """Plan/run controlled 20K–50K-step ICL screening in the current Python environment.
 
-Default: 20K steps, log-uniform 1K–8K screening of two global memories and
-their same-layer sparse residuals, plus dense and a full-retrieval diagnostic.
+Default: 20K steps, log-uniform 1K–8K screening of dense, global, periodic
+retrieval, alternating, same-layer fused and all-sparse ICL architectures.
+Fixed validation also performs branch interventions and stability diagnostics.
 The stage1 preset retains the original fixed-1024 data distribution.
 The explicit pilot preset uses a small model and is NOT a pretraining ranking.
 """
@@ -22,6 +23,7 @@ import torch
 from tabicl._model.tabicl import TabICL
 from tabicl.prior._dataset import PriorDataset
 from tabicl.prior.graph_lib._config import PriorConfig
+from tabicl.train._screening import EVAL_ATTENTION_POLICIES
 from tabicl.train._train_config import build_parser
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,9 +34,13 @@ VARIANTS = {
     "global_full_elu": ("global_full", "elu", "projection"),
     "global_sparse_elu": ("global_sparse", "elu", "projection"),
     "global_sparse_induced": ("global_sparse", "induced", "projection"),
-    # Optional follow-ups. They are excluded from the default causal screen.
     "global_sparse_alternating": ("global_sparse_alternating", "elu", "projection"),
+    "sparse_all": ("sparse", "elu", "projection"),
+    # Optional router follow-up. Keep it out of the architecture screen.
     "global_sparse_content_tree": ("global_sparse", "elu", "content_tree"),
+    "global_sparse_alternating_content_tree": (
+        "global_sparse_alternating", "elu", "content_tree"
+    ),
 }
 DEFAULT_VARIANTS = (
     "dense",
@@ -43,6 +49,8 @@ DEFAULT_VARIANTS = (
     "global_full_elu",
     "global_sparse_elu",
     "global_sparse_induced",
+    "global_sparse_alternating",
+    "sparse_all",
 )
 
 
@@ -59,7 +67,13 @@ def arguments():
     p.add_argument("--steps", type=int)
     p.add_argument("--variants", nargs="+", choices=VARIANTS, default=list(DEFAULT_VARIANTS))
     p.add_argument("--seeds", type=int, nargs="+", default=[42])
-    p.add_argument("--num-gpus", type=int, default=1)
+    p.add_argument("--num-gpus", type=int, default=16)
+    p.add_argument(
+        "--recompute",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Recompute transformer activations during backward; screening defaults to False.",
+    )
     p.add_argument(
         "--model-compile",
         action=argparse.BooleanOptionalAction,
@@ -69,14 +83,25 @@ def arguments():
     p.add_argument("--batch-size", type=int)
     p.add_argument("--micro-batch-size", type=int, default=1)
     p.add_argument("--workers", type=int, default=4)
-    p.add_argument("--lr", type=float, default=8e-4, help="Muon matrix peak LR")
+    p.add_argument("--optimizer", choices=("hybrid", "adamw"), default="hybrid")
+    p.add_argument("--lr", type=float, default=4e-4, help="Muon matrix peak LR")
     p.add_argument("--adamw-lr", type=float, default=1e-4, help="Hybrid AdamW peak LR")
+    p.add_argument("--diagnostics-every", type=int, default=200)
+    p.add_argument("--diagnostic-queries", type=int, default=16)
+    p.add_argument("--diagnostic-topk", type=int, default=32)
     p.add_argument("--eval-every", type=int)
     p.add_argument("--eval-support", type=int, nargs="+", default=[256, 1024, 4096, 16384])
     p.add_argument("--eval-cases", type=int, default=16, help="Independent tables per support panel.")
     p.add_argument("--eval-queries", type=int, default=128)
     p.add_argument("--eval-features", type=int, nargs="+", default=[5, 20, 50])
     p.add_argument("--eval-seed", type=int, default=100003)
+    p.add_argument(
+        "--eval-policies",
+        nargs="+",
+        choices=EVAL_ATTENTION_POLICIES,
+        default=list(EVAL_ATTENTION_POLICIES),
+        help="Native plus same-checkpoint retrieval-layer branch interventions.",
+    )
     p.add_argument("--task", choices=("classification", "regression"), default="classification")
     p.add_argument(
         "--memory-limit-gib",
@@ -104,6 +129,8 @@ def arguments():
             args.eval_every,
             args.eval_cases,
             args.eval_queries,
+            args.diagnostic_queries,
+            args.diagnostic_topk,
             args.num_gpus,
             *args.eval_support,
             *args.eval_features,
@@ -117,6 +144,8 @@ def arguments():
         p.error("Seeds and variants must be unique")
     if args.memory_limit_gib < 0:
         p.error("--memory-limit-gib must be nonnegative; 0 disables the cap")
+    if args.diagnostics_every < 0:
+        p.error("--diagnostics-every must be nonnegative")
     if not str(Path(sys.executable).resolve()).startswith("/home/zj/miniconda3/envs/stdplm/"):
         p.error("Run Python from the stdplm conda environment")
     return args
@@ -135,9 +164,9 @@ def train_options(args, variant, seed):
         max_steps=args.steps,
         batch_size=args.batch_size,
         micro_batch_size=args.micro_batch_size,
-        lr=args.lr,
+        lr=args.lr if args.optimizer == "hybrid" else args.adamw_lr,
         adamw_lr=args.adamw_lr,
-        muon=True,
+        muon=args.optimizer == "hybrid",
         beta1=0.9,
         weight_decay=0.01,
         use_cautious_wd=False,
@@ -198,11 +227,11 @@ def train_options(args, variant, seed):
         zero_init=False,
         use_flash_attn3=False,
         model_compile=(not pilot if args.model_compile is None else args.model_compile),
-        recompute=not pilot,
+        recompute=args.recompute,
         fail_fast=True,
-        icl_diagnostics_every=200,
-        icl_diagnostic_queries=16,
-        icl_diagnostic_topk=32,
+        icl_diagnostics_every=args.diagnostics_every,
+        icl_diagnostic_queries=args.diagnostic_queries,
+        icl_diagnostic_topk=args.diagnostic_topk,
         wandb_log=False,
         tensorboard_log=False,
         log_dir=job / "logs",
@@ -213,6 +242,7 @@ def train_options(args, variant, seed):
         initial_weights=args.output / f"initial_seed_{seed}.pt",
         eval_data=args.output / "validation.pt",
         eval_every=args.eval_every,
+        eval_attention_policies=",".join(args.eval_policies),
     )
     if args.preset == "routing":
         options.update(min_seq_len=1024, log_seq_len=True)
@@ -331,80 +361,187 @@ def prepare(args):
             torch.save(dict(purpose="icl_screen_initialization", config=config, state_dict=model.state_dict()), path)
 
 
+def _bootstrap_ci(values, seed=123):
+    values = np.asarray(values, dtype=np.float64)
+    rng = np.random.default_rng(seed)
+    boot = values[rng.integers(0, len(values), (2000, len(values)))].mean(1)
+    return np.quantile(boot, [0.025, 0.975]).tolist()
+
+
+def _read_jsonl(path):
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
 def summarize(args):
     rows = []
+    mechanism_timeseries = []
+    parameter_timeseries = []
+    objective = "ce" if args.task == "classification" else "pinball"
     for seed in args.seeds:
         by_variant = {}
         for variant in args.variants:
-            path = args.output / f"seed_{seed}" / variant / "logs/validation.jsonl"
-            if path.exists():
-                items = [json.loads(line) for line in path.read_text().splitlines()]
+            log_dir = args.output / f"seed_{seed}" / variant / "logs"
+            validation_path = log_dir / "validation.jsonl"
+            if validation_path.exists():
+                items = _read_jsonl(validation_path)
                 # Never compare checkpoints trained for different step budgets.
-                found = [x for x in items if x["step"] == args.steps]
+                found = [item for item in items if item["step"] == args.steps]
                 if found:
-                    by_variant[variant] = {c["id"]: c for c in found[-1]["cases"]}
+                    by_variant[variant] = {
+                        (case.get("policy", "native"), case["id"]): case
+                        for case in found[-1]["cases"]
+                    }
+
+            metrics_path = log_dir / "metrics.jsonl"
+            if metrics_path.exists():
+                for item in _read_jsonl(metrics_path):
+                    is_training_row = objective in item
+                    is_diagnostic_row = any(
+                        key.startswith(("icl_diag/", "component_grad/", "optimizer_diag/"))
+                        for key in item
+                    )
+                    if is_training_row and (
+                        item["step"] in (1, args.steps) or is_diagnostic_row
+                    ):
+                        mechanism_timeseries.append(dict(seed=seed, variant=variant, **item))
+
+            parameter_path = log_dir / "parameter_validation.jsonl"
+            if parameter_path.exists():
+                parameter_timeseries.extend(
+                    dict(seed=seed, variant=variant, **item)
+                    for item in _read_jsonl(parameter_path)
+                    if item["step"] <= args.steps
+                )
+
         dense = by_variant.get("dense", {})
         for variant, cases in by_variant.items():
-            for support in args.eval_support:
-                panel = [c for c in cases.values() if c["support"] == support]
-                if len(panel) != args.eval_cases:
-                    raise ValueError(f"Incomplete validation panel: {variant}, support={support}")
-                objective = "ce" if args.task == "classification" else "pinball"
-                row = dict(
-                    seed=seed,
-                    variant=variant,
-                    step=args.steps,
-                    support=support,
-                    tables=len(panel),
-                    **{objective: float(np.mean([c[objective] for c in panel]))},
-                )
-                if args.task == "classification":
-                    row["accuracy"] = float(np.mean([c["accuracy"] for c in panel]))
-                if dense:
-                    delta = np.array([c[objective] - dense[c["id"]][objective] for c in panel])
-                    rng = np.random.default_rng(123)
-                    boot = delta[rng.integers(0, len(delta), (2000, len(delta)))].mean(1)
-                    row.update(
-                        delta_vs_dense=float(delta.mean()),
-                        paired_table_bootstrap_ci95=np.quantile(boot, [0.025, 0.975]).tolist(),
-                    )
-                rows.append(row)
-    aggregates = []
-    objective = "ce" if args.task == "classification" else "pinball"
-    for variant in args.variants:
-        for support in args.eval_support:
-            selected = [r for r in rows if r["variant"] == variant and r["support"] == support]
-            if not selected:
-                continue
-            values = [r[objective] for r in selected]
-            item = dict(
-                variant=variant,
-                support=support,
-                completed_seeds=len(selected),
-                requested_seeds=len(args.seeds),
-                **{objective: float(np.mean(values))},
-                objective_std_across_seeds=float(np.std(values, ddof=1)) if len(values) > 1 else None,
+            policies = sorted(
+                {policy for policy, _ in cases}, key=EVAL_ATTENTION_POLICIES.index
             )
-            if all("delta_vs_dense" in r for r in selected):
-                item["mean_delta_vs_dense"] = float(np.mean([r["delta_vs_dense"] for r in selected]))
-            if args.task == "classification":
-                item["accuracy"] = float(np.mean([r["accuracy"] for r in selected]))
-            aggregates.append(item)
+            for policy in policies:
+                for support in args.eval_support:
+                    panel = [
+                        case
+                        for (item_policy, _), case in cases.items()
+                        if item_policy == policy and case["support"] == support
+                    ]
+                    if len(panel) != args.eval_cases:
+                        raise ValueError(
+                            f"Incomplete validation panel: {variant}, "
+                            f"policy={policy}, support={support}"
+                        )
+                    row = dict(
+                        seed=seed,
+                        variant=variant,
+                        policy=policy,
+                        step=args.steps,
+                        support=support,
+                        tables=len(panel),
+                        **{objective: float(np.mean([case[objective] for case in panel]))},
+                    )
+                    if args.task == "classification":
+                        row["accuracy"] = float(
+                            np.mean([case["accuracy"] for case in panel])
+                        )
+                    diagnostic_keys = sorted(
+                        {key for case in panel for key in case if key.startswith("diag/")}
+                    )
+                    row["diagnostics"] = {
+                        key: float(np.mean([case[key] for case in panel if key in case]))
+                        for key in diagnostic_keys
+                    }
+
+                    if policy == "native" and dense:
+                        baseline = dense
+                        delta_name = "delta_vs_dense"
+                    elif policy != "native":
+                        baseline = {
+                            ("native", case_id): value
+                            for (base_policy, case_id), value in cases.items()
+                            if base_policy == "native"
+                        }
+                        delta_name = "delta_vs_native"
+                    else:
+                        baseline = {}
+                        delta_name = None
+                    if baseline and delta_name:
+                        delta = np.array([
+                            case[objective]
+                            - baseline[("native", case["id"])][objective]
+                            for case in panel
+                        ])
+                        row[delta_name] = float(delta.mean())
+                        row["paired_table_bootstrap_ci95"] = _bootstrap_ci(
+                            delta, seed + support
+                        )
+                    rows.append(row)
+
+    aggregates = []
+    for variant in args.variants:
+        for policy in EVAL_ATTENTION_POLICIES:
+            for support in args.eval_support:
+                selected = [
+                    row
+                    for row in rows
+                    if row["variant"] == variant
+                    and row["policy"] == policy
+                    and row["support"] == support
+                ]
+                if not selected:
+                    continue
+                values = [row[objective] for row in selected]
+                item = dict(
+                    variant=variant,
+                    policy=policy,
+                    support=support,
+                    completed_seeds=len(selected),
+                    requested_seeds=len(args.seeds),
+                    **{objective: float(np.mean(values))},
+                    objective_std_across_seeds=(
+                        float(np.std(values, ddof=1)) if len(values) > 1 else None
+                    ),
+                )
+                for delta_name in ("delta_vs_dense", "delta_vs_native"):
+                    if all(delta_name in row for row in selected):
+                        item[f"mean_{delta_name}"] = float(
+                            np.mean([row[delta_name] for row in selected])
+                        )
+                if args.task == "classification":
+                    item["accuracy"] = float(
+                        np.mean([row["accuracy"] for row in selected])
+                    )
+                aggregates.append(item)
+
     output = dict(
         preset=args.preset,
         task=args.task,
         steps=args.steps,
+        optimizer=args.optimizer,
+        eval_policies=args.eval_policies,
         results=rows,
         seed_aggregate=aggregates,
+        mechanism_timeseries=mechanism_timeseries,
+        parameter_timeseries=parameter_timeseries,
         caveat=(
             "Pilot is a functional/learning check, not a convergence ranking. "
             if args.preset == "pilot"
             else "Screening does not replace full pretraining and downstream evaluation. "
         )
-        + "CI resamples paired tables within each seed; seed std is reported separately.",
+        + "CI resamples paired tables within each seed; seed std is reported separately. "
+        + "Branch policies intervene only on retrieval layers; sparse_all/global_only is a "
+        + "counterfactual using shared QKV, not a separately trained global model.",
     )
     (args.output / "summary.json").write_text(json.dumps(output, indent=2) + "\n")
-    print(json.dumps(output, indent=2))
+    print(json.dumps(dict(
+        preset=args.preset,
+        task=args.task,
+        steps=args.steps,
+        optimizer=args.optimizer,
+        seed_aggregate=aggregates,
+        mechanism_points=len(mechanism_timeseries),
+        parameter_points=len(parameter_timeseries),
+        summary_path=str(args.output / "summary.json"),
+    ), indent=2))
 
 
 def main():

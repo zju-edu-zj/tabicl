@@ -9,6 +9,7 @@ import json
 import statistics
 import subprocess
 import time
+from types import SimpleNamespace
 from pathlib import Path
 
 import torch
@@ -18,6 +19,7 @@ from tabicl._model.attention import HAS_FLASH_ATTN3
 from tabicl._model.icl_attention import ICL_ATTENTION_TYPES, SetRetrievalAttention
 from tabicl._model.kv_cache import KVCache
 from tabicl._model.tabicl import TabICL
+from tabicl.train._optimizer import build_optimizer
 
 
 def compiled_variants():
@@ -51,6 +53,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--attention", choices=ICL_ATTENTION_TYPES, default="global_sparse")
     p.add_argument("--rows", type=int, required=True)
+    p.add_argument("--batch-size", type=int, default=1)
     p.add_argument("--blocks", type=int, default=12)
     p.add_argument("--nhead", type=int, default=8)
     p.add_argument(
@@ -73,6 +76,11 @@ def main():
         "--dtype", choices=("float32", "bfloat16", "float16"), default="bfloat16"
     )
     p.add_argument("--recompute", action="store_true")
+    p.add_argument(
+        "--optimizer-step",
+        action="store_true",
+        help="Include a hybrid Muon/AdamW update in train timings.",
+    )
     p.add_argument("--compile", action="store_true", help="Compile the model with dynamic shapes.")
     p.add_argument(
         "--portable",
@@ -93,8 +101,10 @@ def main():
     )
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
-    if args.rows < 2 or args.repeat < 1 or args.warmup < 1:
-        p.error("rows >= 2, repeat >= 1 and warmup >= 1 required")
+    if args.rows < 2 or args.batch_size < 1 or args.repeat < 1 or args.warmup < 1:
+        p.error("rows >= 2, batch-size >= 1, repeat >= 1 and warmup >= 1 required")
+    if args.optimizer_step and (args.phase != "train" or args.scope == "routing"):
+        p.error("--optimizer-step requires encoder or tabicl training")
     if args.vary_support and (args.scope != "encoder" or args.phase != "train"):
         p.error("--vary-support requires encoder training")
     torch.manual_seed(123)
@@ -111,14 +121,14 @@ def main():
         vars(args),
         output=str(args.output),
         profile=str(args.profile) if args.profile else None,
-        benchmark_version=5,
+        benchmark_version=6,
         support=s,
         torch=torch.__version__,
         gpu=torch.cuda.get_device_name(),
         memory_free_gib=torch.cuda.mem_get_info()[0] / 2**30,
         allow_tf32=True,
         seed=123,
-        optimizer_step=False,
+        optimizer_step=args.optimizer_step,
         flash_attn3_available=HAS_FLASH_ATTN3,
     )
     result["gpu_state"] = subprocess.check_output(
@@ -163,10 +173,10 @@ def main():
                 qk_norm=True,
             ).cuda()
             q = torch.randn(
-                1, args.nhead, args.rows, 512 // args.nhead, device="cuda", dtype=dtype
+                args.batch_size, args.nhead, args.rows, 512 // args.nhead, device="cuda", dtype=dtype
             )
             k = torch.randn(
-                1, args.nhead, s, 512 // args.nhead, device="cuda", dtype=dtype
+                args.batch_size, args.nhead, s, 512 // args.nhead, device="cuda", dtype=dtype
             )
 
             def forward():
@@ -199,8 +209,8 @@ def main():
                 recompute=args.recompute,
                 zero_init=False,
             ).cuda()
-            x = torch.randn(1, args.rows, 8, device="cuda", requires_grad=True)
-            y = torch.randint(0, 3, (1, s), device="cuda")
+            x = torch.randn(args.batch_size, args.rows, 8, device="cuda", requires_grad=True)
+            y = torch.randint(0, 3, (args.batch_size, s), device="cuda")
 
             def forward():
                 return model(x, y)
@@ -208,7 +218,7 @@ def main():
         else:
             model = Encoder(**kw).cuda()
             x = torch.randn(
-                1, args.rows, 512, device="cuda", requires_grad=args.phase == "train"
+                args.batch_size, args.rows, 512, device="cuda", requires_grad=args.phase == "train"
             )
             if args.phase in ("prefill", "query"):
                 cache = KVCache()
@@ -222,7 +232,7 @@ def main():
                         model.forward_with_cache(
                             x[:, :s], cache, train_size=s, store_cache=True
                         )
-                    x = torch.randn(1, args.query_rows, 512, device="cuda")
+                    x = torch.randn(args.batch_size, args.query_rows, 512, device="cuda")
 
                     def forward():
                         return model.forward_with_cache(
@@ -247,6 +257,15 @@ def main():
                 if hasattr(module, "use_triton"):
                     module.use_triton = False
         training = args.phase == "train" and args.scope != "routing"
+        optimizer = None
+        if args.optimizer_step:
+            optimizer = build_optimizer(
+                model,
+                SimpleNamespace(
+                    muon=True, lr=4e-4, adamw_lr=1e-4, weight_decay=0.01,
+                    beta1=0.9, beta2=0.999, use_cautious_wd=True,
+                ),
+            )
         if args.compile and args.scope != "routing":
             model = torch.compile(model, dynamic=True)
         model.train(training)
@@ -273,12 +292,19 @@ def main():
             if training:
                 loss.backward()
             torch.cuda.synchronize()
+            backward_finished = time.perf_counter()
+            if optimizer is not None:
+                optimizer.step()
+            torch.cuda.synchronize()
             finished = time.perf_counter()
             record = dict(total_s=finished - started, support=s)
             if args.vary_support:
                 record["jit_variants"] = compiled_variants()
             if step >= args.warmup:
-                records.append(dict(record, fwd_s=fwd - started, bwd_s=finished - fwd))
+                records.append(dict(
+                    record, fwd_s=fwd - started,
+                    bwd_s=backward_finished - fwd, opt_s=finished - backward_finished,
+                ))
             else:
                 warmup_records.append(record)
             assert torch.isfinite(output).all(), "nonfinite output"
@@ -295,7 +321,7 @@ def main():
             peak_allocated_gib=torch.cuda.max_memory_allocated() / 2**30,
             peak_reserved_gib=torch.cuda.max_memory_reserved() / 2**30,
         )
-        for key in ("fwd_s", "bwd_s", "total_s"):
+        for key in ("fwd_s", "bwd_s", "opt_s", "total_s"):
             samples = [row[key] for row in records]
             result.update(
                 {
@@ -324,6 +350,8 @@ def main():
                         loss = target.float().square().mean()
                 if training:
                     loss.backward()
+                if optimizer is not None:
+                    optimizer.step()
                 torch.cuda.synchronize()
             args.profile.parent.mkdir(parents=True, exist_ok=True)
             prof.export_chrome_trace(str(args.profile))

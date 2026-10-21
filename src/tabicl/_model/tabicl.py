@@ -150,7 +150,8 @@ class TabICL(nn.Module):
         If True, uses gradient checkpointing to save memory at the cost of additional computation.
 
     icl_attention : str, default="dense"
-        One of dense, global, global_full, global_sparse_alternating, global_sparse.
+        One of dense, global, sparse, global_full, global_sparse_alternating,
+        global_sparse.
         Non-dense recipes require icl_ssmax=False and dropout=0. See docs/icl_attention.md.
 
     icl_sparse_every : int, default=3
