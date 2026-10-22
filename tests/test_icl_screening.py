@@ -38,7 +38,7 @@ def small_config(**overrides):
     )
 
 
-def test_formal_screen_compiles_training_model(monkeypatch, tmp_path):
+def test_formal_screen_uses_eager_training_model(monkeypatch, tmp_path):
     script = Path(__file__).resolve().parents[1] / "scripts/screen_icl_attention.py"
     spec = importlib.util.spec_from_file_location("screen_icl_attention", script)
     module = importlib.util.module_from_spec(spec)
@@ -59,7 +59,6 @@ def test_formal_screen_compiles_training_model(monkeypatch, tmp_path):
     args = module.arguments()
     options = module.train_options(args, "global_induced", 42)
     assert args.num_gpus == 16
-    assert options["model_compile"] == "True"
     assert options["recompute"] == "False"
     assert options["muon"] == "True"
     assert options["lr"] == "0.0004"
@@ -68,23 +67,6 @@ def test_formal_screen_compiles_training_model(monkeypatch, tmp_path):
     assert module.VARIANTS["global_sparse_alternating_content_tree"] == (
         "global_sparse_alternating", "elu", "content_tree"
     )
-
-    monkeypatch.setattr(
-        "sys.argv",
-        [
-            str(script),
-            "plan",
-            "--output",
-            str(tmp_path),
-            "--steps",
-            "20000",
-            "--variants",
-            "global_induced",
-            "--no-model-compile",
-        ],
-    )
-    args = module.arguments()
-    assert module.train_options(args, "global_induced", 42)["model_compile"] == "False"
 
     monkeypatch.setattr(
         "sys.argv",

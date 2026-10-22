@@ -19,23 +19,25 @@ NUM_GPUS=${NUM_GPUS:-4}                                   # the paper used 4 GPU
 CKPT_DIR=${CKPT_DIR:-/path/to/checkpoints/tabiclv2-clf/stage3}
 LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
 STAGE2_CKPT=${STAGE2_CKPT:-/path/to/checkpoints/tabiclv2-clf/stage2/step-40000.ckpt}
+WANDB_LOG=${WANDB_LOG:-False}
+TENSORBOARD_LOG=${TENSORBOARD_LOG:-False}
 
 # Load the Stage 2 weights only on the very first launch. On later launches (e.g.
 # restarts after a cluster time limit), CKPT_DIR already contains Stage 3
 # checkpoints, and the trainer instead resumes from the latest one with full
 # optimizer/scheduler state (--checkpoint_path would override that, so it must
 # only be passed the first time).
-RESUME_ARGS="--checkpoint_path $STAGE2_CKPT --only_load_model True"
-if ls "$CKPT_DIR"/step-*.ckpt >/dev/null 2>&1; then
-    RESUME_ARGS=""
+RESUME_ARGS=(--checkpoint_path "$STAGE2_CKPT" --only_load_model True)
+if compgen -G "$CKPT_DIR/step-*.ckpt" >/dev/null; then
+    RESUME_ARGS=()
 fi
 
 run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
-            --wandb_log False \
+            --wandb_log "$WANDB_LOG" \
             --wandb_project TabICLv2 \
             --wandb_name tabiclv2_clf_stage3 \
             --log_dir "$LOG_DIR" \
-            --tensorboard_log "${TENSORBOARD_LOG:-False}" \
+            --tensorboard_log "$TENSORBOARD_LOG" \
             --device cuda \
             --dtype "$TRAIN_DTYPE" \
             --np_seed 42 \
@@ -96,7 +98,7 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --zero_init False \
             --use_flash_attn3 "${USE_FLASH_ATTN3:-True}" \
             --recompute "$RECOMPUTE" \
-            --checkpoint_dir $CKPT_DIR \
-            $RESUME_ARGS \
+            --checkpoint_dir "$CKPT_DIR" \
+            ${RESUME_ARGS[@]+"${RESUME_ARGS[@]}"} \
             --save_temp_every 50 \
             --save_perm_every 1000

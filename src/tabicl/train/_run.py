@@ -4,6 +4,7 @@ import os
 import timeit
 import warnings
 import functools
+import inspect
 import json
 from contextlib import nullcontext
 from pathlib import Path
@@ -357,16 +358,7 @@ class Trainer:
             for param in model.icl_predictor.parameters():
                 param.requires_grad = False
 
-        # Keep the eager module as the canonical model for checkpoints and
-        # rank-zero validation. The compiled wrapper shares the same parameters
-        # but prefixes state_dict keys with ``_orig_mod.``.
         self.raw_model = model
-
-        # Compile model if requested
-        if self.config.model_compile:
-            model = torch.compile(model, dynamic=True)
-            if self.master_process:
-                print("Model compiled successfully.")
 
         # Wrap model into DDP container if using distributed training
         if self.ddp:
@@ -421,17 +413,23 @@ class Trainer:
             num_workers = self.config.n_jobs
             if num_workers <= 0:
                 num_workers = psutil.cpu_count(logical=False) or os.cpu_count() or 1
-            prefetch_factor = 2
+            prefetch_factor = self.config.prior_prefetch_factor
         else:
             num_workers = 1
             prefetch_factor = 4
+
+        if num_workers < 1 or prefetch_factor < 1:
+            raise ValueError("prior workers and prefetch factor must be positive")
+        prior_in_order = self.config.prior_in_order if self.config.prior_dir is None else True
+        if self.config.prior_seed_by_step and not prior_in_order:
+            raise ValueError("prior_in_order=False is incompatible with prior_seed_by_step=True")
 
         # Create dataloader for efficient loading and prefetching
         if self.config.prior_seed_by_step and self.config.prior_dir is None:
             dataset = StepSeededPrior(dataset, self.config.np_seed, self.config.torch_seed,
                                       self.ddp_rank, self.ddp_world_size)
-        self.dataloader = DataLoader(
-            dataset,
+        loader_kwargs = dict(
+            dataset=dataset,
             batch_size=None,  # No additional batching since PriorDataset handles batching internally
             shuffle=False,
             num_workers=num_workers,
@@ -441,6 +439,17 @@ class Trainer:
             worker_init_fn=seed_worker,
             persistent_workers=True,
         )
+        if "in_order" in inspect.signature(DataLoader).parameters:
+            loader_kwargs["in_order"] = prior_in_order
+        elif not prior_in_order:
+            raise RuntimeError("prior_in_order=False requires a PyTorch DataLoader with in_order support")
+        self.dataloader = DataLoader(**loader_kwargs)
+        if self.master_process:
+            local_world_size = int(os.environ.get("LOCAL_WORLD_SIZE", self.ddp_world_size))
+            print(
+                f"Prior pipeline: workers/rank={num_workers}, workers/node={num_workers * local_world_size}, "
+                f"prefetch/worker={prefetch_factor}, in_order={prior_in_order}"
+            )
 
     def configure_optimizer(self):
         """Configure optimizer and scheduler."""
@@ -727,10 +736,7 @@ class Trainer:
         if self.ddp:
             torch.distributed.barrier()
         if self.master_process:
-            # PyTorch 2.9 can fail while tracing non-reentrant row checkpoints
-            # under no_grad. Validation shares the same parameters, so bypass
-            # only the compiled wrapper while keeping training compiled.
-            validation_model = getattr(self.raw_model, "_orig_mod", self.raw_model)
+            validation_model = self.raw_model
             with self._sdpa_ctx():
                 metrics, records = evaluate_cases(validation_model, self.eval_cases, self.config.device,
                                                   self.amp_ctx, self.config.icl_diagnostic_queries,

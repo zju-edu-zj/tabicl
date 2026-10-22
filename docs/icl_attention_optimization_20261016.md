@@ -9,7 +9,7 @@
 3. projection 和 centroid 路由 kernel 直接读取 BF16/FP16 Q/K，以 FP32 累积，消除了路由入口的全量 `k.float()`/`q.float()`；centroid 按 128 leaves 分片，64K 不超过 shared-memory 限制。
 4. activation checkpoint 的原始 forward 保存离散 `(order, selected)`，recompute 重放同一路由；soft attention、global 和 FFN 仍重算。这样既省掉第二次排序/top-k，也避免临界分数在两次 forward 选择不同路径。
 5. global ELU CUDA forward 融合 `ELU+1`、support state/normalizer 和 query apply，不物化完整 FP32 feature tensor；backward 保持分块重算与 FP32 状态。
-6. gate kernel 融合 per-head dot、sigmoid、global/sparse 混合和 BHND→BND 布局转换；正式筛选与性能矩阵启用 dynamic `torch.compile`。
+6. gate kernel 融合 per-head dot、sigmoid、global/sparse 混合和 BHND→BND 布局转换。下文历史性能矩阵使用了 dynamic `torch.compile`；当前正式筛选固定使用 eager 模式。
 
 content tree 的“segmented selection”做了两版精确原型：每层双 top-k 取中位两侧，以及单 top-k 后补集 compaction。16K 纯路由的双 top-k 为 2.14–4.31 ms（中位 2.60），补集版为 6.99–7.08 ms；最终的 CUDA segmented radix argsort 为 1.25–3.39 ms（中位 2.26）。瓶颈是每层 top-k/补集与临时张量，而不是移动完整 K/V。因此最终保留标量 score/index 的非稳定局部 radix argsort，Triton 继续负责 pivot、projection 和原始 K 读取。分数完全相等时不承诺 tie 顺序；stable argsort 实测为 3.34–3.40 ms（中位 3.36），却仍不能提供严格的集合 tie-break，所以未保留。这是基于测量撤销负优化，不把较慢实现留在主路径。
 

@@ -38,13 +38,15 @@ source "$REPO_ROOT/scripts/icl_recipe.sh"
 NUM_GPUS=${NUM_GPUS:-4}                                   # the paper used 4 GPUs for pre-training
 CKPT_DIR=${CKPT_DIR:-/path/to/checkpoints/tabiclv2-reg/stage1}
 LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
+WANDB_LOG=${WANDB_LOG:-False}
+TENSORBOARD_LOG=${TENSORBOARD_LOG:-False}
 
 run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
-            --wandb_log False \
+            --wandb_log "$WANDB_LOG" \
             --wandb_project TabICLv2 \
             --wandb_name tabiclv2_reg_stage1 \
             --log_dir "$LOG_DIR" \
-            --tensorboard_log "${TENSORBOARD_LOG:-False}" \
+            --tensorboard_log "$TENSORBOARD_LOG" \
             --device cuda \
             --dtype "$TRAIN_DTYPE" \
             --np_seed 43 \
@@ -105,7 +107,7 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --use_flash_attn3 "${USE_FLASH_ATTN3:-False}" \
             --recompute "$RECOMPUTE" \
             --norm_type layernorm_nobias \
-            --checkpoint_dir $CKPT_DIR \
+            --checkpoint_dir "$CKPT_DIR" \
             --save_temp_every 500 \
             --save_perm_every 5000
 

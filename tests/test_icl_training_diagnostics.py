@@ -14,11 +14,10 @@ from tabicl.train._train_config import build_parser
 from tabicl._model.ssmax import create_ssmax_layer
 
 
-def test_screen_validation_bypasses_compiled_wrapper(monkeypatch):
+def test_screen_validation_uses_eager_model(monkeypatch):
     from tabicl.train import _run
 
     eager_model = object()
-    compiled_wrapper = SimpleNamespace(_orig_mod=eager_model)
     trainer = Trainer.__new__(Trainer)
     trainer.config = SimpleNamespace(
         eval_data=True,
@@ -27,7 +26,7 @@ def test_screen_validation_bypasses_compiled_wrapper(monkeypatch):
     )
     trainer.ddp = False
     trainer.master_process = True
-    trainer.raw_model = compiled_wrapper
+    trainer.raw_model = eager_model
     trainer.eval_cases = {}
     trainer.amp_ctx = nullcontext()
     trainer.curr_step = 0
@@ -57,6 +56,8 @@ def test_all_v2_launchers_expand_to_valid_default_and_ablation_arguments(tmp_pat
             config = build_parser().parse_args(tokens[tokens.index("--wandb_log") :])
             assert config.icl_attention == "global_sparse"
             assert config.icl_ssmax is False
+            assert config.wandb_log is False
+            assert config.tensorboard_log is False
     env.update(ICL_ATTENTION="global", ICL_DIAGNOSTICS_EVERY="0")
     text = subprocess.check_output(["bash", str(root / "scripts/train_v2_clf_stage1.sh")], env=env, text=True)
     tokens = shlex.split(text)

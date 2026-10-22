@@ -1,16 +1,15 @@
 # Stage 1 training records
 
-`scripts/train_v2_clf_stage1.sh` records the training run in three local
-formats:
+`scripts/train_v2_clf_stage1.sh` always records JSONL metrics. TensorBoard and
+W&B are optional and disabled by default:
 
 ```text
 $CKPT_DIR/
   step-*.ckpt              model, optimizer, scheduler and current step
   logs/
     metrics.jsonl          one JSON object per optimizer step
-    tensorboard/           TensorBoard event files
-    wandb/                 offline W&B run files
-    curves.png             static training diagnostics after normal exit
+    tensorboard/           optional TensorBoard event files
+    wandb/                 optional W&B run files
 ```
 
 The default checkpoint directory is
@@ -55,10 +54,10 @@ diagnostic.
 
 ## How to view it
 
-Live monitoring while training:
+To enable TensorBoard and monitor it live:
 
 ```bash
-conda activate stdplm
+TENSORBOARD_LOG=True bash scripts/train_v2_clf_stage1.sh
 tensorboard --logdir /home/zj/table_foundation/checkpoints/m3-stage1-smoke/logs/tensorboard \
   --host 127.0.0.1 --port 6006
 ```
@@ -68,21 +67,24 @@ SSH. The most useful TensorBoard panels are `train/ce`, `train/accuracy`,
 `train/grad_norm`, `train/lr_used`, `system/prior_time`, and
 `system/train_time`.
 
-The W&B run is deliberately offline. After the job finishes, inspect it locally
-or upload it later:
+W&B is also opt-in and defaults to offline mode when enabled:
+
+```bash
+WANDB_LOG=True bash scripts/train_v2_clf_stage1.sh
+```
+
+After the job finishes, inspect it locally or upload it later:
 
 ```bash
 /home/zj/miniconda3/envs/stdplm/bin/wandb sync \
   /home/zj/table_foundation/checkpoints/m3-stage1-smoke/logs/wandb/offline-run-*
 ```
 
-For a connected W&B server, launch with `WANDB_MODE=online`; for no W&B files,
-use `WANDB_LOG=False`. The JSONL/TensorBoard records are independent of W&B.
+For a connected W&B server, launch with `WANDB_LOG=True WANDB_MODE=online`.
+JSONL logging is independent of both optional integrations.
 
-`curves.png` is generated automatically on normal script exit. It is a training
-diagnostic containing CE, accuracy, gradient, learning-rate, timing, and memory
-panels. `metrics.jsonl` remains the source of truth and can be replotted with
-`scripts/plot_pretrain_metrics.py` after an interrupted run.
+`metrics.jsonl` remains the source of truth and can be plotted with
+`scripts/plot_pretrain_metrics.py` after a normal or interrupted run.
 
 ## What to inspect first
 

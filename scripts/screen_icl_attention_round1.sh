@@ -7,12 +7,11 @@ set -euo pipefail
 # checkpoint with model, optimizer, scheduler, and global step.
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
-PYTHON=${PYTHON:-/home/zj/miniconda3/envs/stdplm/bin/python}
+PYTHON=${PYTHON:-python}
 NUM_GPUS=${NUM_GPUS:-16}
 RUN_ID=$(date -u +%Y%m%d_%H%M%S)_$$
 OUTPUT_DIR=${OUTPUT_DIR:-$ROOT_DIR/checkpoints/icl_screen_round1_20k_$RUN_ID}
 STEPS=${STEPS:-20000}
-MODEL_COMPILE=${MODEL_COMPILE:-True}
 
 args=(
   run
@@ -29,11 +28,6 @@ args=(
   --diagnostics-every 200
   --eval-every 2000
 )
-if [[ "$MODEL_COMPILE" == True ]]; then
-  args+=(--model-compile)
-else
-  args+=(--no-model-compile)
-fi
 
 export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 printf 'Screen output: %s\n' "$OUTPUT_DIR"

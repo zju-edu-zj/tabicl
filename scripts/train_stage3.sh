@@ -5,7 +5,7 @@
 # ----------------------------------
 
 torchrun --standalone --nproc_per_node=1 /path/to/tabicl/train/run.py \
-            --wandb_log True \
+            --wandb_log False \
             --wandb_project TabICL \
             --wandb_name Stage3 \
             --wandb_dir /my/wandb/dir \
@@ -85,7 +85,7 @@ python /path/to/tabicl/prior/genload.py \
 
 # Loading from disk and training
 torchrun --standalone --nproc_per_node=1 /path/to/tabicl/train/run.py \
-            --wandb_log True \
+            --wandb_log False \
             --wandb_project TabICL \
             --wandb_name Stage3 \
             --wandb_dir /my/wandb/dir \

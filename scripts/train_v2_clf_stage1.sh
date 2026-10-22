@@ -44,11 +44,14 @@ MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
 WARMUP_PROPORTION=${WARMUP_PROPORTION:--1}
 WARMUP_STEPS=${WARMUP_STEPS:-5000}
 INIT_CKPT=${INIT_CKPT:-}                     # first launch only; reset optimizer/step
-TENSORBOARD_LOG=${TENSORBOARD_LOG:-True}
+TENSORBOARD_LOG=${TENSORBOARD_LOG:-False}
 SAVE_TEMP_EVERY=${SAVE_TEMP_EVERY:-500}
 SAVE_PERM_EVERY=${SAVE_PERM_EVERY:-5000}
-WANDB_LOG=${WANDB_LOG:-True}
+WANDB_LOG=${WANDB_LOG:-False}
 WANDB_MODE=${WANDB_MODE:-offline}
+PRIOR_WORKERS=${PRIOR_WORKERS:-8}             # 8 x 16 ranks = 128 workers on the training node
+PRIOR_PREFETCH_FACTOR=${PRIOR_PREFETCH_FACTOR:-8}
+PRIOR_IN_ORDER=${PRIOR_IN_ORDER:-False}       # avoid graph_scm head-of-line blocking
 source "$REPO_ROOT/scripts/icl_recipe.sh"
 mkdir -p "$LOG_DIR"
 
@@ -91,7 +94,9 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --gradient_clipping 10.0 \
             --prior_type graph_scm \
             --prior_device cpu \
-            --n_jobs 16 \
+            --n_jobs "$PRIOR_WORKERS" \
+            --prior_prefetch_factor "$PRIOR_PREFETCH_FACTOR" \
+            --prior_in_order "$PRIOR_IN_ORDER" \
             --batch_size_per_gp 4 \
             --min_features 1 \
             --max_features 100 \
@@ -130,11 +135,11 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --use_flash_attn3 "${USE_FLASH_ATTN3:-False}" \
             --recompute "$RECOMPUTE" \
             --checkpoint_dir "$CKPT_DIR" \
-            "${RESUME_ARGS[@]}" \
+            ${RESUME_ARGS[@]+"${RESUME_ARGS[@]}"} \
             --save_temp_every "$SAVE_TEMP_EVERY" \
             --save_perm_every "$SAVE_PERM_EVERY"
 
-# JSONL and TensorBoard are written during training, including ICL diagnostics.
+# JSONL is always written; TensorBoard and W&B are opt-in.
 
 # Note on cautious weight decay: the paper reports using cautious weight decay (parameter
 # 0.01), but the reference pretraining runs that produced the released checkpoints

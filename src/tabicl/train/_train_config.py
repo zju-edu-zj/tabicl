@@ -227,6 +227,19 @@ def build_parser():
         "physical CPU cores. Ignored when loading pre-generated data from prior_dir.",
     )
     parser.add_argument(
+        "--prior_prefetch_factor",
+        type=int,
+        default=2,
+        help="Batches prefetched by each prior DataLoader worker. Increase this to absorb variable graph_scm latency.",
+    )
+    parser.add_argument(
+        "--prior_in_order",
+        default=True,
+        type=str2bool,
+        help="Return prior batches in worker-assignment order. False reduces head-of-line blocking but is incompatible "
+        "with prior_seed_by_step reproducibility.",
+    )
+    parser.add_argument(
         "--log_n_features",
         default=False,
         type=str2bool,
@@ -254,12 +267,6 @@ def build_parser():
         default=True,
         type=str2bool,
         help="If True, use automatic mixed precision (AMP) which can provide significant speedups on compatible GPU",
-    )
-    parser.add_argument(
-        "--model_compile",
-        default=False,
-        type=str2bool,
-        help="If True, compile the model using torch.compile for speedup",
     )
     parser.add_argument(
         "--ignore_d",

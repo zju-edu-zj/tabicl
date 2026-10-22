@@ -74,12 +74,6 @@ def arguments():
         default=False,
         help="Recompute transformer activations during backward; screening defaults to False.",
     )
-    p.add_argument(
-        "--model-compile",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="Compile formal training by default; use --no-model-compile for eager/DDP diagnosis.",
-    )
     p.add_argument("--batch-size", type=int)
     p.add_argument("--micro-batch-size", type=int, default=1)
     p.add_argument("--workers", type=int, default=4)
@@ -226,7 +220,6 @@ def train_options(args, variant, seed):
         norm_first=True,
         zero_init=False,
         use_flash_attn3=False,
-        model_compile=(not pilot if args.model_compile is None else args.model_compile),
         recompute=args.recompute,
         fail_fast=True,
         icl_diagnostics_every=args.diagnostics_every,

@@ -50,9 +50,11 @@ warnings.filterwarnings(
 def seed_worker(worker_id: int):
     # Ensure Python & NumPy match the worker’s torch seed.
     s = torch.initial_seed() % (2**32)
-    print(f'Initializing worker {worker_id} with seed {s}', flush=True)
     random.seed(s)
     np.random.seed(s)
+    # A DataLoader process is already a unit of generation parallelism. Avoid
+    # expanding every worker into another CPU thread pool under multi-rank DDP.
+    torch.set_num_threads(1)
 
 
 def dense2sparse(

@@ -11,7 +11,6 @@ import time
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.utils.tensorboard import SummaryWriter
 
 # Allow ``python scripts/pretrain_m3_pilot.py`` from a source checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -54,6 +53,11 @@ def main():
     parser.add_argument("--val-every", type=int, default=20)
     parser.add_argument("--val-tables", type=int, default=16)
     parser.add_argument("--dtype", choices=["float32", "bfloat16"], default="float32")
+    parser.add_argument(
+        "--tensorboard-log",
+        action="store_true",
+        help="Write TensorBoard events (disabled by default).",
+    )
     args = parser.parse_args()
     if args.steps > args.schedule_steps:
         parser.error("steps must not exceed schedule-steps")
@@ -85,7 +89,6 @@ def main():
     config.recompute = True
     config.wandb_log = False
     config.fail_fast = True
-    config.model_compile = False
     os.makedirs(config.checkpoint_dir, exist_ok=True)
     torch.set_num_threads(2)
     (run / "config.json").write_text(json.dumps(vars(config), indent=2))
@@ -94,7 +97,11 @@ def main():
     (run / "launcher.py").write_text(Path(__file__).read_text())
     (run / "environment.txt").write_text(subprocess.check_output(["/home/zj/miniconda3/envs/stdplm/bin/python", "-m", "pip", "freeze"], text=True))
     trainer = Trainer(config)
-    writer = SummaryWriter(str(run / "tensorboard"), flush_secs=10)
+    writer = None
+    if args.tensorboard_log:
+        from torch.utils.tensorboard import SummaryWriter
+
+        writer = SummaryWriter(str(run / "tensorboard"), flush_secs=10)
     metrics = (run / "metrics.jsonl").open("a", buffering=1)
     started = time.monotonic()
     (run / "status.json").write_text(json.dumps({"status": "running", "pid": os.getpid(), "step": 0}))
@@ -102,9 +109,10 @@ def main():
     def log(step, values):
         row = {"step": step, "elapsed_s": time.monotonic() - started, **values}
         metrics.write(json.dumps(row, allow_nan=False) + "\n")
-        for key, value in values.items():
-            writer.add_scalar(key, value, step)
-        writer.flush()
+        if writer is not None:
+            for key, value in values.items():
+                writer.add_scalar(key, value, step)
+            writer.flush()
         print(json.dumps(row), flush=True)
 
     try:
@@ -147,7 +155,8 @@ def main():
         (run / "status.json").write_text(json.dumps({"status": "failed", "step": trainer.curr_step, "error": repr(exc)}))
         raise
     finally:
-        writer.close()
+        if writer is not None:
+            writer.close()
         metrics.close()
 
 
