@@ -88,6 +88,7 @@ class GraphSCM:
         permute_labels: bool = True,
         config: Optional[PriorConfig] = None,
         device: str = "cpu",
+        defer_padding: bool = False,
         **kwargs,
     ):
         super(GraphSCM, self).__init__()
@@ -100,6 +101,7 @@ class GraphSCM:
         self.permute_labels = permute_labels
         self.config = config
         self.device = device
+        self.defer_padding = defer_padding
 
     def __call__(self) -> None:
         """Generate a dataset and return features and target."""
@@ -135,7 +137,7 @@ class GraphSCM:
             feat_perm = torch.randperm(self.num_features, device=self.device)
             X = X[..., feat_perm]
 
-        if self.num_features < self.max_features:
+        if not self.defer_padding and self.num_features < self.max_features:
             X = F.pad(
                 X, (0, self.max_features - self.num_features), mode="constant", value=0.0
             )  # (seq_len, max_features)

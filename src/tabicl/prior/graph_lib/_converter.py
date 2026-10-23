@@ -7,6 +7,7 @@ from tabicl.prior.graph_lib._activation import Standardize, RandomActivation, Ku
 from tabicl.prior.graph_lib._function import CheapRandomFunction
 from tabicl.prior.graph_lib._points import RandomPoints
 from tabicl.prior.graph_lib._weights import RandomWeights
+from tabicl.prior.graph_lib._distance import nearest_center
 
 
 class Converter(RandomTransformer):
@@ -87,8 +88,7 @@ class CategoricalNeighborDiscretizer(Converter):
 
     def _transform(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # All operations happen on the same device as x and centers
-        dists = torch.cdist(x, self.centers_, p=self.p_)  # this is faster than manually calculating the distance matrix
-        closest_idx = dists.argmin(dim=-1)
+        closest_idx = nearest_center(x, self.centers_, self.p_)
         return self.centers_[closest_idx], closest_idx[:, None]
 
 

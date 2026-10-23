@@ -73,3 +73,20 @@ def test_stage1_prior_pipeline_defaults_match_128_core_node(tmp_path):
     assert args.n_jobs == 8
     assert args.prior_prefetch_factor == 8
     assert args.prior_in_order is False
+    assert args.prior_backend == "node_pool"
+    assert args.prior_pool_workers == 112
+
+
+@pytest.mark.parametrize("task", ["clf", "reg"])
+@pytest.mark.parametrize("stage", [1, 2, 3])
+def test_all_curriculum_scripts_support_shared_pool_and_override(tmp_path, task, stage):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", PRIOR_BACKEND="node_pool", PRIOR_POOL_WORKERS="12",
+               PRIOR_POOL_WINDOW="7", PRIOR_POOL_MB="128", CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
+    text = subprocess.check_output(["bash", str(root / f"scripts/train_v2_{task}_stage{stage}.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert args.prior_pool_workers == 12
+    assert args.prior_pool_window == 7
+    assert args.prior_pool_mb == 128
+    assert args.prior_backend == "node_pool"

@@ -219,6 +219,13 @@ def build_parser():
         "--prior_type", default="mix_scm", type=str, help="Prior type: dummy, mlp_scm, tree_scm, mix_scm"
     )
     parser.add_argument("--prior_device", default="cpu", type=str, help="Device for prior data generation")
+    parser.add_argument("--prior_backend", choices=("dataloader", "node_pool"), default="dataloader")
+    parser.add_argument("--prior_pool_workers", type=int, default=0,
+                        help="Total CPU workers per node (0: available cores minus local GPU ranks)")
+    parser.add_argument("--prior_pool_window", type=int, default=128,
+                        help="Maximum in-flight plus ready local batches per node")
+    parser.add_argument("--prior_pool_mb", type=int, default=2048,
+                        help="Queue output reservation in MiB; excludes worker scratch memory")
     parser.add_argument(
         "--n_jobs",
         type=int,

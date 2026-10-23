@@ -1,0 +1,100 @@
+{
+  "backend": "node_pool",
+  "stage": 3,
+  "regression": false,
+  "batch_size": 4,
+  "pool_workers": 8,
+  "pool_window": 32,
+  "pool_mb": 512,
+  "min_seq_len": null,
+  "max_seq_len": null,
+  "workers": 4,
+  "start_method": "spawn",
+  "prefetch": 8,
+  "in_order": false,
+  "warmup": 16,
+  "steps": 100,
+  "consumer_ms": 0.0,
+  "corrected_cat_meta_sampling": false,
+  "output": "/home/zj/table_foundation/sparse/tabicl/docs/benchmarks/prior_pipeline_20261022/stage3_node_pool_throughput.json",
+  "world_size": 2,
+  "workers_per_node": 8,
+  "wall_s": 138.8582962618675,
+  "startup_and_warmup_s": 32.66519319312647,
+  "startup_warmup_and_measurement_s": 171.52348945499398,
+  "sum_rank_peak_rss_mb": 9087.80078125,
+  "datasets_per_s": 5.761269016950279,
+  "pool_stats": {
+    "completed_datasets": 947,
+    "delivered_batches": 232,
+    "buffered_batches": 31,
+    "ready_batches": 0,
+    "reserved_bytes": 305443680,
+    "peak_reserved_bytes": 395785672,
+    "worker_pids": [
+      1107937,
+      1107940,
+      1107941,
+      1107942,
+      1107944,
+      1107945,
+      1107946,
+      1107947
+    ]
+  },
+  "mean_payload_mb": 5.48886173248291,
+  "length_mean": 11769.1725,
+  "features_mean": 42.025,
+  "padding_and_validation": {
+    "mean_ms": 5.966417896561325,
+    "p50_ms": 5.434804479591548,
+    "p90_ms": 10.928321676328778,
+    "p95_ms": 13.183516974095255,
+    "p99_ms": 16.362969009205706,
+    "max_ms": 17.75621180422604,
+    "blocked_100ms": 0.0,
+    "blocked_1s": 0.0
+  },
+  "all_rank_wait": {
+    "mean_ms": 1050.6231643236242,
+    "p50_ms": 760.9323045471683,
+    "p90_ms": 2135.566101199947,
+    "p95_ms": 2661.7588423541733,
+    "p99_ms": 4744.6783070522315,
+    "max_ms": 5694.812313886359,
+    "blocked_100ms": 0.92,
+    "blocked_1s": 0.4
+  },
+  "max_rank_wait": {
+    "mean_ms": 1382.2406287002377,
+    "p50_ms": 1182.6617163605988,
+    "p90_ms": 2625.453742430546,
+    "p95_ms": 2991.7316313483752,
+    "p99_ms": 5319.597682675814,
+    "max_ms": 5694.812313886359,
+    "blocked_100ms": 0.99,
+    "blocked_1s": 0.56
+  },
+  "per_rank": [
+    {
+      "mean_ms": 1049.4675790611655,
+      "p50_ms": 818.1163455592468,
+      "p90_ms": 1959.0999673586357,
+      "p95_ms": 2622.7661540848203,
+      "p99_ms": 3297.4433797481597,
+      "max_ms": 5694.812313886359,
+      "blocked_100ms": 0.91,
+      "blocked_1s": 0.43
+    },
+    {
+      "mean_ms": 1051.778749586083,
+      "p50_ms": 705.3157310001552,
+      "p90_ms": 2136.231145821512,
+      "p95_ms": 2855.4365661228076,
+      "p99_ms": 4744.678307052239,
+      "max_ms": 5315.807635895908,
+      "blocked_100ms": 0.93,
+      "blocked_1s": 0.37
+    }
+  ]
+}

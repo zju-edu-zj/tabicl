@@ -342,8 +342,11 @@ class Prior:
             # Only consider actual features (up to di, ignoring padding)
             xi = xi[:, :di]
             # Identify features with more than one unique value (informative features)
-            unique_mask = [len(torch.unique(xi[:, j])) > 1 for j in range(di)]
-            di_new = sum(unique_mask)
+            # Comparing with the first row is linear in the table size, whereas
+            # unique sorts every column. This also preserves unique's NaN
+            # behavior (each NaN is distinct), including the single-row case.
+            unique_mask = (xi[1:] != xi[:1]).any(dim=0)
+            di_new = int(unique_mask.sum())
             # Create new tensor with only informative features, padding the rest
             xi_new = F.pad(xi[:, unique_mask], pad=(0, num_features - di_new), mode="constant", value=0)
             return xi_new, torch.tensor(di_new, device=xi.device)
@@ -926,7 +929,7 @@ class GraphPrior(Prior):
         self.device = device
 
     @torch.no_grad()
-    def generate_dataset(self, params: Dict[str, Any]) -> Tuple[Tensor, Tensor, Tensor]:
+    def generate_dataset(self, params: Dict[str, Any], *, compact: bool = False) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Generates a single valid dataset based on the provided parameters.
 
@@ -958,7 +961,7 @@ class GraphPrior(Prior):
         """
 
         while True:
-            X, y = GraphSCM(**params)()
+            X, y = GraphSCM(**params, defer_padding=compact)()
 
             # Add batch dim for single dataset to be compatible with delete_unique_features and sanity_check
             X, y = X.unsqueeze(0), y.unsqueeze(0)
@@ -972,39 +975,26 @@ class GraphPrior(Prior):
             if not (self.regression or self.cls_sanity_check(X, y, params["train_size"])):
                 continue
 
-            if should_filter(X[0], y[0], self.config, is_classif=not self.regression):
+            # Padding columns affect ExtraTrees' random feature selection. Keep
+            # the original filter input, even when transporting compact tables.
+            filter_x = X[0]
+            if compact and filter_x.shape[-1] < params["max_features"]:
+                filter_x = F.pad(filter_x, (0, params["max_features"] - filter_x.shape[-1]))
+            if should_filter(filter_x, y[0], self.config, is_classif=not self.regression):
                 continue
 
-            return X.squeeze(0), y.squeeze(0), d.squeeze(0)
+            x = X.squeeze(0)
+            if compact:
+                x = x[:, :int(d.item())].contiguous()
+            return x, y.squeeze(0), d.squeeze(0)
 
     @torch.no_grad()
-    def get_batch(self, batch_size: Optional[int] = None) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
-        """
-        Generates a batch of datasets by first creating a parameter list and then processing it.
+    def sample_parameters(self, batch_size: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Sample one batch's parameters, preserving all group correlations.
 
-        Parameters
-        ----------
-        batch_size : int, optional
-            Batch size override. If None, uses self.batch_size
-
-        Returns
-        -------
-        X : Tensor or NestedTensor
-            Features tensor. If seq_len_per_gp=False, shape is (batch_size, seq_len, max_features).
-            If seq_len_per_gp=True, returns a NestedTensor.
-
-        y : Tensor or NestedTensor
-            Targets tensor. If seq_len_per_gp=False, shape is (batch_size, seq_len).
-            If seq_len_per_gp=True, returns a NestedTensor.
-
-        d : Tensor
-            Number of active features per dataset after filtering, shape (batch_size,)
-
-        seq_lens : Tensor
-            Sequence length for each dataset, shape (batch_size,)
-
-        train_sizes : Tensor
-            Position for train/test split for each dataset, shape (batch_size,)
+        Length/split are shared by group (or globally), feature count by
+        subgroup, and class count is sampled independently for each dataset.
+        Execution order is separate from this sampling hierarchy.
         """
         batch_size = batch_size or self.batch_size
 
@@ -1099,6 +1089,12 @@ class GraphPrior(Prior):
 
                     param_list.append(params)
 
+        return param_list
+
+    @torch.no_grad()
+    def get_batch(self, batch_size: Optional[int] = None) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+        """Generate and assemble a batch using the shared parameter sampler."""
+        param_list = self.sample_parameters(batch_size)
         with threadpoolctl.threadpool_limits(limits=1):
             if self.n_jobs == 1:
                 n_threads_old = torch.get_num_threads()
@@ -1538,6 +1534,28 @@ class DisablePrinting:
         sys.stdout = self.original_stdout
 
 
+@functools.lru_cache(maxsize=2)
+def _small_bootstrap_indices(n, n_boot):
+    return np.random.default_rng(0).integers(0, n, size=(n_boot, n))
+
+
+def _bootstrap_pvalue(imp, n_boot=200):
+    """Same RNG stream and row-wise reductions, bounded index/gather memory."""
+    n = len(imp)
+    if n < 1 or n_boot < 1:
+        raise ValueError("bootstrap needs nonempty improvements and positive repetitions")
+    if n * n_boot * 8 <= 2 * 1024**2:
+        idx = _small_bootstrap_indices(n, n_boot)
+        return float(np.mean(imp[idx].mean(axis=1) <= 0.0))
+    rng = np.random.default_rng(0)
+    rows = max(1, (8 * 1024**2) // (n * (8 + imp.dtype.itemsize)))
+    nonpositive = 0
+    for start in range(0, n_boot, rows):
+        idx = rng.integers(0, n, size=(min(rows, n_boot - start), n))
+        nonpositive += np.count_nonzero(imp[idx].mean(axis=1) <= 0.0)
+    return float(nonpositive / n_boot)
+
+
 def should_filter(
         X: torch.Tensor,
         y: torch.Tensor,
@@ -1587,10 +1605,7 @@ def should_filter(
     extratrees_mse = ((Yv - Yhatv) ** 2).sum(axis=1).mean()
 
     # Vectorized bootstrap (no retraining)
-    rng = np.random.default_rng(0)
-    n = imp.shape[0]
-    idx = rng.integers(0, n, size=(n_boot, n))
-    pval = float(np.mean(imp[idx].mean(axis=1) <= 0.0))
+    pval = _bootstrap_pvalue(imp, n_boot)
 
     if config.remove_trivial_datasets and np.sqrt(extratrees_mse) <= config.trivial_dataset_threshold * np.sqrt(baseline_mse):
         return True
@@ -1647,8 +1662,5 @@ def compute_predictability_pvalue(
     imp = ((Yv - baseline) ** 2).sum(axis=1) - ((Yv - Yhatv) ** 2).sum(axis=1)
 
     # Vectorized bootstrap (no retraining)
-    rng = np.random.default_rng(0)
-    n = imp.shape[0]
-    idx = rng.integers(0, n, size=(n_boot, n))
-    pval = float(np.mean(imp[idx].mean(axis=1) <= 0.0))
+    pval = _bootstrap_pvalue(imp, n_boot)
     return pval

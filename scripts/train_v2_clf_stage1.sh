@@ -53,6 +53,7 @@ PRIOR_WORKERS=${PRIOR_WORKERS:-8}             # 8 x 16 ranks = 128 workers on th
 PRIOR_PREFETCH_FACTOR=${PRIOR_PREFETCH_FACTOR:-8}
 PRIOR_IN_ORDER=${PRIOR_IN_ORDER:-False}       # avoid graph_scm head-of-line blocking
 source "$REPO_ROOT/scripts/icl_recipe.sh"
+source "$REPO_ROOT/scripts/prior_recipe.sh"
 mkdir -p "$LOG_DIR"
 
 # Reusing the same command after interruption resumes the new hybrid run,
@@ -94,9 +95,7 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --gradient_clipping 10.0 \
             --prior_type graph_scm \
             --prior_device cpu \
-            --n_jobs "$PRIOR_WORKERS" \
-            --prior_prefetch_factor "$PRIOR_PREFETCH_FACTOR" \
-            --prior_in_order "$PRIOR_IN_ORDER" \
+            "${PRIOR_ARGS[@]}" \
             --batch_size_per_gp 4 \
             --min_features 1 \
             --max_features 100 \

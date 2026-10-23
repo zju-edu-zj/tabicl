@@ -1,5 +1,13 @@
 # Prior generation bottleneck audit
 
+> Superseded implementation and benchmark: see
+> [节点共享池与长表算子优化](prior_node_pool_20261022.md).
+> The current curriculum launchers default to a node-wide pool, not the
+> per-rank DataLoader policy below. The historical multi-rank measurements on
+> this page used independent consumer loops; they must not be interpreted as
+> lockstep DDP wall-time measurements. The new benchmark synchronizes every step
+> and reports both total elapsed time and slowest-rank waits.
+
 ## Root cause
 
 The Stage 1 recipe runs 16 DDP ranks and previously gave every rank 16

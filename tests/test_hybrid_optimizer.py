@@ -126,7 +126,8 @@ def test_batched_muon_matches_individual_step_with_missing_gradients(device, nes
 @pytest.mark.parametrize("device", [
     "cpu", pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")),
 ])
-def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, device):
+@pytest.mark.parametrize("batch_kind", ["dense", "compact", "nested"])
+def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, device, batch_kind):
     torch.manual_seed(12)
     trainer = Trainer.__new__(Trainer)
     trainer.config = config("--batch_size", "1", "--micro_batch_size", "1",
@@ -146,6 +147,11 @@ def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, devic
     trainer.configure_optimizer()
     batch = (torch.randn(1, 35, 3), torch.randint(0, 3, (1, 35)),
              torch.tensor([3]), torch.tensor([35]), torch.tensor([25]))
+    if batch_kind == "compact":
+        batch = ([batch[0][0]], [batch[1][0]], *batch[2:])
+    elif batch_kind == "nested":
+        batch = (torch.nested.nested_tensor([batch[0][0]]),
+                 torch.nested.nested_tensor([batch[1][0]]), *batch[2:])
     for step in range(3):
         trainer.run_batch(batch)
         trainer.curr_step = step + 1
