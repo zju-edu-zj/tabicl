@@ -32,6 +32,7 @@ from tabicl._model.tabicl import TabICL
 from tabicl._model.attention import HAS_FLASH_ATTN3, set_flash_attn3_enabled
 from tabicl.prior._dataset import PriorDataset
 from tabicl.prior._genload import LoadPriorDataset, seed_worker, pad_prior_batch
+from tabicl.prior._node_pool import NodePriorPool, iter_micro_batches
 from tabicl.prior.graph_lib._config import PriorConfig
 from tabicl.train._optim import get_scheduler
 from tabicl.train._optimizer import build_optimizer, optimizer_spec, validate_optimizer_checkpoint
@@ -74,6 +75,8 @@ def ddp_cleanup(func):
             return func(self, *args, **kwargs)
         finally:
             self.close_local_logging()
+            if isinstance(getattr(self, "dataloader", None), NodePriorPool):
+                self.dataloader.close()
             if self.ddp:
                 destroy_process_group()
 
@@ -422,6 +425,22 @@ class Trainer:
         if self.master_process:
             print(dataset)
 
+        if self.config.prior_backend == "node_pool":
+            if self.config.prior_dir is not None or self.config.prior_seed_by_step:
+                raise ValueError("node_pool requires online generation and prior_seed_by_step=False")
+            local_world = int(os.environ.get("LOCAL_WORLD_SIZE", 1))
+            available = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+            workers = self.config.prior_pool_workers or max(1, available - local_world)
+            self.dataloader = NodePriorPool(
+                dataset.prior, workers=workers, window=self.config.prior_pool_window,
+                byte_budget=self.config.prior_pool_mb * 1024**2,
+                seed=self.config.np_seed + 100003 * int(os.environ.get("GROUP_RANK", 0)),
+            )
+            if self.master_process:
+                print(f"Prior pipeline: node_pool workers/node={workers}, window={self.config.prior_pool_window}, "
+                      f"output budget={self.config.prior_pool_mb} MiB; padding per micro-batch")
+            return
+
         # For on-the-fly generation, parallelize dataset creation across dataloader workers.
         # For pre-generated data loaded from disk, a single worker is enough.
         if self.config.prior_dir is None:
@@ -703,6 +722,8 @@ class Trainer:
 
         self.validate_screen()
         warmup_frontend(self)
+        if isinstance(self.dataloader, NodePriorPool):
+            self.dataloader.set_start_step(self.curr_step)
         dataloader = iter(self.dataloader)
         for step in step_progress:
             # Get the next batch
@@ -714,6 +735,9 @@ class Trainer:
             with Timer() as train_timer:
                 results = self.run_batch(batch)
             train_time = train_timer.elapsed
+            if self.master_process and isinstance(self.dataloader, NodePriorPool) and step % 200 == 0:
+                results.update({f"prior_pool/{key}": value for key, value in self.dataloader.stats().items()
+                                if key != "worker_pids"})
 
             self.curr_step = step + 1
             if self.master_process:
@@ -1160,13 +1184,8 @@ class Trainer:
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
-        # Pad nested tensors to the same size
-        batch = [t.to_padded_tensor(padding=0.0) if t.is_nested else t for t in batch]
-
-        # Split the batch into micro-batches along the first dimension
-        num_micro_batches = math.ceil(self.config.batch_size / self.config.micro_batch_size)
-        micro_batches = [torch.split(t, self.config.micro_batch_size, dim=0) for t in batch]
-        micro_batches = list(zip(*micro_batches))
+        num_micro_batches = math.ceil(len(batch[2]) / self.config.micro_batch_size)
+        micro_batches = iter_micro_batches(batch, self.config.micro_batch_size)
 
         results = {"pinball": 0.0} if self.regression else {"ce": 0.0, "accuracy": 0.0}
         failed_batches = 0

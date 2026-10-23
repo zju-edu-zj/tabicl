@@ -128,7 +128,8 @@ def test_batched_muon_matches_individual_step_with_missing_gradients(device, nes
     pytest.param("cuda", False, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")),
     pytest.param("cuda", True, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")),
 ])
-def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, device, compiled):
+@pytest.mark.parametrize("batch_kind", ["dense", "compact", "nested"])
+def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, device, compiled, batch_kind):
     torch.manual_seed(12)
     trainer = Trainer.__new__(Trainer)
     trainer.config = config("--batch_size", "2", "--micro_batch_size", "1",
@@ -151,6 +152,11 @@ def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, devic
     trainer.configure_optimizer()
     batch = (torch.randn(2, 35, 3), torch.randint(0, 3, (2, 35)),
              torch.tensor([3, 3]), torch.tensor([35, 35]), torch.tensor([25, 25]))
+    if batch_kind == "compact":
+        batch = (list(batch[0].unbind()), list(batch[1].unbind()), *batch[2:])
+    elif batch_kind == "nested":
+        batch = (torch.nested.nested_tensor(list(batch[0].unbind())),
+                 torch.nested.nested_tensor(list(batch[1].unbind())), *batch[2:])
     for step in range(3):
         trainer.run_batch(batch)
         trainer.curr_step = step + 1

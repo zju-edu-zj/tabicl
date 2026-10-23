@@ -7,6 +7,7 @@ from tabicl.prior.graph_lib._base import RandomTensorTransformer, Context
 from tabicl.prior.graph_lib._activation import RandomActivation
 from tabicl.prior.graph_lib._matrix import RandomMatrix, RandomGaussianMatrix
 from tabicl.prior.graph_lib._weights import RandomWeights
+from tabicl.prior.graph_lib._distance import nearest_center
 
 
 class RandomFunction(RandomTensorTransformer):
@@ -152,6 +153,12 @@ class RandomTreeFunction(RandomFunction):
             by conversion to long integer indices. This resolves the "baddbmm_cuda not implemented
             for Long" error while maintaining index integrity.
         """
+        # Bound boolean/index/gather temporaries per worker on long tables.
+        # Chunk rows only: tree reduction order and all random draws stay intact.
+        bytes_per_row = self.n_trees_ * (self.depth_ * 9 + self.out_features * x.element_size() + 16)
+        rows = max(1, int((16 * 1024**2) // bytes_per_row))
+        if x.shape[0] > rows:
+            return torch.cat([self._transform(chunk) for chunk in x.split(rows)], dim=0)
         split_dims = self.split_dims_.to(x.device)
         split_points = self.split_points_.to(x.device)
         split_sides = x[:, split_dims] > split_points
@@ -198,8 +205,7 @@ class RandomDiscretizationFunction(RandomFunction):
         self.targets_ = RandomLinearFunction(self.context, self.in_features, self.out_features)(self.centers_)
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
-        dists = torch.cdist(x, self.centers_, self.p_)  # this is faster than manually calculating the distance matrix
-        closest_idx = dists.argmin(dim=-1)
+        closest_idx = nearest_center(x, self.centers_, self.p_)
         return self.targets_[closest_idx]
 
 
