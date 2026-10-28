@@ -379,6 +379,41 @@ class TabICL(nn.Module):
         """Clear the stored cache."""
         self._cache = None
 
+    def compile_frontend(self, mode: str = "all") -> None:
+        """Opt into dynamic training compilation (PyTorch >= 2.8).
+
+        ``row`` compiles row aggregation; ``all`` additionally compiles column
+        embedding. Only bound tensor methods are compiled: registered modules,
+        parameter identities and checkpoint keys stay unchanged. First use and
+        new shape guards can incur compilation latency. Fused floating point
+        operations can change rounding. Configure once before DDP wrapping.
+        """
+        if mode not in ("none", "row", "all"):
+            raise ValueError("compile_frontend mode must be none, row or all")
+        if mode == "none":
+            return
+        version = tuple(int(part) for part in torch.__version__.split("+")[0].split(".")[:2])
+        if version < (2, 8):
+            raise RuntimeError("Frontend compilation requires PyTorch >= 2.8; older dynamic column graphs can produce NaNs")
+        if getattr(self, "_frontend_compile_mode", None) is not None:
+            raise RuntimeError("Frontend compilation has already been configured")
+        def compile_tensor_method(method):
+            compiled = torch.compile(method, dynamic=True)
+            # These are component graphs, not a compiled DDP forward. Torch
+            # 2.8's DDP bucket splitter can emit non-tensor graph outputs here
+            # (RoPE scalars), failing AOTAutograd. Disable only that compiler
+            # pass during component calls; DDP gradient reduction stays active.
+            return torch._dynamo.config.patch(optimize_ddp=False)(compiled)
+
+        if mode == "all":
+            self.col_embedder._compute_embeddings = compile_tensor_method(
+                self.col_embedder._compute_embeddings
+            )
+        self.row_interactor._aggregate_embeddings = compile_tensor_method(
+            self.row_interactor._aggregate_embeddings
+        )
+        self._frontend_compile_mode = mode
+
     def _train_forward(
         self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None, embed_with_test: bool = False
     ) -> Tensor:
@@ -428,6 +463,7 @@ class TabICL(nn.Module):
                 y_train=y_train,
                 d=d,
                 embed_with_test=embed_with_test,
+                skip_reserved=(self.col_embedder.reserve_cls_tokens == self.row_interactor.num_cls),
             ),
             d=d,
         )

@@ -20,7 +20,11 @@ DRY_RUN=${DRY_RUN:-0}
 FAIL_FAST=${FAIL_FAST:-True}
 TRAIN_DTYPE=${TRAIN_DTYPE:-bfloat16}
 RECOMPUTE=${RECOMPUTE:-False}
+COMPILE_FRONTEND=${COMPILE_FRONTEND:-none}
+COMPILE_OPTIMIZER=${COMPILE_OPTIMIZER:-False}
 ICL_ARGS=(
+    --compile_frontend "$COMPILE_FRONTEND"
+    --compile_optimizer "$COMPILE_OPTIMIZER"
     --icl_attention "$ICL_ATTENTION"
     --icl_router "$ICL_ROUTER"
     --icl_router_beam "$ICL_ROUTER_BEAM"

@@ -358,6 +358,7 @@ class Trainer:
             for param in model.icl_predictor.parameters():
                 param.requires_grad = False
 
+        model.compile_frontend(getattr(self.config, "compile_frontend", "none"))
         self.raw_model = model
 
         # Wrap model into DDP container if using distributed training
@@ -931,9 +932,9 @@ class Trainer:
         micro_X, micro_y = self.align_micro_batch(micro_X, micro_y, micro_d, seq_len)
 
         # Move to device
-        micro_X = micro_X.to(self.config.device)
-        micro_y = micro_y.to(self.config.device)
-        micro_d = micro_d.to(self.config.device)
+        micro_X = micro_X.to(self.config.device, non_blocking=True)
+        micro_y = micro_y.to(self.config.device, non_blocking=True)
+        micro_d = micro_d.to(self.config.device, non_blocking=True)
 
         y_train = micro_y[:, :train_size]
         y_test = micro_y[:, train_size:]
@@ -990,11 +991,11 @@ class Trainer:
         with torch.no_grad():
             micro_results = {}
             if self.regression:
-                micro_results["pinball"] = scaled_loss.item()
+                micro_results["pinball"] = scaled_loss.detach()
             else:
-                micro_results["ce"] = scaled_loss.item()
+                micro_results["ce"] = scaled_loss.detach()
                 accuracy = (pred.argmax(dim=1) == true).sum() / len(true)
-                micro_results["accuracy"] = accuracy.item() / num_micro_batches
+                micro_results["accuracy"] = accuracy.detach() / num_micro_batches
 
         for name, module in diagnostic_modules:
             for key, value in module.last_diagnostics.items():
@@ -1163,8 +1164,8 @@ class Trainer:
                 self.model.parameters(), self.config.gradient_clipping,
                 error_if_nonfinite=getattr(self.config, "fail_fast", False),
             )
-            results["grad_norm"] = float(grad_norm)
-            results["grad_clipped"] = float(grad_norm > self.config.gradient_clipping)
+            results["grad_norm"] = grad_norm.detach()
+            results["grad_clipped"] = (grad_norm > self.config.gradient_clipping).detach()
 
         # Update parameters
         results["lr_used"] = self.optimizer.param_groups[0]["lr"]
@@ -1178,6 +1179,12 @@ class Trainer:
         self.optimizer.zero_grad(set_to_none=True)
         self.scheduler.step()
 
+        # Keep detached scalars on device throughout gradient accumulation and
+        # transfer them together once per optimizer step, after the GPU updates.
+        tensor_keys = [key for key, value in results.items() if isinstance(value, torch.Tensor)]
+        if tensor_keys:
+            values = torch.stack([results[key].float() for key in tensor_keys]).cpu().tolist()
+            results.update(zip(tensor_keys, values))
         return results
 
 

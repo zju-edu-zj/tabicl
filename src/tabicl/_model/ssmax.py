@@ -10,6 +10,12 @@ def _logn(n: int | torch.Tensor, device: torch.device, dtype: torch.dtype) -> to
     """Compute :math:`\\log(n)` safely, avoiding fp16 overflow for large ``n``."""
     if isinstance(n, torch.Tensor):
         return n.to(device=device, dtype=torch.float32).clamp_min(1).log().to(dtype)
+    if torch.compiler.is_compiling():
+        # Keep symbolic lengths in the graph. Constructing a tensor from
+        # math.log(SymInt) specializes the value at AOT graph breaks, exhausting
+        # Dynamo's cache on changing support sizes. Double precision mirrors
+        # Python's math.log before the final cast, including BF16 rounding.
+        return torch.scalar_tensor(n, device=device, dtype=torch.float64).clamp_min(1).log().to(dtype)
     return torch.tensor(math.log(max(n, 1)), device=device, dtype=dtype)
 
 

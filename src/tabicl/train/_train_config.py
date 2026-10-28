@@ -74,6 +74,16 @@ def build_parser():
     ###########################################################################
     parser.add_argument("--device", default="cuda", type=str, help="Device for training: cpu, cuda, cuda:0")
     parser.add_argument(
+        "--compile_frontend", choices=["none", "row", "all"], default="none",
+        help="Opt into dynamic column/row compilation with PyTorch >= 2.8. "
+             "Preserves checkpoint keys; first use incurs compilation latency and rounding may differ.",
+    )
+    parser.add_argument(
+        "--compile_optimizer", type=str2bool, default=False,
+        help="Compile Muon Newton-Schulz matrix buckets with PyTorch >= 2.8; "
+             "incurs initial compilation and can change floating point rounding.",
+    )
+    parser.add_argument(
         "--dtype",
         default="float32",
         type=str,

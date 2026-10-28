@@ -123,16 +123,19 @@ def test_batched_muon_matches_individual_step_with_missing_gradients(device, nes
         torch.testing.assert_close(params[1], reference[1], rtol=2e-5, atol=2e-6)
 
 
-@pytest.mark.parametrize("device", [
-    "cpu", pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")),
+@pytest.mark.parametrize("device,compiled", [
+    ("cpu", False),
+    pytest.param("cuda", False, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")),
+    pytest.param("cuda", True, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")),
 ])
-def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, device):
+def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, device, compiled):
     torch.manual_seed(12)
     trainer = Trainer.__new__(Trainer)
-    trainer.config = config("--batch_size", "1", "--micro_batch_size", "1",
+    trainer.config = config("--batch_size", "2", "--micro_batch_size", "1",
                             "--icl_diagnostics_every", "0", "--fail_fast", "True")
     trainer.config.checkpoint_dir = str(tmp_path)
     trainer.config.device = device
+    trainer.config.compile_optimizer = compiled
     trainer.master_process = True
     trainer.ddp = False
     trainer.regression = False
@@ -141,16 +144,19 @@ def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, devic
     trainer.amp_ctx = torch.autocast("cuda", dtype=torch.bfloat16) if device == "cuda" else nullcontext()
     trainer.scaler = torch.amp.GradScaler(device, enabled=False)
     trainer.model = trainer.raw_model = small_model().to(device)
+    if compiled:
+        trainer.model.compile_frontend("all")
     trainer.model_config = dict(icl_attention="global_sparse", icl_attention_impl_version=4,
                                icl_qk_norm=True, icl_block_size=16, icl_num_selected_blocks=1)
     trainer.configure_optimizer()
-    batch = (torch.randn(1, 35, 3), torch.randint(0, 3, (1, 35)),
-             torch.tensor([3]), torch.tensor([35]), torch.tensor([25]))
+    batch = (torch.randn(2, 35, 3), torch.randint(0, 3, (2, 35)),
+             torch.tensor([3, 3]), torch.tensor([35, 35]), torch.tensor([25, 25]))
     for step in range(3):
         trainer.run_batch(batch)
         trainer.curr_step = step + 1
     trainer.save_checkpoint("step-3.ckpt")
     expected = trainer.run_batch(batch)
+    assert all(not isinstance(value, torch.Tensor) for value in expected.values())
     expected_params = deepcopy(trainer.model.state_dict())
     trainer.config.checkpoint_path = str(tmp_path / "step-3.ckpt")
     trainer.configure_optimizer()
@@ -164,6 +170,36 @@ def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, devic
     for name, p in trainer.model.state_dict().items():
         torch.testing.assert_close(p, expected_params[name], rtol=0 if device == "cpu" else 1e-5,
                                    atol=0 if device == "cpu" else 1e-7)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")
+@pytest.mark.parametrize("nesterov,cautious", [(True, False), (False, True)])
+@pytest.mark.parametrize("allow_tf32", [False, True])
+def test_compiled_muon_preserves_updates_state_and_missing_gradients(nesterov, cautious, allow_tf32, monkeypatch):
+    monkeypatch.setattr(torch.backends.cuda.matmul, "allow_tf32", allow_tf32)
+    torch.manual_seed(83)
+    shapes = [(8, 5), (8, 5), (5, 8), (4, 4), (128, 384)]
+    eager_params = [torch.nn.Parameter(torch.randn(*shape, device="cuda")) for shape in shapes]
+    compiled_params = [torch.nn.Parameter(p.detach().clone()) for p in eager_params]
+    options = dict(lr=4e-4, weight_decay=0.01, momentum=0.9,
+                   nesterov=nesterov, use_cautious_wd=cautious)
+    eager = Muon([dict(params=eager_params, use_muon=True)], **options)
+    compiled = Muon([dict(params=compiled_params, use_muon=True)], compile_ns=True, **options)
+    for step in range(4):
+        for i, (p, q) in enumerate(zip(eager_params, compiled_params)):
+            grad = None if i == 1 and step % 2 == 0 else torch.randn_like(p)
+            p.grad = grad
+            q.grad = None if grad is None else grad.clone()
+        eager.step()
+        compiled.step()
+        for p, q in zip(eager_params, compiled_params):
+            torch.testing.assert_close(q, p, rtol=2e-5, atol=2e-6)
+            assert eager.state[p].keys() == compiled.state[q].keys()
+            for key in eager.state[p]:
+                torch.testing.assert_close(eager.state[p][key], compiled.state[q][key], rtol=0, atol=0)
+        # Compilation is runtime-only; optimizer checkpoints stay interchangeable.
+        if step == 1:
+            compiled.load_state_dict(deepcopy(eager.state_dict()))
 
 
 def test_legacy_all_muon_rejected_but_weights_only_load_succeeds(tmp_path):

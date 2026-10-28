@@ -97,7 +97,8 @@ class Muon(torch.optim.Optimizer):
                  ns_steps=5,
                  adamw_betas=(0.95, 0.95),
                  adamw_eps=1e-8,
-                 use_cautious_wd: bool = False):
+                 use_cautious_wd: bool = False,
+                 compile_ns: bool = False):
 
         defaults = dict(lr=lr, weight_decay=weight_decay,
                         matched_adamw_rms=matched_adamw_rms,
@@ -105,6 +106,15 @@ class Muon(torch.optim.Optimizer):
                         adamw_betas=adamw_betas, adamw_eps=adamw_eps, use_cautious_wd=use_cautious_wd)
 
         super().__init__(param_groups, defaults)
+        self._zeropower = zeropower_via_newtonschulz5
+        if compile_ns:
+            version = tuple(int(part) for part in torch.__version__.split("+")[0].split(".")[:2])
+            if version < (2, 8):
+                raise RuntimeError("Compiled Muon requires PyTorch >= 2.8")
+            # Bucket sizes can change when a parameter has no gradient. Share
+            # dynamic graphs across matrix shapes instead of exhausting Dynamo's
+            # specialization cache. Keep state/step counters eager.
+            self._zeropower = torch.compile(zeropower_via_newtonschulz5, fullgraph=True, dynamic=True)
 
     @torch.no_grad()
     def step(self):
@@ -149,7 +159,7 @@ class Muon(torch.optim.Optimizer):
                                             for _, g, buf in entries])
                 else:
                     ns_input = torch.stack([buf.reshape(matrix_shape) for _, _, buf in entries])
-                updates = zeropower_via_newtonschulz5(ns_input, steps=ns_steps).unbind(0)
+                updates = self._zeropower(ns_input, steps=ns_steps).unbind(0)
                 params = [p for p, _, _ in entries]
                 if use_cautious_wd:
                     for p, update in zip(params, updates):
@@ -173,6 +183,39 @@ class Muon(torch.optim.Optimizer):
             use_cautious_wd = group['use_cautious_wd']
             beta1, beta2 = group['adamw_betas']
             eps = group['adamw_eps']
+
+            if not use_cautious_wd:
+                # Most auxiliary parameters are small. Launching every moment,
+                # bias correction and update separately costs more than their
+                # arithmetic. Bucket by each parameter's own clock so missing
+                # gradients and resumed optimizer states keep AdamW semantics.
+                buckets = {}
+                for p in params:
+                    if p.grad is None:
+                        continue
+                    state = self.state[p]
+                    if len(state) == 0:
+                        state['adamw_exp_avg'] = torch.zeros_like(p.grad)
+                        state['adamw_exp_avg_sq'] = torch.zeros_like(p.grad)
+                        state['step'] = 0
+                    state['step'] += 1
+                    key = (p.device, p.dtype, state['step'])
+                    buckets.setdefault(key, []).append((p, p.grad, state))
+                for (_, _, step), entries in buckets.items():
+                    active_params = [p for p, _, _ in entries]
+                    grads = [g for _, g, _ in entries]
+                    averages = [s['adamw_exp_avg'] for _, _, s in entries]
+                    squares = [s['adamw_exp_avg_sq'] for _, _, s in entries]
+                    torch._foreach_lerp_(averages, grads, 1 - beta1)
+                    torch._foreach_lerp_(squares, torch._foreach_mul(grads, grads), 1 - beta2)
+                    corrected = torch._foreach_div(averages, 1 - beta1 ** step)
+                    denominator = torch._foreach_sqrt(squares)
+                    torch._foreach_div_(denominator, (1 - beta2 ** step) ** 0.5)
+                    torch._foreach_add_(denominator, eps)
+                    updates = torch._foreach_div(corrected, denominator)
+                    torch._foreach_mul_(active_params, 1 - lr * weight_decay)
+                    torch._foreach_add_(active_params, updates, alpha=-lr)
+                continue
 
             for p in params:
 

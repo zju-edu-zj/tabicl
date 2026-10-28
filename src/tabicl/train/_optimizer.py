@@ -60,6 +60,7 @@ def build_optimizer(model, config):
         matched_adamw_rms=0.2, momentum=config.beta1, nesterov=True, ns_steps=5,
         adamw_betas=(config.beta1, config.beta2), adamw_eps=1e-8,
         use_cautious_wd=config.use_cautious_wd,
+        compile_ns=getattr(config, "compile_optimizer", False),
     )
 
 

@@ -150,6 +150,7 @@ class ColEmbedding(nn.Module):
         self.max_classes = max_classes
         self.affine = affine
         self.mixed_radix_ensemble = mixed_radix_ensemble
+        self.dropout = dropout
         self.in_linear = SkippableLinear(feature_group_size if feature_group else 1, embed_dim)
 
         self.tf_col = SetTransformer(
@@ -377,7 +378,7 @@ class ColEmbedding(nn.Module):
             assert y_train is not None, "y_train must be provided when target_aware=True."
 
             # Determine if mixed-radix ensemble is needed
-            num_classes = int(y_train.max().item()) + 1
+            num_classes = int(y_train.max().item()) + 1 if self.max_classes > 0 else 0
             needs_mixed_radix = self.max_classes > 0 and num_classes > self.max_classes
 
             if not needs_mixed_radix:
@@ -400,12 +401,14 @@ class ColEmbedding(nn.Module):
                 bases = self._compute_mixed_radix_bases(num_classes)
                 num_digits = len(bases)
                 src_accum = torch.zeros_like(src)
-                src_with_y = src.clone()
 
                 # Run the set transformer for each digit, accumulate, and average
                 for digit_idx in range(num_digits):
                     y_digit = self._extract_mixed_radix_digit(y_train, digit_idx, bases)
                     y_emb = self.y_encoder(y_digit.float())
+                    # Each digit's backward retains its own transformer input.
+                    # Reusing one mutated buffer invalidates saved tensors.
+                    src_with_y = src.clone()
                     src_with_y[..., :train_size, :] = src[..., :train_size, :] + y_emb
                     src_accum = src_accum + self.tf_col(src_with_y, train_size=None if embed_with_test else train_size)
 
@@ -421,7 +424,8 @@ class ColEmbedding(nn.Module):
         return embeddings
 
     def _train_forward(
-        self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None, embed_with_test: bool = False
+        self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None, embed_with_test: bool = False,
+        skip_reserved: bool = False,
     ) -> Tensor:
         """Transform input table into embeddings for training.
 
@@ -455,41 +459,50 @@ class ColEmbedding(nn.Module):
              - C is the number of class tokens
              - E is embedding dimension.
         """
+        # Only the paired row module may discard these columns. Keep the public
+        # column output and dropout RNG sequence unchanged by default.
+        skip_reserved = skip_reserved and self.dropout == 0 and d is None
         if self.feature_group:
             assert d is None, "d is not supported when feature grouping is enabled."
-            return self._train_forward_with_feature_group(X, y_train, embed_with_test)
+            return self._train_forward_with_feature_group(X, y_train, embed_with_test, skip_reserved)
         else:
-            return self._train_forward_without_feature_group(X, y_train, d, embed_with_test)
+            return self._train_forward_without_feature_group(X, y_train, d, embed_with_test, skip_reserved)
 
-    def _train_forward_with_feature_group(self, X: Tensor, y_train: Tensor, embed_with_test: bool) -> Tensor:
+    def _train_forward_with_feature_group(
+        self, X: Tensor, y_train: Tensor, embed_with_test: bool, skip_reserved: bool = False
+    ) -> Tensor:
         """Training path when feature grouping is enabled."""
         train_size = y_train.shape[1]
         X = self.feature_grouping(X)  # (B, T, G, group_size)
-        if self.reserve_cls_tokens > 0:
+        if self.reserve_cls_tokens > 0 and not skip_reserved:
             X = F.pad(X, (0, 0, self.reserve_cls_tokens, 0), value=-100.0)
 
         features = X.transpose(1, 2)  # (B, G+C, T, group_size)
         if self.target_aware:
             assert y_train is not None, "y_train must be provided when target_aware=True."
-            y_train = y_train.unsqueeze(1).expand(-1, features.shape[1], -1)
+            y_train = y_train.unsqueeze(1)
 
         embeddings = self._compute_embeddings(features, train_size, y_train, embed_with_test)
-        return embeddings.transpose(1, 2)  # (B, T, G+C, E)
+        embeddings = embeddings.transpose(1, 2)
+        if skip_reserved:
+            embeddings = F.pad(embeddings, (0, 0, self.reserve_cls_tokens, 0))
+        return embeddings  # (B, T, G+C, E)
 
     def _train_forward_without_feature_group(
-        self, X: Tensor, y_train: Tensor, d: Optional[Tensor], embed_with_test: bool
+        self, X: Tensor, y_train: Tensor, d: Optional[Tensor], embed_with_test: bool,
+        skip_reserved: bool = False,
     ) -> Tensor:
         """Training path without feature grouping, supporting variable number of features per table."""
         train_size = y_train.shape[1]
 
-        if self.reserve_cls_tokens > 0:
+        if self.reserve_cls_tokens > 0 and not skip_reserved:
             X = F.pad(X, (self.reserve_cls_tokens, 0), value=-100.0)
 
         if d is None:
             features = X.transpose(1, 2).unsqueeze(-1)  # (B, H+C, T, 1)
             if self.target_aware:
                 assert y_train is not None, "y_train must be provided when target_aware=True."
-                y_train = y_train.unsqueeze(1).expand(-1, features.shape[1], -1)
+                y_train = y_train.unsqueeze(1)
             embeddings = self._compute_embeddings(features, train_size, y_train, embed_with_test)
         else:
             if self.reserve_cls_tokens > 0:
@@ -515,7 +528,10 @@ class ColEmbedding(nn.Module):
             embeddings = torch.zeros(B, HC, T, self.embed_dim, device=X.device, dtype=effective_embeddings.dtype)
             embeddings[mask] = effective_embeddings
 
-        return embeddings.transpose(1, 2)  # (B, T, H+C, E)
+        embeddings = embeddings.transpose(1, 2)
+        if skip_reserved:
+            embeddings = F.pad(embeddings, (0, 0, self.reserve_cls_tokens, 0))
+        return embeddings  # (B, T, H+C, E)
 
     def _inference_forward(
         self,
@@ -684,6 +700,7 @@ class ColEmbedding(nn.Module):
         embed_with_test: bool = False,
         feature_shuffles: Optional[List[List[int]]] = None,
         mgr_config: MgrConfig = None,
+        skip_reserved: bool = False,
     ) -> Tensor:
         """Transform input table into embeddings.
 
@@ -716,6 +733,10 @@ class ColEmbedding(nn.Module):
         mgr_config : MgrConfig, default=None
             Configuration for InferenceManager. Used only in inference mode.
 
+        skip_reserved : bool, default=False
+            Training only: leave the reserved CLS slots empty for the paired row
+            module to overwrite. Disabled with dropout or ragged feature counts.
+
         Returns
         -------
         Tensor
@@ -727,7 +748,7 @@ class ColEmbedding(nn.Module):
              - E is embedding dimension.
         """
         if self.training:
-            embeddings = self._train_forward(X, y_train, d, embed_with_test)
+            embeddings = self._train_forward(X, y_train, d, embed_with_test, skip_reserved)
         else:
             embeddings = self._inference_forward(X, y_train, embed_with_test, feature_shuffles, mgr_config)
 

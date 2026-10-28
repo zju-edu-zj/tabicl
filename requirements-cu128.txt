@@ -1,0 +1,6 @@
+# Reproducible accelerated training runtime. Python >=3.10, Linux x86_64.
+# Install the project's pretrain extras separately: pip install -e '.[pretrain]'
+# Inductor also needs a working C/C++ compiler (tested with GCC 11.2).
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.8.0+cu128
+triton==3.4.0

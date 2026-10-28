@@ -132,10 +132,9 @@ class SkippableLinear(nn.Linear):
 
         out = F.linear(src, self.weight, self.bias)
         skip_mask = (src == self.skip_value).all(dim=-1)
-        if skip_mask.any():
-            out[skip_mask] = self.skip_value
-
-        return out
+        # Avoid a device-to-host synchronization on every projection. The
+        # selection also gives skipped cells exactly zero parameter/input grad.
+        return torch.where(skip_mask.unsqueeze(-1), self.skip_value, out)
 
 
 class MultiheadAttention(nn.MultiheadAttention):
