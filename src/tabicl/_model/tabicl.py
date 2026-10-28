@@ -383,7 +383,8 @@ class TabICL(nn.Module):
         """Opt into dynamic training compilation (PyTorch >= 2.8).
 
         ``row`` compiles row aggregation; ``all`` additionally compiles column
-        embedding. Only bound tensor methods are compiled: registered modules,
+        embedding's tensor-only common path. Class validation/mixed-radix
+        dispatch remain eager. Only bound tensor methods are compiled: registered modules,
         parameter identities and checkpoint keys stay unchanged. First use and
         new shape guards can incur compilation latency. Fused floating point
         operations can change rounding. Configure once before DDP wrapping.
@@ -397,20 +398,31 @@ class TabICL(nn.Module):
             raise RuntimeError("Frontend compilation requires PyTorch >= 2.8; older dynamic column graphs can produce NaNs")
         if getattr(self, "_frontend_compile_mode", None) is not None:
             raise RuntimeError("Frontend compilation has already been configured")
-        def compile_tensor_method(method):
-            compiled = torch.compile(method, dynamic=True)
+
+        def compile_tensor_method(method, *, fullgraph=True, recompute=False):
+            compiled = torch.compile(method, dynamic=True, fullgraph=fullgraph)
             # These are component graphs, not a compiled DDP forward. Torch
             # 2.8's DDP bucket splitter can emit non-tensor graph outputs here
             # (RoPE scalars), failing AOTAutograd. Disable only that compiler
             # pass during component calls; DDP gradient reduction stays active.
-            return torch._dynamo.config.patch(optimize_ddp=False)(compiled)
+            # Float module hyperparameters (e.g. RoPE interpolation) are fixed.
+            # Torch 2.8 cannot lift a shared symbolic float across sibling
+            # checkpoint subgraphs. Specializing these constants leaves tensor
+            # dimensions dynamic and keeps recomputation fullgraph-compatible.
+            compiler_options = dict(optimize_ddp=False)
+            if recompute:
+                compiler_options["specialize_float"] = True
+            return torch._dynamo.config.patch(**compiler_options)(compiled)
 
         if mode == "all":
-            self.col_embedder._compute_embeddings = compile_tensor_method(
-                self.col_embedder._compute_embeddings
+            self.col_embedder._compute_embeddings_standard = compile_tensor_method(
+                self.col_embedder._compute_embeddings_standard,
+                # Nonzero dropout retains sentinel compaction and its RNG
+                # semantics, whose data-dependent branches need graph breaks.
+                fullgraph=self.col_embedder.dropout == 0,
             )
         self.row_interactor._aggregate_embeddings = compile_tensor_method(
-            self.row_interactor._aggregate_embeddings
+            self.row_interactor._aggregate_embeddings, recompute=self.row_interactor.recompute
         )
         self._frontend_compile_mode = mode
 

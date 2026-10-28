@@ -361,7 +361,9 @@ class RotaryEmbedding(nn.Module):
     def get_scale(self, t: Tensor, seq_len: int | None = None, offset=0):
         assert self.use_xpos
 
-        should_cache = self.cache_if_possible and exists(seq_len)
+        # Mutable length caches add guards whenever a wider table arrives.
+        # Inductor can fuse the frequency/scale calculation into its graph.
+        should_cache = self.cache_if_possible and exists(seq_len) and not torch.compiler.is_compiling()
 
         if should_cache and exists(self.cached_scales) and (seq_len + offset) <= self.cached_scales.shape[0]:
             return self.cached_scales[offset : (offset + seq_len)]
@@ -401,7 +403,11 @@ class RotaryEmbedding(nn.Module):
     @torch.autocast("cuda", enabled=False)
     def forward(self, t: Tensor, seq_len=None, offset=0):
         should_cache = (
-            self.cache_if_possible and not self.learned_freq and exists(seq_len) and self.freqs_for != "pixel"
+            self.cache_if_possible
+            and not self.learned_freq
+            and exists(seq_len)
+            and self.freqs_for != "pixel"
+            and not torch.compiler.is_compiling()
         )
 
         if should_cache and exists(self.cached_freqs) and (offset + seq_len) <= self.cached_freqs.shape[0]:

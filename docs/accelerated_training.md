@@ -32,16 +32,29 @@ pass is locally disabled to avoid its RoPE scalar-output compilation failure.
 This does not disable DDP gradient reduction or persistently change the global
 compiler configuration. Single-rank NCCL training and resume are tested;
 multi-rank communication/scaling are not covered by that check.
+For row recomputation, the same local compiler context specializes fixed float
+hyperparameters to work around a Torch 2.8 checkpoint subgraph tracing error;
+tensor dimensions remain dynamic.
 SSMax length scaling stays inside the tensor graph so changing support lengths
 does not specialize a Python logarithm and exhaust the default graph cache.
+For the default zero-dropout column path, class-count validation and many-class
+mixed-radix dispatch run outside compilation; the common tensor path and row
+aggregation use `fullgraph=True`. Sentinel handling uses tensor selection rather
+than data-dependent Python branches, and compiled RoPE calls do not mutate
+length caches. Nonzero column dropout retains the original compaction/RNG
+semantics and permits graph breaks. Many-class mixed-radix execution stays eager.
 `compile_optimizer` defaults to false and compiles only Muon's Newton–Schulz
 tensor algebra. It has no effect for all-AdamW training (`--muon False`). Both
 compiler options require PyTorch >=2.8; this repository pins the tested 2.8.0 /
 3.4.0 pair rather than claiming compatibility with every newer release.
 
 Compilation adds cold-start latency and can compile additional graphs for new
-shapes. Keep the compiler cache on persistent writable local storage. Large
-tables may still need `RECOMPUTE=True` and a smaller micro-batch. Compilation
+shapes. In particular, Torch specializes singleton dimensions: H=1 can need
+one extra column graph even with `dynamic=True`. Changing architecture, dtype,
+gradient mode, masks or input layout can also need different graphs. This is
+different from recompiling every distinct width. Keep the compiler cache on
+persistent writable local storage. Large tables may still need `RECOMPUTE=True`
+and a smaller micro-batch. Compilation
 does not remove the need to provision CPU workers and prefetching for the
 `graph_scm` prior.
 
@@ -55,6 +68,17 @@ comparisons against the already optimized ICL baseline, not portable guarantees.
 FP32 measurements allow TF32 matmul, as in the training configuration.
 Frontend compilation supplies most of the gain; compiling Muon adds little
 in these measurements and can be left off to reduce startup complexity.
+
+When measuring variable-column Stage 1, retain every slow step and report both
+the entire run and the mean excluding only the initial step. Log Dynamo guards
+with `TORCH_LOGS=recompiles,graph_breaks`; `dynamic=True` alone is not evidence
+of bounded compilation. For a diagnostic run, use
+`torch._dynamo.config.patch(fail_on_recompile_limit_hit=True)` to detect a cache
+limit instead of silently accepting eager fallback. Increasing cache limits or
+enabling `capture_scalar_outputs` is not the fix used here. Torch 2.8 normally
+falls back to eager at the recompile limit; this is not an LRU eviction policy.
+Full-graph compilation can cost more at startup than the previous fragmented
+graphs. Short runs can remain slower overall even when graph counts stabilize.
 
 Module registration, parameter identities, model checkpoint keys, optimizer
 state layout and parameter routing stay unchanged. These options can be

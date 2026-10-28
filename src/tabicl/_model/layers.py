@@ -950,6 +950,12 @@ class InducedSelfAttentionBlock(nn.Module):
         """
 
         skip_mask = (src == self.skip_value).all(dim=(-2, -1))  # batch shape
+        if torch.compiler.is_compiling() and self.multihead_attn1.attn.dropout == 0:
+            # Sequences in this batch are independent. Avoid data-dependent
+            # Python branches / boolean compaction and restore sentinel outputs
+            # with zero gradients. Keep dropout's eager RNG/compaction semantics.
+            out = self.induced_attention(src, train_size)
+            return torch.where(skip_mask[..., None, None], self.skip_value, out)
         if skip_mask.any():
             if skip_mask.all():
                 out = torch.full_like(src, self.skip_value)

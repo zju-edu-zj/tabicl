@@ -370,26 +370,12 @@ class ColEmbedding(nn.Module):
             Embeddings of shape (..., T, E) where E is the embedding dimension.
         """
 
-        src = self.in_linear(features)  # (..., T, in_dim) -> (..., T, E)
-
-        if not self.target_aware:
-            src = self.tf_col(src, train_size=None if embed_with_test else train_size)
-        else:
+        # Keep data-dependent class dispatch OUTSIDE the compiled tensor method.
+        # Capturing item() fragments the tensor graph around scalar dispatch.
+        if self.target_aware and self.max_classes > 0:
             assert y_train is not None, "y_train must be provided when target_aware=True."
-
-            # Determine if mixed-radix ensemble is needed
-            num_classes = int(y_train.max().item()) + 1 if self.max_classes > 0 else 0
-            needs_mixed_radix = self.max_classes > 0 and num_classes > self.max_classes
-
-            if not needs_mixed_radix:
-                # Standard target-aware embedding
-                if self.max_classes > 0:
-                    y_emb = self.y_encoder(y_train.float())
-                else:
-                    y_emb = self.y_encoder(y_train.unsqueeze(-1))
-                src[..., :train_size, :] = src[..., :train_size, :] + y_emb
-                src = self.tf_col(src, train_size=None if embed_with_test else train_size)
-            else:
+            num_classes = int(y_train.max().item()) + 1
+            if num_classes > self.max_classes:
                 # Mixed-radix ensembling for many-class classification
                 if not self.mixed_radix_ensemble:
                     raise ValueError(
@@ -400,6 +386,7 @@ class ColEmbedding(nn.Module):
                 # Compute balanced bases for mixed-radix decomposition
                 bases = self._compute_mixed_radix_bases(num_classes)
                 num_digits = len(bases)
+                src = self.in_linear(features)
                 src_accum = torch.zeros_like(src)
 
                 # Run the set transformer for each digit, accumulate, and average
@@ -412,8 +399,27 @@ class ColEmbedding(nn.Module):
                     src_with_y[..., :train_size, :] = src[..., :train_size, :] + y_emb
                     src_accum = src_accum + self.tf_col(src_with_y, train_size=None if embed_with_test else train_size)
 
-                src = src_accum / num_digits
+                return self._apply_affine(features, src_accum / num_digits)
 
+        return self._compute_embeddings_standard(features, train_size, y_train, embed_with_test)
+
+    def _compute_embeddings_standard(
+        self, features: Tensor, train_size: int, y_train: Optional[Tensor] = None, embed_with_test: bool = False
+    ) -> Tensor:
+        """Tensor-only common path; class-count validation stays in the caller."""
+        src = self.in_linear(features)
+        if self.target_aware:
+            assert y_train is not None, "y_train must be provided when target_aware=True."
+            train_size = y_train.shape[-1]
+            if self.max_classes > 0:
+                y_emb = self.y_encoder(y_train.float())
+            else:
+                y_emb = self.y_encoder(y_train.unsqueeze(-1))
+            src[..., :train_size, :] = src[..., :train_size, :] + y_emb
+        src = self.tf_col(src, train_size=None if embed_with_test else train_size)
+        return self._apply_affine(features, src)
+
+    def _apply_affine(self, features: Tensor, src: Tensor) -> Tensor:
         if self.affine:
             weights = self.ln_w(self.out_w(src))
             biases = self.ln_b(self.out_b(src))
