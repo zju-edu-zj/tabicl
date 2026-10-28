@@ -31,10 +31,25 @@ class KVCacheEntry:
 
     key: Optional[Tensor] = None
     value: Optional[Tensor] = None
+    # Derived ICL support tensors are local to this entry. Slicing, moving and
+    # concatenating entries deliberately rebuild them lazily.
+    _derived: dict = field(default_factory=dict, repr=False, compare=False)
 
     def is_valid(self) -> bool:
         """Check if this cache entry contains valid data."""
         return self.key is not None and self.value is not None
+
+    def size_bytes(self) -> int:
+        def size(value):
+            if isinstance(value, Tensor):
+                return value.numel() * value.element_size()
+            if isinstance(value, dict):
+                return sum(size(v) for v in value.values())
+            if isinstance(value, (tuple, list)):
+                return sum(size(v) for v in value)
+            return 0
+
+        return size((self.key, self.value, self._derived))
 
     def __getitem__(self, indices) -> KVCacheEntry:
         """Slice key/value along batch dimensions.
@@ -51,6 +66,7 @@ class KVCacheEntry:
         if other.is_valid() and self.is_valid():
             self.key[indices] = other.key
             self.value[indices] = other.value
+            self._derived.clear()
 
     def to(self, device, dtype=None) -> KVCacheEntry:
         """Move this entry to the given device and optionally cast dtype.
@@ -254,20 +270,14 @@ class TabICLCache:
         # Count memory from ColEmbedding
         if self.col_cache:
             for kv in self.col_cache.kv.values():
-                if kv.key is not None:
-                    total += kv.key.numel() * kv.key.element_size()
-                if kv.value is not None:
-                    total += kv.value.numel() * kv.value.element_size()
+                total += kv.size_bytes()
         # Count memory from row representations
         if self.row_repr is not None:
             total += self.row_repr.numel() * self.row_repr.element_size()
         # Count memory from ICLearning
         if self.icl_cache:
             for kv in self.icl_cache.kv.values():
-                if kv.key is not None:
-                    total += kv.key.numel() * kv.key.element_size()
-                if kv.value is not None:
-                    total += kv.value.numel() * kv.value.element_size()
+                total += kv.size_bytes()
 
         return total // (1024 * 1024)
 

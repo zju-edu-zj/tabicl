@@ -370,6 +370,24 @@ class SupportAttention(nn.Module):
                 q = rope.rotate_queries_or_keys(q)
             if self.qk_norm is not None:
                 q = self.qk_norm.normalize_q(q)
+            # Never retain a training graph or bypass diagnostics. Tensor
+            # versions invalidate derived states after in-place cache edits.
+            if (not self.training and not torch.is_grad_enabled()
+                    and not getattr(self, "diagnostics_enabled", False)
+                    and not torch.is_inference(cached_kv.key)
+                    and not torch.is_inference(cached_kv.value)):
+                signature = (id(self), id(cached_kv.key), cached_kv.key._version,
+                             id(cached_kv.value), cached_kv.value._version,
+                             tuple(p._version for p in self.parameters()),
+                             tuple(b._version for b in self.buffers()),
+                             getattr(self, "block_size", None), getattr(self, "partition", None),
+                             getattr(self, "use_triton", None), getattr(self, "global_type", None))
+                if cached_kv._derived.get("signature") != signature:
+                    cached_kv._derived.clear()
+                    cached_kv._derived.update(signature=signature,
+                                              state=self._prepare_support(cached_kv.key, cached_kv.value))
+                return self._hybrid_attention(q, cached_kv.key, cached_kv.value,
+                                              prepared=cached_kv._derived["state"])
             return self._hybrid_attention(q, cached_kv.key, cached_kv.value)
         if key_padding_mask is not None or attn_mask is not None:
             raise NotImplementedError(
@@ -446,7 +464,18 @@ class GlobalLinearAttention(SupportAttention):
             self.diagnostics_enabled = False
         return out
 
-    def _global_attention(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
+    def _prepare_support(self, k, v):
+        if self.global_type == "elu":
+            from ._elu_kernel import prepare_elu_state
+
+            return {"elu": prepare_elu_state(k, v)}
+        return {}
+
+    def _global_attention(self, q: Tensor, k: Tensor, v: Tensor, prepared=None) -> Tensor:
+        if prepared is not None and "elu" in prepared:
+            from ._elu_kernel import apply_elu_state
+
+            return apply_elu_state(q, *prepared["elu"])
         if self.global_type == "induced":
             return self._induced_attention(q, k, v)
         # Positive ELU features make the denominator well-defined. Accumulate
@@ -493,8 +522,11 @@ class GlobalLinearAttention(SupportAttention):
                 self.diagnostics_enabled = False
             return out.to(q.dtype)
 
-    def _hybrid_attention(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
-        global_out = self._global_attention(q, k, v)
+    @torch.compiler.disable
+    def _hybrid_attention(self, q: Tensor, k: Tensor, v: Tensor, prepared=None) -> Tensor:
+        # Keep dynamic custom-kernel launch metadata outside Inductor. Torch
+        # 2.5 emits undefined symbolic constexprs for variable support lengths.
+        global_out = self._global_attention(q, k, v, prepared)
         combined = global_out.transpose(-3, -2).contiguous().view(
             *q.shape[:-3], q.shape[-2], self.embed_dim
         )

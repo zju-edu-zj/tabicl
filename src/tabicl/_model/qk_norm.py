@@ -46,10 +46,23 @@ class ICLQKNorm(nn.Module):
         )
 
     def normalize_q(self, q: torch.Tensor) -> torch.Tensor:
-        return F.rms_norm(q, (self.head_dim,), self.q_weight.to(q.dtype), self.eps)
+        return self._normalize(q, self.q_weight)
 
     def normalize_k(self, k: torch.Tensor) -> torch.Tensor:
-        return F.rms_norm(k, (self.head_dim,), self.k_weight.to(k.dtype), self.eps)
+        return self._normalize(k, self.k_weight)
+
+    def _normalize(self, x: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
+        if (x.is_cuda and x.ndim == 4 and x.numel() and 16 <= x.shape[-1] <= 256
+                and x.dtype in (torch.float32, torch.bfloat16, torch.float16)):
+            from ._norm_triton import rms_norm
+
+            return rms_norm(x, weight, self.eps)
+        # Autocast normally promotes rms_norm to FP32. Keep reductions in FP32
+        # while returning the projection dtype, so Q/K and V agree for SDPA
+        # and low-precision tensor-core kernels.
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            work = x.float() if x.dtype in (torch.bfloat16, torch.float16) else x
+            return F.rms_norm(work, (self.head_dim,), weight.to(x.dtype).to(work.dtype), self.eps).to(x.dtype)
 
     def scale_query(self, q: torch.Tensor, visible_keys: int) -> torch.Tensor:
         log_ratio = math.log(max(visible_keys, 1) / self.reference_length)

@@ -74,16 +74,12 @@ class SetRetrievalAttention(GlobalLinearAttention):
             self.fusion_gate_bias = nn.Parameter(torch.zeros(self.num_heads))
 
     @torch.no_grad()
-    def route(self, q, k):
-        """Return head-specific support ordering and selected leaf IDs."""
-        if self._route_replay is not None:
-            return next(self._route_replay)
+    def _prepare_route(self, k):
         if k.shape[-2] == 0:
             raise ValueError("ICL retrieval needs at least one support row")
         size, s = self.block_size, k.shape[-2]
         nk = (s + size - 1) // size
-        budget = min(self.num_selected_blocks, nk)
-        with torch.autocast(device_type=q.device.type, enabled=False):
+        with torch.autocast(device_type=k.device.type, enabled=False):
             if k.is_cuda and self.use_triton:
                 from ._routing_triton import projection_scores
 
@@ -105,6 +101,23 @@ class SetRetrievalAttention(GlobalLinearAttention):
                 padded = F.pad(sorted_k, (0, 0, 0, nk * size - s))
                 centroids = padded.reshape(*k.shape[:2], nk, size, k.shape[-1]).sum(3)
                 centroids = centroids / lengths[None, None, :, None]
+        return order, centroids, lengths
+
+    def _prepare_support(self, k, v):
+        prepared = super()._prepare_support(k, v) if self.mode != "sparse" else {}
+        if self.mode != "fused_full" and k.shape[-2] > self.block_size * self.num_selected_blocks:
+            prepared["route"] = self._prepare_route(k)
+        return prepared
+
+    @torch.no_grad()
+    def route(self, q, k, prepared=None):
+        """Return head-specific support ordering and selected leaf IDs."""
+        if self._route_replay is not None:
+            return next(self._route_replay)
+        order, centroids, lengths = self._prepare_route(k) if prepared is None else prepared
+        nk = centroids.shape[-2]
+        budget = min(self.num_selected_blocks, nk)
+        with torch.autocast(device_type=q.device.type, enabled=False):
             if self.router == "hierarchical":
                 selected = self._route_tree(q, centroids, lengths, budget)
             else:
@@ -209,8 +222,9 @@ class SetRetrievalAttention(GlobalLinearAttention):
             attn_mask=valid.reshape(b * h * n, 1, -1),
         ).reshape(b, h, n, d)
 
-    def _sparse_attention(self, q, k, v):
-        order, selected = self.route(q, k)
+    def _sparse_attention(self, q, k, v, prepared=None):
+        order, selected = (self.route(q, k) if prepared is None or "route" not in prepared
+                           else self.route(q, k, prepared["route"]))
         visible = min(k.shape[-2], self.num_selected_blocks * self.block_size)
         attention_q = self.qk_norm.scale_query(q, visible) if self.qk_norm is not None else q
         if (
@@ -275,7 +289,9 @@ class SetRetrievalAttention(GlobalLinearAttention):
             )
         self.diagnostics_enabled = False
 
-    def _hybrid_attention(self, q, k, v):
+    @torch.compiler.disable
+    def _hybrid_attention(self, q, k, v, prepared=None):
+        # Compile projections/FFN while the dynamic routed kernels stay opaque.
         if not k.shape[-2]:
             raise ValueError("ICL retrieval needs at least one support row")
         diagnose = self.diagnostics_enabled
@@ -283,7 +299,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
             self.last_diagnostics = {}
         global_heads = None
         if self.mode != "sparse":
-            global_heads = self._global_attention(q, k, v)
+            global_heads = self._global_attention(q, k, v, prepared)
         self.diagnostics_enabled = diagnose
         if self.mode == "fused_full" or k.shape[-2] <= self.block_size * self.num_selected_blocks:
             attention_q = self.qk_norm.scale_query(q, k.shape[-2]) if self.qk_norm is not None else q
@@ -291,7 +307,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
             if diagnose:
                 self._diagnose(attention_q, k, v)
         else:
-            sparse_heads = self._sparse_attention(q, k, v)
+            sparse_heads = self._sparse_attention(q, k, v, prepared)
         heads = sparse_heads
         if global_heads is not None:
             if q.is_cuda and q.ndim == 4 and q.shape[-1] <= 128:

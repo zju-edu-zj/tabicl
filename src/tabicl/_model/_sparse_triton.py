@@ -1,9 +1,9 @@
 """Direct indexed attention over routed support blocks (CUDA only).
 
-Forward and dQ use one program per query/head. For half-precision training,
-backward inverts compact routing edges and computes dK/dV per support leaf
-using tensor-core reductions, without token-wise gradient atomics. Small or
-FP32 inputs use a direct atomic reference. Routing and ELU fusion live outside.
+Forward and dQ group queries by support leaf to reuse K/V in matrix tiles.
+Backward computes dK/dV per support leaf without token-wise gradient atomics.
+Small queries and unsupported block sizes retain the direct reference path.
+Routing and ELU fusion live outside. FP32 GEMMs use three-term TF32.
 """
 
 import torch
@@ -158,6 +158,8 @@ def _backward_kv(
     SCALE: tl.constexpr,
     BT: tl.constexpr = 32,
     BQ: tl.constexpr = 32,
+    NC: tl.constexpr = 1,
+    EDGE_IDS: tl.constexpr = False,
 ):
     leaf, bh, tile = tl.program_id(0), tl.program_id(1), tl.program_id(2)
     r = leaf * BS + tile * BT + tl.arange(0, BT)
@@ -165,28 +167,30 @@ def _backward_kv(
     valid_row = r < S
     original = tl.load(ORDER + bh * S + r, valid_row, other=0)
     ko = (bh * S + original[:, None]) * D + d[None, :]
-    key = tl.load(K + ko, valid_row[:, None], other=0)
-    value = tl.load(V + ko, valid_row[:, None], other=0)
+    key = tl.load(K + ko, valid_row[:, None], other=0).to(Q.dtype.element_ty)
+    value = tl.load(V + ko, valid_row[:, None], other=0).to(Q.dtype.element_ty)
     start = tl.load(STARTS + bh * NK + leaf)
     end = tl.load(STARTS + bh * NK + leaf + 1)
     dk = tl.full((BT, D), 0, tl.float32)
     dv = tl.full((BT, D), 0, tl.float32)
     for begin in range(start, end, BQ):
         offset = begin + tl.arange(0, BQ)
-        qi = tl.load(REVERSE + offset, offset < end, other=0)
+        edge = tl.load(REVERSE + offset, offset < end, other=-1)
+        valid_query = (offset < end) & (edge >= 0)
+        qi = edge // NC % N if EDGE_IDS else edge
         qo = (bh * N + qi[:, None]) * D + d[None, :]
-        q = tl.load(Q + qo, offset[:, None] < end, other=0)
-        dout = tl.load(DO + qo, offset[:, None] < end, other=0)
-        out = tl.load(O + qo, offset[:, None] < end, other=0).to(tl.float32)
-        lse = tl.load(LSE + bh * N + qi, offset < end, other=0)
-        score = tl.dot(key, tl.trans(q)) * SCALE
+        q = tl.load(Q + qo, valid_query[:, None], other=0)
+        dout = tl.load(DO + qo, valid_query[:, None], other=0)
+        out = tl.load(O + qo, valid_query[:, None], other=0).to(tl.float32)
+        lse = tl.load(LSE + bh * N + qi, valid_query, other=0)
+        score = tl.dot(key, tl.trans(q), input_precision="tf32x3") * SCALE
         p = tl.exp(score - lse[None, :])
-        p = tl.where(valid_row[:, None] & (offset[None, :] < end), p, 0.0)
-        dp = tl.dot(value, tl.trans(dout))
+        p = tl.where(valid_row[:, None] & valid_query[None, :], p, 0.0)
+        dp = tl.dot(value, tl.trans(dout), input_precision="tf32x3")
         delta = tl.sum(out * dout.to(tl.float32), axis=1)
         ds = p * (dp - delta[None, :]) * SCALE
-        dk += tl.dot(ds.to(q.dtype), q)
-        dv += tl.dot(p.to(dout.dtype), dout)
+        dk += tl.dot(ds.to(q.dtype), q, input_precision="tf32x3")
+        dv += tl.dot(p.to(dout.dtype), dout, input_precision="tf32x3")
     tl.store(DK + ko, dk, valid_row[:, None])
     tl.store(DV + ko, dv, valid_row[:, None])
 
@@ -198,24 +202,34 @@ class _RoutedAttention(torch.autograd.Function):
         s = k.shape[2]
         nc = indices.shape[-1]
         c = triton.next_power_of_2(nc * block_size)
-        # One program per query/head; contiguous head-major layout.
+        # Compact head-major layout shared by all kernels.
         q = q.contiguous()
         k = k.contiguous()
         v = v.contiguous()
         indices = indices.contiguous()
         order = order.contiguous()
-        output = torch.empty_like(q)
-        lse = torch.empty((b, h, n), device=q.device, dtype=torch.float32)
         scale = d**-0.5
-        _forward[(n, h, b)](q, k, v, indices, order, output, lse, n, s, h, d, block_size, nc, c, scale, num_warps=8)
-        ctx.save_for_backward(q, k, v, order, indices, output, lse)
+        # Wide scalar reductions are expensive and unreliable on older Triton;
+        # use matrix tiles for wide leaves even when there are few queries.
+        # The support tile must divide a leaf exactly.
+        ctx.grouped = block_size % 32 == 0 and (n >= 256 or block_size > 128)
+        metadata = ()
+        if ctx.grouped:
+            from ._sparse_grouped import grouped_attention
+
+            output, lse, metadata = grouped_attention(q, k, v, order, indices, block_size)
+        else:
+            output = torch.empty_like(q)
+            lse = torch.empty((b, h, n), device=q.device, dtype=torch.float32)
+            _forward[(n, h, b)](q, k, v, indices, order, output, lse, n, s, h, d, block_size, nc, c, scale, num_warps=8)
+        ctx.save_for_backward(q, k, v, order, indices, output, lse, *metadata)
         ctx.args = (block_size, nc, c, scale)
         return output
 
     @staticmethod
     @once_differentiable
     def backward(ctx, dout):
-        q, k, v, order, indices, out, lse = ctx.saved_tensors
+        q, k, v, order, indices, out, lse, *metadata = ctx.saved_tensors
         bs, nc, c, scale = ctx.args
         b, h, n, d = q.shape
         s = k.shape[2]
@@ -225,27 +239,17 @@ class _RoutedAttention(torch.autograd.Function):
         # executions (including checkpoint replay). Wider accumulation keeps
         # this small-prefix case stable without changing long-table kernels.
         dout = dout.contiguous()
-        grouped = q.dtype in (torch.bfloat16, torch.float16) and n >= 256 and bs >= 32
-        if grouped:
-            # Invert only the compact block edges. Each leaf owns its K/V
-            # gradients and reduces them with tensor-core GEMMs, without
-            # per-token/per-dimension atomic scatter or Q*C*d materialization.
+        if ctx.grouped:
+            from ._sparse_grouped import grouped_attention
+
+            dq, _, _ = grouped_attention(q, k, v, order, indices, bs,
+                                         metadata, (out, lse, dout))
             nk = triton.cdiv(s, bs)
-            edges = indices.numel()
-            counts = torch.zeros(b * h * nk, device=q.device, dtype=torch.int32)
-            _edge_count[(triton.cdiv(edges, 256),)](indices, counts, edges, n, nc, nk, 256)
-            starts = torch.empty(counts.numel() + 1, device=q.device, dtype=torch.int32)
-            starts[0] = 0
-            torch.cumsum(counts, 0, dtype=torch.int32, out=starts[1:])
-            cursor = torch.zeros_like(counts)
-            reverse = torch.empty(edges, device=q.device, dtype=torch.int32)
-            _edge_scatter[(triton.cdiv(edges, 256),)](indices, starts, cursor, reverse, edges, n, nc, nk, 256)
             dk, dv = torch.empty_like(k), torch.empty_like(v)
-            _backward[(n, h, b)](
-                q, k, v, indices, order, out, lse, dout, dq, dk, dv, n, s, h, d, bs, nc, c, scale, True, num_warps=8
-            )
+            starts, reverse = metadata
             _backward_kv[(nk, b * h, triton.cdiv(bs, 32))](
-                q, k, v, out, lse, dout, starts, reverse, order, dk, dv, n, s, d, nk, bs, scale, num_warps=4
+                q, k, v, out, lse, dout, starts, reverse, order, dk, dv,
+                n, s, d, nk, bs, scale, NC=nc, EDGE_IDS=True, num_warps=4, num_stages=1,
             )
         else:
             accumulation_dtype = torch.float64 if k.dtype == torch.bfloat16 and s <= 512 else torch.float32

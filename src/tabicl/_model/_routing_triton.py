@@ -164,7 +164,9 @@ def _beam_search(
     # Heap index zero is the root. Only its first beam slot is live initially.
     nodes = tl.full((2 * WIDTH,), 0, tl.int32)
     for level in tl.static_range(DEPTH):
-        parent = tl.gather(nodes, slot // 2, axis=0)
+        # Portable register gather: tl.gather is absent in Triton 3.0/3.1.
+        # Beam widths are small; this also avoids a framework version pin.
+        parent = tl.sum(tl.where(slot[:, None] // 2 == slot[None, :], nodes[None, :], 0), axis=1)
         children = parent * 2 + 1 + slot % 2
         live = slot < 2 * min(BEAM, 2**level)
         count = tl.load(COUNTS + children, live, other=0)

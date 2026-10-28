@@ -29,8 +29,8 @@ def test_selected_dense_mask_output_and_all_gradients(router, partition, mode, d
         actual = module(query, support, support)
         q, k, v = module._project(query, support, support, None)
         order, chosen = module.route(q, k)
-        ks = k.gather(2, order[..., None].expand_as(k))
-        vs = v.gather(2, order[..., None].expand_as(v))
+        ks = k.gather(2, order.long()[..., None].expand_as(k))
+        vs = v.gather(2, order.long()[..., None].expand_as(v))
         ids = torch.arange(k.shape[2], device=device) // module.block_size
         mask = None if mode == "fused_full" else (chosen[..., None] == ids).any(-2)
         sparse = F.scaled_dot_product_attention(q, ks, vs, attn_mask=mask)
