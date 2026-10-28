@@ -140,8 +140,6 @@ def arguments():
         p.error("--memory-limit-gib must be nonnegative; 0 disables the cap")
     if args.diagnostics_every < 0:
         p.error("--diagnostics-every must be nonnegative")
-    if not str(Path(sys.executable).resolve()).startswith("/home/zj/miniconda3/envs/stdplm/"):
-        p.error("Run Python from the stdplm conda environment")
     return args
 
 

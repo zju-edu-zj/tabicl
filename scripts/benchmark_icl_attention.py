@@ -24,10 +24,12 @@ from tabicl.train._optimizer import build_optimizer
 
 def compiled_variants():
     """Diagnostic only: counts cached Triton variants in this benchmark process."""
-    from tabicl._model import _routing_triton, _sparse_triton
+    from tabicl._model import _routing_triton, _sparse_triton, _sparse_grouped, _norm_triton, _elu_kernel
 
     names = {
         _routing_triton: (
+            "_projection_scores",
+            "_centroid_scores",
             "_centroids",
             "_beam_search",
             "_content_pivots",
@@ -40,12 +42,19 @@ def compiled_variants():
             "_edge_scatter",
             "_backward_kv",
         ),
+        _sparse_grouped: ("_count", "_scatter", "_leaf_tiles", "_merge"),
+        _norm_triton: ("_norm", "_norm_backward"),
+        _elu_kernel: ("_elu_state", "_elu_apply", "_elu_backward_query", "_elu_backward_support"),
     }
     counts = {}
     for module, kernels in names.items():
         for name in kernels:
-            cache = getattr(getattr(module, name), "device_caches", {})
-            counts[name] = sum(len(entry[0]) for entry in cache.values())
+            kernel = getattr(module, name)
+            cache = getattr(kernel, "device_caches", None)
+            if cache is not None:
+                counts[name] = sum(len(entry[0]) for entry in cache.values())
+            else:
+                counts[name] = sum(len(entry) for entry in getattr(kernel, "cache", {}).values())
     return counts
 
 
