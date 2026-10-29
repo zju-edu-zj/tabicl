@@ -130,6 +130,28 @@ def sdpa_with_flattened_batch(
     return out.view(q_shape)
 
 
+def _project_qkv(query, key, value, weight, bias):
+    """Packed projections without materializing three contiguous copies.
+
+    SDPA accepts these strided views (their head dimension is contiguous).
+    torch's MHA helper unpacks via a transpose + contiguous, an unnecessary
+    full activation copy here, especially for the large COL/ROW tensors.
+    """
+    if key is not value:
+        return F._in_projection_packed(query, key, value, weight, bias)
+    if query is key:
+        return F.linear(query, weight, bias).chunk(3, dim=-1)
+    embed_dim = query.shape[-1]
+    q_weight, kv_weight = weight.split([embed_dim, 2 * embed_dim])
+    if bias is None:
+        q_bias = kv_bias = None
+    else:
+        q_bias, kv_bias = bias.split([embed_dim, 2 * embed_dim])
+    q = F.linear(query, q_weight, q_bias)
+    k, v = F.linear(key, kv_weight, kv_bias).chunk(2, dim=-1)
+    return q, k, v
+
+
 def multi_head_attention_forward(
     query: Tensor,
     num_heads: int,
@@ -241,7 +263,7 @@ def multi_head_attention_forward(
             raise ValueError("key and value must be provided when cached_kv is None")
         src_len = key.shape[-2]
         assert key.shape == value.shape, f"key shape {key.shape} does not match value shape {value.shape}"
-        q, k, v = F._in_projection_packed(query, key, value, in_proj_weight, in_proj_bias)
+        q, k, v = _project_qkv(query, key, value, in_proj_weight, in_proj_bias)
         q = q.view(*batch_shape, tgt_len, num_heads, head_dim).transpose(-3, -2)
         k = k.view(*batch_shape, src_len, num_heads, head_dim).transpose(-3, -2)
         v = v.view(*batch_shape, src_len, num_heads, head_dim).transpose(-3, -2)

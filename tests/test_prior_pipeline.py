@@ -5,10 +5,12 @@ import subprocess
 from types import SimpleNamespace
 
 import pytest
+import torch
 
 from tabicl.train import _run
 from tabicl.train._run import Trainer
 from tabicl.train._train_config import build_parser
+from tabicl.prior._genload import pad_prior_batch
 
 
 def prior_config(**overrides):
@@ -48,6 +50,21 @@ def test_configure_prior_passes_ready_first_queue_settings(monkeypatch):
     assert captured["prefetch_factor"] == 7
     assert captured["persistent_workers"] is True
     assert captured["in_order"] is False
+    assert captured["collate_fn"] is pad_prior_batch
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required for pinned memory")
+def test_worker_padding_preserves_values_and_final_pinned_layout():
+    features = torch.nested.nested_tensor([torch.randn(7, 3), torch.randn(11, 3)])
+    labels = torch.nested.nested_tensor([torch.randn(7), torch.randn(11)])
+    batch = (features, labels, torch.tensor([3, 3]), torch.tensor([7, 11]), torch.tensor([4, 8]))
+    loader = torch.utils.data.DataLoader([batch], batch_size=None, num_workers=1,
+                                       collate_fn=pad_prior_batch, pin_memory=True)
+    actual = next(iter(loader))
+    for left, right in zip(actual, batch):
+        expected = right.to_padded_tensor(0.0) if right.is_nested else right
+        torch.testing.assert_close(left, expected)
+        assert not left.is_nested and left.is_pinned()
 
 
 def test_step_seeded_prior_rejects_out_of_order_loading():

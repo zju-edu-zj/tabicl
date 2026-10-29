@@ -400,6 +400,8 @@ class TabICL(nn.Module):
             raise RuntimeError("Frontend compilation has already been configured")
 
         def compile_tensor_method(method, *, fullgraph=True, recompute=False):
+            from torch.fx.experimental import _config as symbolic_shape_config
+
             compiled = torch.compile(method, dynamic=True, fullgraph=fullgraph)
             # These are component graphs, not a compiled DDP forward. Torch
             # 2.8's DDP bucket splitter can emit non-tensor graph outputs here
@@ -412,7 +414,13 @@ class TabICL(nn.Module):
             compiler_options = dict(optimize_ddp=False)
             if recompute:
                 compiler_options["specialize_float"] = True
-            return torch._dynamo.config.patch(**compiler_options)(compiled)
+            # Independently varying B/G/T/S can happen to be equal in the first
+            # batch. Duck shaping otherwise unifies their symbols and guards
+            # that accidental equality, adding startup-order-dependent graphs.
+            # Scope the private Torch setting to these opt-in component calls.
+            return symbolic_shape_config.patch(use_duck_shape=False)(
+                torch._dynamo.config.patch(**compiler_options)(compiled)
+            )
 
         if mode == "all":
             self.col_embedder._compute_embeddings_standard = compile_tensor_method(

@@ -291,6 +291,35 @@ def test_frontend_random_widths_classes_and_label_strides_have_bounded_graphs(mo
     assert all(torch.isfinite(p.grad).all() for p in candidate.parameters() if p.grad is not None)
 
 
+@pytest.mark.parametrize("first_width", [2, 5, 35])
+def test_compile_avoids_accidental_dimension_equalities_and_restores_config(monkeypatch, first_width):
+    from torch._dynamo.testing import CompileCounter
+    from torch.fx.experimental import _config as shape_config
+
+    counter = CompileCounter()
+    compile_ = torch.compile
+    monkeypatch.setattr(torch, "compile", lambda *a, **kw: compile_(*a, **kw, backend=counter))
+    candidate = model(icl_attention="dense", row_rope_interleaved=False)
+    previous = shape_config.use_duck_shape
+    candidate.compile_frontend("all")
+    shapes = [(35, first_width, 5), (39, 7, 11), (41, 1, 17)]
+    shapes += [(rows, width, support) for rows, width, support in
+               [(35, 2, 7), (47, 5, 13), (39, 35, 5), (41, 1, 19)]] * 3
+    stabilized = None
+    with torch._dynamo.config.patch(fail_on_recompile_limit_hit=True):
+        for index, (rows, width, support) in enumerate(shapes):
+            candidate.zero_grad(set_to_none=True)
+            x = torch.randn(2, rows, width)
+            y = torch.randint(3, (2, rows)).float()[:, :support]
+            candidate(x, y).square().mean().backward()
+            assert shape_config.use_duck_shape == previous
+            if index == 2:
+                stabilized = counter.frame_count
+                assert stabilized == 3  # regular/singleton COL, shared ROW
+            elif index > 2:
+                assert counter.frame_count == stabilized
+
+
 @pytest.mark.parametrize("all_skipped", [False, True])
 def test_fullgraph_isab_preserves_sentinel_outputs_and_zero_gradients(all_skipped):
     torch.manual_seed(771)

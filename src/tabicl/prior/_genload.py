@@ -57,6 +57,16 @@ def seed_worker(worker_id: int):
     torch.set_num_threads(1)
 
 
+def pad_prior_batch(batch):
+    """Materialize the final CPU layout before DataLoader's pinning stage.
+
+    Padding a pinned NestedTensor in the training process allocates pageable
+    memory again. Doing it in the worker preserves asynchronous H2D transfers
+    and overlaps the CPU allocation/copy with training the preceding batch.
+    """
+    return [tensor.to_padded_tensor(padding=0.0) if tensor.is_nested else tensor for tensor in batch]
+
+
 def dense2sparse(
     dense_tensor: torch.Tensor, row_lengths: torch.Tensor, dtype: torch.dtype = torch.float32
 ) -> torch.Tensor:

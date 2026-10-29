@@ -243,6 +243,23 @@ def test_optimizer_gradient_diagnostics_are_grouped_and_preclip():
     assert metrics["optimizer_diag/sensitive/grad_rms"] == 2.0
 
 
+def test_gradient_summaries_handle_overlapping_missing_and_nonfinite_parameters():
+    finite = torch.nn.Parameter(torch.ones(5))
+    missing = torch.nn.Parameter(torch.ones(3))
+    invalid = torch.nn.Parameter(torch.ones(2))
+    finite.grad = torch.tensor([3., 4., float("nan"), float("inf"), -float("inf")])
+    invalid.grad = torch.tensor([float("nan"), float("inf")])
+    values = Trainer._gradient_statistics_many({"all": [finite, missing, invalid],
+                                                "part": [finite], "invalid": [invalid], "empty": []})
+    assert values["all"]["grad_rms"] == pytest.approx((25 / 2) ** .5)
+    assert values["all"]["grad_max_abs"] == 4
+    assert values["all"]["grad_nonfinite_fraction"] == pytest.approx(5 / 7)
+    assert values["all"]["grad_missing_fraction"] == pytest.approx(3 / 10)
+    assert values["part"]["grad_rms"] == values["all"]["grad_rms"]
+    assert values["invalid"]["grad_rms"] == 0 and values["invalid"]["grad_max_abs"] == 0
+    assert values["empty"]["grad_missing_fraction"] == 0
+
+
 def test_component_diagnostics_isolate_decoder_gradients_and_parameters():
     trainer = Trainer.__new__(Trainer)
     trainer.raw_model = small_model()
@@ -267,7 +284,8 @@ def test_stage1_launcher_initializes_once_then_resumes_hybrid(tmp_path):
     script = Path(__file__).resolve().parents[1] / "scripts/train_v2_clf_stage1.sh"
     env = dict(os.environ, DRY_RUN="1", CKPT_DIR=str(tmp_path / "new run"),
                LOG_DIR=str(tmp_path / "logs"), INIT_CKPT=str(tmp_path / "old run/step-40000.ckpt"),
-               LR="4e-4", ADAMW_LR="1e-4", MAX_STEPS="20000", WARMUP_STEPS="500")
+               LR="4e-4", ADAMW_LR="1e-4", MAX_STEPS="20000", WARMUP_STEPS="500",
+               MAX_SEQ_LEN="4096")
 
     def launch():
         tokens = shlex.split(subprocess.check_output(["bash", str(script)], env=env, text=True))
@@ -277,6 +295,7 @@ def test_stage1_launcher_initializes_once_then_resumes_hybrid(tmp_path):
     assert args.only_load_model and args.checkpoint_path == env["INIT_CKPT"]
     assert args.muon and args.lr == 4e-4 and args.adamw_lr == 1e-4
     assert args.warmup_proportion == -1 and args.warmup_steps == 500
+    assert args.max_seq_len == 4096
     Path(env["CKPT_DIR"]).mkdir()
     Path(env["CKPT_DIR"], "step-500.ckpt").touch()
     args = launch()

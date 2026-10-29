@@ -1,0 +1,388 @@
+{
+  "baseline_git_head": "4a0cd58e1fac7c55e002b945309d3e3a8fd88572",
+  "environment": {
+    "gpu": "RTX 3090 24 GiB",
+    "torch": "2.8.0+cu128",
+    "triton": "3.4",
+    "tf32_matmul": true
+  },
+  "benchmark_script_sha256": "1c7b490debdf3c328ba4ffe603509ae620b76e1a62fd54aa94f89e4cf41f5e01",
+  "scope": "Single-GPU real Trainer.run_batch; synthetic pinned CPU inputs; no prior generation, logging, checkpoint or DDP in timings. Cold runs have independent empty Inductor caches. All other runs share cache; do not attribute startup differences to patches.",
+  "phases": {
+    "baseline": "tracked baseline snapshot",
+    "candidate1": "final projection/support patches; before diagnostics/pipeline changes",
+    "variable_candidate_none": "final eager kernels",
+    "variable_final_all": "final production compiler policy",
+    "b4_final": "final implementation",
+    "cold_final": "final implementation"
+  },
+  "elapsed_ms_note": "Full step times rounded to 0.0001 ms; retained compilation spikes. After5 means skip first five steps, not skip outliers.",
+  "run_count": 44,
+  "timed_steps": 2210,
+  "profiles": [
+    {
+      "arguments": {
+        "output": "/tmp/tabicl_final_stage1_float32_profile.json",
+        "dtype": "float32",
+        "rows": 1024,
+        "features": 100,
+        "batch": 4,
+        "support_fraction": 0.6,
+        "attention": "global_sparse",
+        "warmup": 3,
+        "repeat": 7,
+        "recompute": false,
+        "profile": true,
+        "baseline_root": null,
+        "ablation": "none",
+        "compile_front": false,
+        "compile_row": false,
+        "production_front": "none",
+        "static_col": false
+      },
+      "source": {
+        "root": "/home/wbq/sparse/tabicl",
+        "source_sha256": "d9abe06d2311d42bf608bbeb5dd0423e0a6fe02f99374c9ecf9d7647db37a189",
+        "git_head": "4a0cd58e1fac7c55e002b945309d3e3a8fd88572"
+      },
+      "medians_ms": {
+        "col_forward": 84.56813049316406,
+        "row_forward": 66.58560180664062,
+        "icl_forward": 16.700416564941406,
+        "loss": 0.01945599913597107,
+        "icl_backward": 35.12934494018555,
+        "row_backward": 155.64186096191406,
+        "col_backward": 239.8505859375,
+        "cuda_total": 597.5554809570312,
+        "wall": 597.5807950017042,
+        "loss_value": 2.3314297199249268
+      },
+      "peak_allocated_gib": 17.381893157958984,
+      "optimizer_zero_lr_ms": 20.58982098242268,
+      "selected_operators": [
+        {
+          "name": "aten::copy_",
+          "calls": 281,
+          "cpu_us": 692.8369999995566,
+          "cuda_us": 19208.778000000322,
+          "total_cuda_us": 19208.778000000322
+        },
+        {
+          "name": "aten::native_layer_norm",
+          "calls": 51,
+          "cpu_us": 397.13999999997486,
+          "cuda_us": 15373.111000000003,
+          "total_cuda_us": 16384.629000000008
+        },
+        {
+          "name": "aten::scaled_dot_product_attention",
+          "calls": 9,
+          "cpu_us": 41.375000000007276,
+          "cuda_us": 0.0,
+          "total_cuda_us": 75865.45000000003
+        },
+        {
+          "name": "aten::_scaled_dot_product_efficient_attention",
+          "calls": 9,
+          "cpu_us": 53.70500000001721,
+          "cuda_us": 0.0,
+          "total_cuda_us": 75865.45000000003
+        },
+        {
+          "name": "aten::_efficient_attention_forward",
+          "calls": 9,
+          "cpu_us": 52.9099999999944,
+          "cuda_us": 75865.45000000003,
+          "total_cuda_us": 75865.45000000003
+        },
+        {
+          "name": "aten::native_layer_norm_backward",
+          "calls": 51,
+          "cpu_us": 323.97700000024633,
+          "cuda_us": 21647.575000000303,
+          "total_cuda_us": 23090.454000000085
+        },
+        {
+          "name": "aten::_scaled_dot_product_efficient_attention_backward",
+          "calls": 9,
+          "cpu_us": 61.16300000005867,
+          "cuda_us": 0.0,
+          "total_cuda_us": 236042.27000000002
+        },
+        {
+          "name": "aten::_efficient_attention_backward",
+          "calls": 9,
+          "cpu_us": 96.78300000019954,
+          "cuda_us": 228179.65299999996,
+          "total_cuda_us": 236042.27000000002
+        }
+      ]
+    },
+    {
+      "arguments": {
+        "output": "/tmp/tabicl_final_stage1_bfloat16_profile.json",
+        "dtype": "bfloat16",
+        "rows": 1024,
+        "features": 100,
+        "batch": 4,
+        "support_fraction": 0.6,
+        "attention": "global_sparse",
+        "warmup": 3,
+        "repeat": 7,
+        "recompute": false,
+        "profile": true,
+        "baseline_root": null,
+        "ablation": "none",
+        "compile_front": false,
+        "compile_row": false,
+        "production_front": "none",
+        "static_col": false
+      },
+      "source": {
+        "root": "/home/wbq/sparse/tabicl",
+        "source_sha256": "d9abe06d2311d42bf608bbeb5dd0423e0a6fe02f99374c9ecf9d7647db37a189",
+        "git_head": "4a0cd58e1fac7c55e002b945309d3e3a8fd88572"
+      },
+      "medians_ms": {
+        "col_forward": 36.51814270019531,
+        "row_forward": 31.651840209960938,
+        "icl_forward": 11.804672241210938,
+        "loss": 0.022655999287962914,
+        "icl_backward": 23.7260799407959,
+        "row_backward": 66.6583023071289,
+        "col_backward": 76.24089813232422,
+        "cuda_total": 246.629150390625,
+        "wall": 246.65121498401277,
+        "loss_value": 2.331449270248413
+      },
+      "peak_allocated_gib": 10.830500602722168,
+      "optimizer_zero_lr_ms": 20.620404015062377,
+      "selected_operators": [
+        {
+          "name": "aten::copy_",
+          "calls": 1006,
+          "cpu_us": 1907.5510000000922,
+          "cuda_us": 36309.159999999996,
+          "total_cuda_us": 36309.159999999996
+        },
+        {
+          "name": "aten::native_layer_norm",
+          "calls": 51,
+          "cpu_us": 404.9110000000055,
+          "cuda_us": 15243.215000000015,
+          "total_cuda_us": 15335.023000000014
+        },
+        {
+          "name": "aten::scaled_dot_product_attention",
+          "calls": 9,
+          "cpu_us": 56.91099999999551,
+          "cuda_us": 0.0,
+          "total_cuda_us": 10516.503999999995
+        },
+        {
+          "name": "aten::_scaled_dot_product_flash_attention",
+          "calls": 9,
+          "cpu_us": 70.75999999998476,
+          "cuda_us": 0.0,
+          "total_cuda_us": 10516.503999999995
+        },
+        {
+          "name": "aten::_flash_attention_forward",
+          "calls": 9,
+          "cpu_us": 63.209000000014385,
+          "cuda_us": 10516.503999999995,
+          "total_cuda_us": 10516.503999999995
+        },
+        {
+          "name": "aten::native_layer_norm_backward",
+          "calls": 51,
+          "cpu_us": 289.8270000000339,
+          "cuda_us": 21906.86500000005,
+          "total_cuda_us": 22464.62200000006
+        },
+        {
+          "name": "aten::_scaled_dot_product_flash_attention_backward",
+          "calls": 9,
+          "cpu_us": 61.78599999992002,
+          "cuda_us": 0.0,
+          "total_cuda_us": 40487.26000000004
+        },
+        {
+          "name": "aten::_flash_attention_backward",
+          "calls": 9,
+          "cpu_us": 77.62299999991956,
+          "cuda_us": 39865.75600000005,
+          "total_cuda_us": 40487.26000000004
+        }
+      ]
+    }
+  ],
+  "smoke": [
+    {
+      "dtype": "float32",
+      "max_seq_len": 2048,
+      "batch": 4,
+      "micro_batch": 1,
+      "workers": 2,
+      "prefetch": 2,
+      "compile": "all",
+      "steps": [
+        {
+          "step": 1,
+          "elapsed_s": 23.708242730004713,
+          "ce": 2.3204092979431152,
+          "accuracy": 0.0,
+          "grad_norm": 7.0000996589660645,
+          "grad_clipped": 0.0,
+          "lr_used": 0.0,
+          "lr/muon": 0.0,
+          "lr/adamw_decay": 0.0,
+          "lr/adamw_no_decay": 0.0,
+          "oom_micro_batches": 0.0,
+          "prior_time": 2.4497120369924232,
+          "train_time": 21.23578626100789
+        },
+        {
+          "step": 2,
+          "elapsed_s": 24.48264506299165,
+          "ce": 2.3217830657958984,
+          "accuracy": 0.0,
+          "grad_norm": 8.061851501464844,
+          "grad_clipped": 0.0,
+          "lr_used": 0.0008,
+          "lr/muon": 0.0008,
+          "lr/adamw_decay": 0.0001,
+          "lr/adamw_no_decay": 0.0001,
+          "oom_micro_batches": 0.0,
+          "prior_time": 8.721300400793552e-05,
+          "train_time": 0.7740371039835736
+        },
+        {
+          "step": 3,
+          "elapsed_s": 13.130852517002495,
+          "ce": 2.314281940460205,
+          "accuracy": 0.12708333134651184,
+          "grad_norm": 5.96799898147583,
+          "grad_clipped": 0.0,
+          "lr_used": 9.999999999999998e-08,
+          "lr/muon": 9.999999999999998e-08,
+          "lr/adamw_decay": 1.2499999999999998e-08,
+          "lr/adamw_no_decay": 1.2499999999999998e-08,
+          "oom_micro_batches": 0.0,
+          "prior_time": 2.8682102719903924,
+          "train_time": 10.2183405260148
+        }
+      ],
+      "resume_from_step": 2,
+      "final_checkpoint_step": 3,
+      "checkpoint_parameter_keys": 355,
+      "optimizer_groups": 3
+    },
+    {
+      "dtype": "bfloat16",
+      "max_seq_len": 4096,
+      "batch": 4,
+      "micro_batch": 1,
+      "workers": 2,
+      "prefetch": 2,
+      "compile": "all",
+      "steps": [
+        {
+          "step": 1,
+          "elapsed_s": 27.184917529986706,
+          "ce": 2.36612606048584,
+          "accuracy": 0.0,
+          "grad_norm": 6.037660121917725,
+          "grad_clipped": 0.0,
+          "lr_used": 0.0,
+          "lr/muon": 0.0,
+          "lr/adamw_decay": 0.0,
+          "lr/adamw_no_decay": 0.0,
+          "oom_micro_batches": 0.0,
+          "prior_time": 3.454931646992918,
+          "train_time": 23.705307889002142
+        },
+        {
+          "step": 2,
+          "elapsed_s": 27.730931044992758,
+          "ce": 2.3386340141296387,
+          "accuracy": 0.0,
+          "grad_norm": 8.103377342224121,
+          "grad_clipped": 0.0,
+          "lr_used": 0.0008,
+          "lr/muon": 0.0008,
+          "lr/adamw_decay": 0.0001,
+          "lr/adamw_no_decay": 0.0001,
+          "oom_micro_batches": 0.0,
+          "prior_time": 8.933100616559386e-05,
+          "train_time": 0.5456429389887489
+        },
+        {
+          "step": 3,
+          "elapsed_s": 13.822933930001454,
+          "ce": 2.140477180480957,
+          "accuracy": 0.2865370810031891,
+          "grad_norm": 4.120388507843018,
+          "grad_clipped": 0.0,
+          "lr_used": 9.999999999999998e-08,
+          "lr/muon": 9.999999999999998e-08,
+          "lr/adamw_decay": 1.2499999999999998e-08,
+          "lr/adamw_no_decay": 1.2499999999999998e-08,
+          "oom_micro_batches": 0.0,
+          "prior_time": 2.7364537279936485,
+          "train_time": 11.045904933009297
+        }
+      ],
+      "resume_from_step": 2,
+      "final_checkpoint_step": 3,
+      "checkpoint_parameter_keys": 355,
+      "optimizer_groups": 3
+    }
+  ],
+  "runs": [
+    {"id": "tabicl_perf_b4_baseline_bfloat16_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 25, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 25, "first_ms": 11753.328382008476, "mean_all_ms": 660.0248071574606, "total_ms": 16500.620178936515, "mean_after5_ms": 197.90151164634153, "median_after5_ms": 197.9187200049637, "p95_after5_ms": 198.57334101106972, "peak_gib": 9.481992721557617, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [11753.3284, 197.2775, 197.2577, 197.1306, 197.5958, 197.6919, 197.4084, 197.364, 197.3987, 198.8769, 197.6189, 197.4895, 197.7259, 198.0839, 198.049, 198.3807, 197.9107, 197.9882, 198.0958, 198.1508, 197.9267, 197.5604, 197.7028, 198.5733, 198.0338]},
+    {"id": "tabicl_perf_b4_baseline_bfloat16_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 25, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 25, "first_ms": 857.0031730050687, "mean_all_ms": 317.3698190005962, "total_ms": 7934.2454750149045, "mean_after5_ms": 294.98278484970797, "median_after5_ms": 294.8957814951427, "p95_after5_ms": 295.560763013782, "peak_gib": 11.372351169586182, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [857.0032, 294.3279, 294.5172, 294.5748, 294.1667, 295.2925, 295.0148, 294.7973, 294.7093, 294.8872, 294.6579, 294.7062, 295.1242, 294.9044, 294.6982, 294.4998, 295.1719, 295.5652, 295.2388, 294.6358, 294.7943, 295.5608, 295.1987, 294.8566, 295.3418]},
+    {"id": "tabicl_perf_b4_baseline_float32_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 25, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 25, "first_ms": 10867.464756011032, "mean_all_ms": 968.805862601148, "total_ms": 24220.1465650287, "mean_after5_ms": 556.9660237524658, "median_after5_ms": 557.2587820061017, "p95_after5_ms": 557.9044679761864, "peak_gib": 17.576583862304688, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10867.4648, 552.9135, 552.7316, 553.098, 554.6182, 556.1669, 556.0655, 555.299, 556.3322, 555.7744, 555.1942, 556.8874, 556.829, 557.5968, 557.788, 557.5866, 557.5796, 557.1009, 556.5795, 557.4167, 558.1973, 557.8122, 557.9045, 557.5608, 557.649]},
+    {"id": "tabicl_perf_b4_baseline_float32_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 25, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 25, "first_ms": 1128.8608399918303, "mean_all_ms": 678.7575158430263, "total_ms": 16968.93789607566, "mean_after5_ms": 660.8388543027104, "median_after5_ms": 659.6481690066867, "p95_after5_ms": 665.1741260138806, "peak_gib": 17.844802379608154, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [1128.8608, 654.6331, 654.6114, 656.8131, 657.2423, 659.0618, 659.156, 658.756, 659.4851, 659.4234, 658.5778, 658.7943, 658.712, 659.2175, 659.5536, 659.7427, 659.8237, 660.1078, 662.6551, 665.1741, 663.0771, 662.3134, 663.417, 666.6501, 663.0786]},
+    {"id": "tabicl_perf_b4_final_bfloat16_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 25, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 25, "first_ms": 33918.59584598569, "mean_all_ms": 1540.5677810776979, "total_ms": 38514.19452694245, "mean_after5_ms": 191.52227114827838, "median_after5_ms": 191.51982199400663, "p95_after5_ms": 191.99523600400425, "peak_gib": 9.494565963745117, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [33918.5958, 191.1198, 191.5794, 190.8476, 191.6064, 191.3124, 191.0661, 191.0622, 191.6041, 191.4624, 191.5322, 191.5075, 191.0568, 191.6724, 191.4421, 191.8197, 191.3907, 191.6057, 191.9952, 191.4805, 191.7155, 191.7686, 191.6259, 191.2631, 192.0624]},
+    {"id": "tabicl_perf_b4_final_bfloat16_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 25, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "default (shared)", "status": "ok", "steps": 25, "first_ms": 835.357756994199, "mean_all_ms": 293.8922129990533, "total_ms": 7347.3053249763325, "mean_after5_ms": 271.4172818494262, "median_after5_ms": 271.4515520056011, "p95_after5_ms": 271.83116000378504, "peak_gib": 10.835381984710693, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [835.3578, 270.8179, 271.0046, 270.1202, 271.6592, 271.0778, 271.3893, 271.0994, 271.3066, 271.4504, 270.9214, 271.541, 271.2765, 271.744, 271.8312, 271.0785, 271.3535, 271.788, 271.0845, 271.4527, 271.5331, 271.5083, 271.4653, 271.4836, 271.9606]},
+    {"id": "tabicl_perf_b4_final_float32_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 25, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 25, "first_ms": 31160.059506975813, "mean_all_ms": 1775.6055643165018, "total_ms": 44390.139107912546, "mean_after5_ms": 551.8110544478986, "median_after5_ms": 552.0120819855947, "p95_after5_ms": 553.3196140022483, "peak_gib": 17.580734252929688, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [31160.0595, 547.5531, 548.4308, 549.3717, 548.5029, 548.8119, 549.8083, 550.8219, 550.5872, 550.7816, 551.6347, 550.7741, 551.9499, 552.8793, 551.3932, 552.5349, 552.2955, 551.2874, 552.5935, 553.0542, 552.1967, 552.0743, 553.3196, 552.9848, 554.4382]},
+    {"id": "tabicl_perf_b4_final_float32_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 25, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "default (shared)", "status": "ok", "steps": 25, "first_ms": 1098.79145398736, "mean_all_ms": 648.1525065586902, "total_ms": 16203.812663967256, "mean_after5_ms": 629.8222812998574, "median_after5_ms": 629.6105014916975, "p95_after5_ms": 631.3656950078439, "peak_gib": 17.488726139068604, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [1098.7915, 625.5947, 627.438, 627.6457, 627.8972, 628.5913, 628.483, 628.6879, 628.7231, 628.5864, 629.053, 629.2777, 628.7129, 630.4698, 628.6521, 631.1737, 629.0092, 630.788, 629.9433, 630.4673, 631.9052, 630.887, 631.3657, 630.7679, 630.9012]},
+    {"id": "tabicl_perf_baseline_bfloat16_1024_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 25928.34104600479, "mean_all_ms": 1370.56930950057, "total_ms": 27411.3861900114, "mean_after5_ms": 77.84108120055559, "median_after5_ms": 77.7825910190586, "p95_after5_ms": 79.63877799920738, "peak_gib": 2.6042957305908203, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [25928.341, 78.8238, 78.4498, 79.9854, 78.1699, 79.6388, 78.1461, 77.7605, 77.5401, 77.7712, 77.4421, 77.5375, 77.2997, 77.3715, 77.8421, 77.8798, 77.8528, 77.7826, 77.8889, 77.8625]},
+    {"id": "tabicl_perf_baseline_bfloat16_1024_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [1024], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 677.9909459874034, "mean_all_ms": 130.22050204890547, "total_ms": 2604.4100409781095, "mean_after5_ms": 101.34843553144795, "median_after5_ms": 101.08394600683823, "p95_after5_ms": 102.91197799961083, "peak_gib": 3.0643959045410156, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [677.9909, 103.1133, 101.1887, 100.9839, 100.9066, 100.8942, 101.2424, 101.0839, 102.912, 102.1597, 101.9699, 101.4665, 101.4389, 101.0165, 100.9096, 101.0358, 100.9893, 100.9381, 100.9619, 101.2078]},
+    {"id": "tabicl_perf_baseline_bfloat16_2048_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [2048], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 10870.920171990292, "mean_all_ms": 655.2886905046762, "total_ms": 13105.773810093524, "mean_after5_ms": 117.68232327303849, "median_after5_ms": 117.58430299232714, "p95_after5_ms": 118.34484300925396, "peak_gib": 4.643564224243164, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10870.9202, 117.1591, 117.3291, 117.3088, 117.8218, 117.7614, 117.5843, 117.5304, 117.9961, 118.3448, 117.8407, 117.4523, 117.3517, 117.5383, 117.3101, 117.3858, 117.3446, 118.0374, 118.0763, 117.6807]},
+    {"id": "tabicl_perf_baseline_bfloat16_2048_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [2048], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 721.4524270093534, "mean_all_ms": 186.50930260191672, "total_ms": 3730.1860520383343, "mean_after5_ms": 158.45035873547508, "median_after5_ms": 158.36938199936412, "p95_after5_ms": 159.12466499139555, "peak_gib": 5.561410427093506, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [721.4524, 158.7601, 157.5953, 157.8363, 157.7865, 158.1611, 158.5633, 158.0072, 158.6963, 158.2786, 158.3602, 158.3464, 158.8041, 159.1247, 159.0865, 158.6388, 158.3827, 158.3694, 157.9236, 158.0125]},
+    {"id": "tabicl_perf_baseline_bfloat16_4096_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 10956.218641018495, "mean_all_ms": 742.3630454999511, "total_ms": 14847.260909999022, "mean_after5_ms": 204.91395719776241, "median_after5_ms": 204.94715598761104, "p95_after5_ms": 205.98920600605197, "peak_gib": 8.751394748687744, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10956.2186, 204.4959, 204.3705, 203.8585, 204.608, 205.2795, 204.3729, 204.4341, 204.4872, 204.2514, 204.3928, 204.5661, 205.5139, 204.4769, 205.4427, 205.9892, 205.4405, 205.0266, 205.0883, 204.9472]},
+    {"id": "tabicl_perf_baseline_bfloat16_4096_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 835.5763690196909, "mean_all_ms": 307.0579281935352, "total_ms": 6141.158563870704, "mean_after5_ms": 279.32462752602686, "median_after5_ms": 279.2861399939284, "p95_after5_ms": 279.7713659820147, "peak_gib": 10.585748672485352, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [835.5764, 279.0365, 279.0345, 278.596, 279.0459, 279.1611, 279.0861, 278.6885, 279.7714, 279.1647, 279.2047, 279.2664, 279.2861, 279.731, 279.4354, 279.5247, 279.5112, 279.3301, 279.1154, 279.5927]},
+    {"id": "tabicl_perf_baseline_float32_1024_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [1024], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 30039.014425012283, "mean_all_ms": 1660.9906693047378, "total_ms": 33219.81338609476, "mean_after5_ms": 167.61764720625555, "median_after5_ms": 167.62891900725663, "p95_after5_ms": 169.03944601654075, "peak_gib": 4.560539245605469, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [30039.0144, 166.5306, 166.5452, 166.6255, 166.8329, 166.9193, 167.8479, 166.6802, 169.0394, 167.9523, 167.6521, 167.4984, 167.4746, 167.2983, 167.6342, 167.6289, 167.5275, 167.7216, 168.1156, 167.2744]},
+    {"id": "tabicl_perf_baseline_float32_1024_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [1024], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 708.6538930016104, "mean_all_ms": 218.0448446466471, "total_ms": 4360.896892932942, "mean_after5_ms": 192.29994039827338, "median_after5_ms": 192.24250901606865, "p95_after5_ms": 193.23851098306477, "peak_gib": 4.630046367645264, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [708.6539, 192.5401, 191.0657, 191.8668, 192.2713, 192.3495, 192.2986, 191.7587, 192.2153, 192.5508, 192.1587, 192.4068, 192.0956, 192.2425, 192.1909, 192.3162, 192.1694, 192.4304, 192.0772, 193.2385]},
+    {"id": "tabicl_perf_baseline_float32_2048_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [2048], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 10056.720822001807, "mean_all_ms": 799.2671179512399, "total_ms": 15985.342359024798, "mean_after5_ms": 312.0887166005559, "median_after5_ms": 312.1107149927411, "p95_after5_ms": 312.65080100274645, "peak_gib": 8.43610668182373, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10056.7208, 311.2015, 312.1618, 312.0164, 311.9111, 311.9589, 311.8444, 311.5916, 311.9815, 311.66, 311.8299, 312.3267, 312.2959, 312.112, 312.3368, 311.5463, 312.5521, 312.5332, 312.1107, 312.6508]},
+    {"id": "tabicl_perf_baseline_float32_2048_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [2048], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 812.1874619973823, "mean_all_ms": 381.27981154830195, "total_ms": 7625.596230966039, "mean_after5_ms": 358.99362033233047, "median_after5_ms": 359.11369099630974, "p95_after5_ms": 359.59674601326697, "peak_gib": 8.53093957901001, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [812.1875, 356.2151, 357.2693, 357.5604, 357.4597, 357.6168, 358.1892, 358.3813, 358.7184, 359.2981, 359.1137, 358.9286, 359.0456, 359.4631, 359.4328, 359.3495, 359.5967, 359.5026, 358.8281, 359.4398]},
+    {"id": "tabicl_perf_baseline_float32_4096_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 10266.022352006985, "mean_all_ms": 1129.0397941556876, "total_ms": 22580.79588311375, "mean_after5_ms": 648.9802258690664, "median_after5_ms": 649.1364420216996, "p95_after5_ms": 650.4035560064949, "peak_gib": 16.169002056121826, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10266.0224, 645.1798, 643.3168, 646.0354, 645.5381, 647.0923, 649.1262, 648.0866, 649.1364, 647.9771, 649.2192, 648.6273, 649.3536, 648.5326, 649.6547, 649.6985, 649.3052, 649.6818, 648.8083, 650.4036]},
+    {"id": "tabicl_perf_baseline_float32_4096_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 1207.1170790004544, "mean_all_ms": 759.1451280008187, "total_ms": 15182.902560016373, "mean_after5_ms": 736.4585708050678, "median_after5_ms": 736.6621130204294, "p95_after5_ms": 738.6182430200279, "peak_gib": 16.334359169006348, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [1207.1171, 731.3954, 732.053, 733.1205, 732.338, 733.3192, 735.0475, 736.1028, 736.6621, 736.1344, 735.6721, 735.744, 736.6481, 737.0486, 736.9242, 736.8017, 736.8396, 737.1833, 738.1326, 738.6182]},
+    {"id": "tabicl_perf_candidate1_bfloat16_1024_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "94485a4d5d38003a11ba5a5f35d87f8402e4bacc38712174102c70adf7d19d90", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 31578.148363012588, "mean_all_ms": 1654.7455516061746, "total_ms": 33094.91103212349, "mean_after5_ms": 79.91827994119376, "median_after5_ms": 79.68049100600183, "p95_after5_ms": 84.74312300677411, "peak_gib": 2.6061840057373047, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [31578.1484, 79.507, 79.6879, 78.811, 79.9826, 79.3918, 84.7431, 79.8811, 79.6805, 79.215, 78.9036, 79.9087, 78.9658, 79.4346, 79.82, 79.5398, 79.7306, 80.0395, 80.0924, 79.4277]},
+    {"id": "tabicl_perf_candidate1_bfloat16_1024_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [1024], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "94485a4d5d38003a11ba5a5f35d87f8402e4bacc38712174102c70adf7d19d90", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 667.6514569844585, "mean_all_ms": 123.35366069892189, "total_ms": 2467.0732139784377, "mean_after5_ms": 94.65918899707806, "median_after5_ms": 94.56946197315119, "p95_after5_ms": 95.92388299643062, "peak_gib": 2.939401626586914, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [667.6515, 96.1726, 94.5494, 94.4216, 94.3903, 94.5738, 94.5727, 94.4258, 94.5623, 94.4638, 94.4022, 94.4454, 95.1768, 94.597, 95.9239, 94.5477, 94.5695, 94.6354, 94.6947, 94.2968]},
+    {"id": "tabicl_perf_candidate1_bfloat16_2048_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [2048], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 10198.3328370261, "mean_all_ms": 619.6691286546411, "total_ms": 12393.382573092822, "mean_after5_ms": 115.58521960202295, "median_after5_ms": 115.55961999692954, "p95_after5_ms": 116.60219499026425, "peak_gib": 4.64369010925293, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10198.3328, 115.5149, 115.2936, 115.1625, 115.3004, 115.6957, 115.5604, 115.6922, 115.4662, 115.4922, 116.6022, 115.6696, 115.4193, 115.3472, 115.2638, 115.4297, 115.6457, 115.3434, 115.591, 115.5596]},
+    {"id": "tabicl_perf_candidate1_bfloat16_2048_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [2048], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 713.0554809991736, "mean_all_ms": 175.03139519976685, "total_ms": 3500.627903995337, "mean_after5_ms": 146.68613106672032, "median_after5_ms": 146.71834002365358, "p95_after5_ms": 147.27214400772937, "peak_gib": 5.295175075531006, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [713.0555, 147.1368, 146.5197, 146.8623, 146.7616, 146.7183, 147.058, 146.8794, 147.2721, 146.6758, 146.2384, 146.3937, 146.7202, 146.1851, 146.8033, 146.2797, 146.5505, 146.5711, 146.7222, 147.2241]},
+    {"id": "tabicl_perf_candidate1_bfloat16_4096_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 10635.361747001298, "mean_all_ms": 721.8065465029213, "total_ms": 14436.130930058425, "mean_after5_ms": 200.13423459992433, "median_after5_ms": 199.95295300032012, "p95_after5_ms": 201.09911798499525, "peak_gib": 8.74601125717163, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10635.3617, 199.4133, 199.5163, 200.0124, 199.8136, 199.953, 199.5685, 199.6116, 199.7122, 200.185, 199.8527, 199.716, 199.6327, 199.6875, 200.896, 200.3883, 200.6696, 200.8557, 200.1859, 201.0991]},
+    {"id": "tabicl_perf_candidate1_bfloat16_4096_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 812.1147280035075, "mean_all_ms": 284.549065050669, "total_ms": 5690.98130101338, "mean_after5_ms": 256.9213037999968, "median_after5_ms": 257.02806300250813, "p95_after5_ms": 257.5747560185846, "peak_gib": 10.049952507019043, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [812.1147, 256.1898, 256.3332, 256.0759, 256.4482, 255.8712, 256.2864, 256.6127, 256.9909, 256.5346, 257.0582, 257.172, 257.0092, 256.9525, 257.077, 257.0734, 257.1091, 257.4695, 257.5748, 257.0281]},
+    {"id": "tabicl_perf_candidate1_float32_1024_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [1024], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "f7748b6fd8e0685d5cf403043d09b150d4ee9d2db1d13660700502f8f5d71c7a", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 28096.206955000525, "mean_all_ms": 1562.3900360005791, "total_ms": 31247.800720011583, "mean_after5_ms": 165.9148228665193, "median_after5_ms": 165.93040199950337, "p95_after5_ms": 166.50632699020207, "peak_gib": 4.563274383544922, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [28096.207, 166.121, 165.1075, 165.9248, 165.7182, 165.2467, 166.0274, 165.6222, 166.3401, 166.5063, 165.9437, 165.8081, 165.6453, 166.049, 165.9194, 165.8591, 166.0341, 165.9304, 165.6509, 166.1396]},
+    {"id": "tabicl_perf_candidate1_float32_1024_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [1024], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "f7748b6fd8e0685d5cf403043d09b150d4ee9d2db1d13660700502f8f5d71c7a", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 650.7155770086683, "mean_all_ms": 205.53467545541935, "total_ms": 4110.693509108387, "mean_after5_ms": 182.27653027279302, "median_after5_ms": 182.26512198452838, "p95_after5_ms": 182.92314300197177, "peak_gib": 4.537150859832764, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [650.7156, 180.965, 180.9056, 182.6388, 181.3206, 182.0874, 181.4791, 181.8833, 181.9943, 182.9231, 182.6454, 182.2912, 182.3563, 182.2568, 182.3795, 182.2451, 182.2651, 182.122, 182.6486, 182.5706]},
+    {"id": "tabicl_perf_candidate1_float32_2048_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [2048], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "f7748b6fd8e0685d5cf403043d09b150d4ee9d2db1d13660700502f8f5d71c7a", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 9468.822964001447, "mean_all_ms": 767.4555851524929, "total_ms": 15349.111703049857, "mean_after5_ms": 309.80635280138813, "median_after5_ms": 309.87492701387964, "p95_after5_ms": 310.2955619979184, "peak_gib": 8.43237590789795, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [9468.823, 307.8367, 308.1564, 308.4078, 308.7925, 308.5449, 309.3729, 309.6558, 310.1912, 310.1462, 309.7051, 309.8749, 309.5645, 309.929, 309.9866, 310.2956, 310.1423, 309.7988, 309.8656, 310.0219]},
+    {"id": "tabicl_perf_candidate1_float32_2048_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [2048], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "f7748b6fd8e0685d5cf403043d09b150d4ee9d2db1d13660700502f8f5d71c7a", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 790.630092000356, "mean_all_ms": 363.2530189031968, "total_ms": 7265.060378063936, "mean_after5_ms": 341.08696293551475, "median_after5_ms": 341.3019459985662, "p95_after5_ms": 341.5839520166628, "peak_gib": 8.353540897369385, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [790.6301, 339.382, 338.7901, 339.9746, 339.9792, 340.7703, 340.3772, 339.9616, 341.3933, 341.3019, 341.584, 341.1783, 341.3319, 341.1487, 340.5318, 340.9601, 341.4034, 341.3557, 341.5533, 341.453]},
+    {"id": "tabicl_perf_candidate1_float32_4096_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "94485a4d5d38003a11ba5a5f35d87f8402e4bacc38712174102c70adf7d19d90", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 20, "first_ms": 9865.532204014016, "mean_all_ms": 1103.859687600925, "total_ms": 22077.193752018502, "mean_after5_ms": 642.9336094025833, "median_after5_ms": 642.776969994884, "p95_after5_ms": 644.7690789937042, "peak_gib": 16.17339849472046, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [9865.5322, 639.7717, 641.1182, 643.3415, 643.426, 642.3393, 641.0523, 641.5327, 642.602, 643.5176, 642.7721, 642.0787, 641.8828, 643.928, 644.5916, 642.777, 643.1097, 643.8169, 644.7691, 643.2346]},
+    {"id": "tabicl_perf_candidate1_float32_4096_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 20, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "f7748b6fd8e0685d5cf403043d09b150d4ee9d2db1d13660700502f8f5d71c7a", "cache": "default (shared)", "status": "ok", "steps": 20, "first_ms": 1163.0942579940893, "mean_all_ms": 724.1365065026912, "total_ms": 14482.730130053824, "mean_after5_ms": 701.4211620029528, "median_after5_ms": 701.4068559801672, "p95_after5_ms": 703.2427180092782, "peak_gib": 15.9757719039917, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [1163.0943, 699.1446, 699.0595, 700.5259, 699.5885, 699.5284, 699.7476, 699.4329, 700.881, 701.4207, 702.6519, 702.3764, 702.6532, 700.5448, 701.1768, 701.9736, 703.2427, 703.152, 701.4069, 701.1284]},
+    {"id": "tabicl_perf_cold_baseline", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 150, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/tabicl-cold-inductor.Iuzvik", "status": "ok", "steps": 150, "first_ms": 42025.395506992936, "mean_all_ms": 474.4869542475014, "total_ms": 71173.0431371252, "mean_after5_ms": 195.66164825609403, "median_after5_ms": 195.84595898049884, "p95_after5_ms": 196.79903698852286, "peak_gib": 9.481359481811523, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [42025.3955, 194.2765, 193.8602, 194.2132, 194.3588, 194.1426, 193.9368, 194.2983, 194.0434, 194.5277, 195.2783, 194.5741, 194.4411, 194.0645, 194.4378, 194.5734, 194.2701, 194.4014, 194.72, 194.6171, 193.9519, 197.1413, 194.6843, 194.6184, 194.8855, 194.3342, 194.2758, 194.6326, 195.1035, 194.7387, 194.5607, 194.9919, 195.0689, 194.7009, 194.852, 194.7479, 194.5945, 194.5922, 194.9553, 195.1806, 194.7013, 194.4095, 194.9279, 195.104, 195.6045, 195.4827, 194.7271, 194.9027, 195.2729, 195.54, 195.4448, 195.1939, 195.4387, 195.7605, 195.1683, 195.4188, 195.6306, 195.3872, 195.221, 195.846, 195.2391, 195.575, 195.5551, 196.0105, 195.2047, 195.3606, 195.2873, 195.5522, 195.8473, 195.8492, 195.7282, 195.1285, 195.5782, 195.6278, 196.1243, 195.9442, 195.5366, 195.0012, 195.4602, 195.7957, 196.5263, 196.5343, 195.8733, 195.9617, 195.5664, 195.669, 196.1047, 195.9449, 196.2574, 195.8952, 196.1658, 196.0274, 195.7531, 195.9131, 196.1402, 196.5964, 196.0826, 195.935, 196.0472, 196.799, 196.2485, 196.3178, 195.7189, 196.0913, 196.3478, 196.2521, 195.8949, 196.0064, 196.2775, 195.9666, 196.4257, 197.0309, 196.0597, 196.2069, 196.5649, 196.1768, 196.0419, 196.0934, 196.3687, 196.5291, 196.223, 196.6462, 196.4448, 195.8574, 196.1644, 196.5539, 196.2635, 196.4892, 196.5149, 196.5023, 196.4283, 196.6676, 196.2483, 196.4001, 196.2769, 196.7982, 196.865, 196.8122, 196.732, 196.6213, 196.3372, 195.9686, 196.8091, 196.2298, 196.5041, 197.3564, 197.1483, 196.6128, 196.5559, 195.9688]},
+    {"id": "tabicl_perf_cold_final", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 150, "variable": false, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "/tmp/tabicl-cold-inductor.xyZEwS", "status": "ok", "steps": 150, "first_ms": 41282.42870699614, "mean_all_ms": 466.4678498004408, "total_ms": 69970.17747006612, "mean_after5_ms": 192.5699779454715, "median_after5_ms": 192.61498498963192, "p95_after5_ms": 193.724263983313, "peak_gib": 9.494565963745117, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [41282.4287, 191.0661, 191.2493, 191.5859, 191.2006, 191.0082, 191.4385, 191.3953, 191.0689, 191.8719, 191.4236, 191.612, 191.4915, 191.7251, 191.6072, 191.405, 191.0913, 191.9715, 191.5531, 191.3723, 192.1195, 191.5492, 191.3752, 191.7231, 192.2966, 191.5091, 191.2648, 191.4647, 191.7218, 191.7655, 192.0022, 192.2387, 191.76, 192.1925, 192.397, 191.9995, 191.6176, 192.3082, 191.5915, 191.6828, 191.746, 191.8894, 191.9405, 191.7774, 191.6362, 191.9254, 191.9767, 191.8202, 191.459, 191.9665, 191.8709, 192.1766, 192.286, 191.8005, 191.952, 193.264, 192.2781, 192.2533, 192.2137, 191.9509, 192.1826, 192.5284, 192.2856, 192.7387, 192.3003, 192.068, 192.5953, 192.9698, 192.2179, 192.1744, 192.7924, 192.2087, 192.2181, 193.1578, 192.9016, 192.4343, 192.9152, 193.2162, 192.5138, 192.2177, 192.8941, 192.3921, 192.2903, 192.8099, 193.3905, 192.7879, 192.615, 193.2772, 192.7403, 192.7452, 192.8678, 192.4717, 192.4932, 192.6352, 193.6154, 192.8666, 192.5886, 193.3175, 192.9751, 192.9613, 193.0215, 192.9323, 192.6741, 192.8942, 193.236, 193.1833, 192.9025, 193.2587, 193.1414, 193.26, 192.8379, 193.2209, 192.9526, 192.8247, 193.3456, 193.6436, 193.0339, 193.0463, 193.8056, 193.3169, 192.8553, 193.1419, 193.5465, 192.9084, 193.0009, 193.6503, 193.9648, 193.4773, 193.1736, 193.7201, 193.8235, 193.4386, 193.2818, 193.6055, 193.0552, 192.9996, 193.7302, 193.6762, 193.3995, 193.3139, 193.3255, 193.5732, 193.6296, 193.222, 193.7403, 193.6983, 193.8847, 193.6219, 193.7617, 193.7243]},
+    {"id": "tabicl_perf_diagnostics_baseline", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 15, "variable": false, "diagnostics": 3, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 15, "first_ms": 11688.13155402313, "mean_all_ms": 1010.4147788719274, "total_ms": 15156.221683078911, "mean_after5_ms": 254.00217940332368, "median_after5_ms": 197.53005800885148, "p95_after5_ms": 340.5459100031294, "peak_gib": 9.481361389160156, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [11688.1316, 197.2244, 336.8617, 196.7442, 197.238, 337.473, 197.5975, 197.3879, 337.9373, 197.1747, 197.0577, 340.5459, 197.4626, 197.3045, 340.0806], "median_ordinary_ms": 197.3461989982752, "median_diagnostic_ms": 339.00897701096255},
+    {"id": "tabicl_perf_diagnostics_final", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024], "features": 100, "batch": 4, "micro_batch": 4, "steps": 15, "variable": false, "diagnostics": 3, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 15, "first_ms": 11239.175344002433, "mean_all_ms": 937.2100513331437, "total_ms": 14058.150769997155, "mean_after5_ms": 202.83605900185648, "median_after5_ms": 191.67442749312613, "p95_after5_ms": 221.82793999672867, "peak_gib": 9.482795715332031, "graph_transitions": [[0, 2]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [11239.1753, 191.2891, 218.3694, 189.3778, 191.5785, 219.0918, 191.3944, 191.4033, 220.2666, 191.1678, 191.3, 218.7444, 191.2188, 191.9456, 221.8279], "median_ordinary_ms": 191.34718000714201, "median_diagnostic_ms": 219.67918099835515},
+    {"id": "tabicl_perf_variable_baseline_bfloat16_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024, 2048, 4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 150, "variable": true, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 150, "first_ms": 10475.781604007352, "mean_all_ms": 235.69851715486342, "total_ms": 35354.77757322951, "mean_after5_ms": 99.60057240156135, "median_after5_ms": 80.68068799911998, "p95_after5_ms": 188.4059830044862, "peak_gib": 8.840562343597412, "graph_transitions": [[0, 2], [1, 3]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10475.7816, 10237.5031, 86.221, 48.8428, 64.346, 119.8587, 62.495, 121.7542, 213.5115, 64.0938, 98.0271, 90.3602, 50.6582, 65.0404, 178.6435, 70.5123, 93.8104, 137.8496, 71.9964, 80.7499, 136.3155, 53.9291, 83.2362, 159.3109, 60.3348, 63.894, 144.2272, 61.8413, 102.1888, 185.7732, 50.1957, 62.3644, 112.1474, 49.8169, 97.8124, 123.6294, 51.6206, 73.5058, 127.7057, 73.5592, 75.2607, 134.209, 80.1168, 78.2996, 150.2864, 50.8432, 74.399, 193.8749, 53.3998, 95.9532, 106.2005, 68.0024, 69.1268, 186.454, 55.3491, 100.2169, 193.9807, 79.7762, 114.6659, 149.4077, 76.8785, 75.5062, 204.6285, 51.1927, 113.3357, 156.1213, 72.5774, 79.5817, 175.3419, 66.3063, 60.8188, 175.5371, 61.9414, 69.6323, 176.1985, 64.3381, 59.3816, 188.0554, 55.9211, 101.8056, 102.0968, 56.1357, 59.9592, 120.7492, 70.9124, 134.4753, 204.5143, 66.7707, 93.5222, 173.6942, 66.5791, 102.5114, 169.6074, 52.751, 60.9329, 160.4461, 56.5993, 119.1628, 144.7356, 60.3869, 88.7243, 177.5348, 60.8975, 68.278, 188.406, 65.6096, 62.5654, 133.1829, 50.3147, 59.1011, 84.3683, 50.5453, 63.5504, 115.4891, 68.6999, 116.0562, 204.2073, 72.1802, 95.4441, 94.5229, 50.5234, 64.0745, 191.6626, 66.1302, 90.3809, 146.3854, 67.1303, 78.8038, 144.4864, 50.4855, 87.359, 169.5287, 59.8923, 65.9807, 139.448, 61.2641, 107.6182, 177.9552, 51.0623, 64.1058, 108.6107, 52.6606, 95.124, 119.9456, 55.9811, 71.7088, 123.0178, 80.6807, 73.6959, 142.4672]},
+    {"id": "tabicl_perf_variable_baseline_bfloat16_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [1024, 2048, 4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 150, "variable": true, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 150, "first_ms": 625.5012360052206, "mean_all_ms": 130.9736947666776, "total_ms": 19646.05421500164, "mean_after5_ms": 128.53604268969102, "median_after5_ms": 105.14707601396367, "p95_after5_ms": 258.7437109905295, "peak_gib": 10.987947463989258, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [625.5012, 142.9962, 100.8641, 60.6375, 78.329, 151.3986, 81.3715, 162.4713, 291.8337, 84.2818, 129.0963, 107.7907, 61.4433, 76.6228, 320.4695, 114.0923, 126.1773, 210.29, 126.8109, 141.1058, 247.038, 79.6261, 105.1471, 209.2802, 73.9455, 72.8086, 188.2181, 77.5904, 134.8849, 248.5559, 57.1063, 70.6656, 136.1799, 54.7441, 129.408, 154.2256, 58.8455, 92.0607, 161.5631, 95.8638, 97.5766, 168.8239, 101.6962, 95.6565, 197.1754, 54.6935, 92.8373, 263.1097, 60.2261, 124.9252, 127.8034, 85.9652, 82.3488, 258.5457, 65.8353, 131.7175, 260.4744, 98.6025, 147.5743, 186.5016, 98.62, 91.8143, 276.6396, 58.1318, 150.2838, 196.5423, 93.3992, 98.1931, 236.2406, 83.425, 64.5541, 239.8808, 76.5611, 84.8359, 236.1159, 80.7178, 62.8142, 253.7366, 64.5599, 132.9362, 120.6079, 55.5828, 63.4664, 150.9769, 89.1915, 169.2479, 278.7181, 85.9185, 123.3937, 245.376, 85.1731, 135.3391, 222.8114, 61.917, 65.9743, 207.7124, 67.2625, 161.0477, 181.8218, 77.1131, 113.2737, 238.7865, 75.889, 81.3235, 254.2249, 83.1081, 68.8054, 172.1275, 54.0931, 64.453, 91.9254, 54.6619, 72.3526, 144.1438, 88.1757, 155.6754, 276.8546, 88.4359, 125.4932, 108.7336, 55.4969, 73.289, 258.7437, 82.7278, 116.2495, 190.3189, 84.6358, 96.3253, 187.2264, 53.7038, 109.6634, 223.4327, 71.2172, 74.9711, 180.2659, 73.6994, 141.6026, 235.5942, 51.5688, 71.8423, 131.9159, 56.6416, 122.5373, 147.5398, 62.3162, 86.6788, 153.9797, 101.4389, 88.3581, 177.4516]},
+    {"id": "tabicl_perf_variable_baseline_float32_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [1024, 2048, 4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 150, "variable": true, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 150, "first_ms": 10012.559291993966, "mean_all_ms": 349.5757916067184, "total_ms": 52436.368741007755, "mean_after5_ms": 228.97020871048505, "median_after5_ms": 160.52080600638874, "p95_after5_ms": 594.2728380032349, "peak_gib": 16.41028118133545, "graph_transitions": [[0, 2], [1, 3]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10012.5593, 8944.4473, 124.0958, 56.5309, 98.0552, 290.2932, 123.0499, 320.4193, 912.087, 127.5658, 250.1575, 136.9098, 58.5178, 100.6257, 475.9886, 141.8381, 213.9596, 307.3809, 147.7486, 170.911, 311.7089, 67.2508, 153.7536, 455.7185, 99.6221, 93.0063, 363.4584, 106.5182, 243.7244, 582.1023, 57.0361, 88.3391, 242.0585, 61.3497, 240.6847, 306.113, 70.7245, 129.8423, 331.4831, 157.0725, 140.7271, 245.2687, 166.0946, 155.1177, 388.7641, 60.173, 142.6902, 552.3354, 70.0227, 232.5858, 199.2692, 138.5537, 107.1089, 523.8833, 81.3259, 231.5081, 594.2728, 169.8539, 245.8273, 328.0034, 172.9333, 134.7964, 682.6885, 66.1466, 285.6324, 374.6469, 152.4596, 153.6867, 599.2735, 133.5464, 79.7055, 450.6738, 99.4992, 118.839, 464.0225, 106.3189, 75.4846, 517.779, 80.2514, 279.2756, 184.96, 65.3319, 75.0852, 265.1661, 148.5556, 252.1868, 645.2889, 122.6393, 218.9531, 572.7056, 124.4866, 249.7029, 507.979, 77.2507, 80.4938, 426.7724, 85.7537, 315.9168, 355.8845, 102.6036, 188.2833, 460.8093, 96.6036, 114.1088, 503.5051, 112.0513, 88.3055, 289.6086, 57.0461, 75.8122, 119.6327, 61.9394, 94.4347, 252.8387, 141.0896, 282.3779, 640.1814, 147.7347, 226.9932, 160.5208, 64.9365, 95.5084, 624.3286, 129.6695, 185.8821, 398.236, 135.1749, 154.9453, 408.5259, 72.1973, 190.2541, 620.4647, 93.3688, 104.5289, 302.3309, 99.3607, 296.1981, 481.327, 56.8205, 98.2871, 208.5658, 68.8635, 214.7083, 259.99, 79.6816, 118.4893, 281.8639, 183.5345, 127.6874, 313.292]},
+    {"id": "tabicl_perf_variable_baseline_float32_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [1024, 2048, 4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 150, "variable": true, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e6f07707352f6ec50a30f2b4333680f7064e7f9f8c27ddfe1921f7df729c842", "cache": "default (shared)", "status": "ok", "steps": 150, "first_ms": 527.2581269964576, "mean_all_ms": 253.95453926660898, "total_ms": 38093.180889991345, "mean_after5_ms": 256.2104625169766, "median_after5_ms": 189.9317119969055, "p95_after5_ms": 649.3533469911199, "peak_gib": 16.620426654815674, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [527.2581, 121.6702, 129.1871, 58.9635, 105.5848, 320.8004, 138.4371, 364.7513, 990.7311, 142.6093, 280.4352, 147.9067, 60.673, 108.49, 542.792, 170.5881, 240.9364, 348.5782, 166.7793, 189.9317, 353.6088, 71.6555, 175.4563, 509.5764, 111.1516, 100.8636, 409.1306, 120.7786, 278.4575, 649.2267, 57.2795, 94.7442, 266.0792, 66.0153, 272.1248, 336.6414, 76.8241, 145.9043, 364.8056, 190.81, 158.1593, 280.7006, 191.0174, 172.6288, 439.2363, 63.946, 160.5664, 627.2291, 74.2214, 261.1628, 220.1949, 158.0492, 119.4409, 591.6925, 89.5487, 265.7851, 670.5761, 192.7292, 281.5304, 368.5615, 195.1349, 152.1918, 766.4501, 71.2839, 328.5932, 418.7486, 175.0808, 173.295, 664.5937, 152.1011, 82.5359, 520.4967, 112.1102, 131.6029, 533.6501, 121.4622, 77.4415, 592.8815, 88.9358, 312.8014, 204.203, 68.8103, 79.8961, 299.9338, 168.6223, 289.7611, 728.7563, 141.3296, 247.4881, 601.0435, 140.6873, 283.7159, 565.9914, 85.4804, 84.9412, 477.2547, 95.9162, 360.304, 393.3332, 118.8889, 212.3221, 527.1423, 108.4572, 124.4192, 577.9857, 127.8534, 93.4605, 329.9465, 58.7759, 78.9022, 124.6393, 63.5063, 99.9153, 276.7847, 159.0079, 324.5605, 723.5698, 165.0651, 254.3927, 171.6528, 64.7787, 102.9885, 700.4134, 147.1274, 213.5666, 445.7432, 153.7745, 170.0996, 453.6264, 67.8721, 208.2418, 649.3533, 104.7334, 113.242, 347.3696, 112.6871, 333.8481, 550.5781, 57.1027, 106.0312, 232.9721, 74.2484, 245.9271, 290.0349, 86.8511, 134.472, 316.1862, 207.8588, 144.1422, 351.9882]},
+    {"id": "tabicl_perf_variable_candidate_bfloat16_none", "arguments": {"dtype": "bfloat16", "mode": "none", "rows": [1024, 2048, 4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 150, "variable": true, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e49a0514c92544576780a1046e96cf6610f954c19bcc564e675234027238ee9", "cache": "default (shared)", "status": "ok", "steps": 150, "first_ms": 590.7611479924526, "mean_all_ms": 120.29304305382539, "total_ms": 18043.956458073808, "mean_after5_ms": 118.11981450380951, "median_after5_ms": 94.27817500545643, "p95_after5_ms": 236.328387982212, "peak_gib": 10.241043090820312, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [590.7611, 111.0696, 92.5691, 50.283, 71.9005, 141.6691, 74.9271, 149.4882, 264.9473, 75.5081, 118.8919, 100.5245, 52.6572, 72.2211, 223.4924, 82.9892, 112.3025, 168.2459, 85.3204, 94.2782, 165.8394, 56.4661, 99.4843, 195.0968, 70.4855, 70.6217, 176.3689, 72.0603, 126.2233, 229.2372, 50.5545, 68.2766, 129.8717, 52.884, 120.5407, 145.6847, 56.4065, 85.6432, 151.0587, 88.9153, 87.4847, 160.2902, 95.037, 90.4479, 184.7013, 52.0184, 88.3292, 244.4033, 57.3501, 115.7984, 121.5025, 79.7893, 79.4596, 226.4643, 61.4639, 123.1825, 240.3101, 91.7736, 138.1324, 176.4912, 91.2099, 87.4952, 253.2427, 55.7882, 139.4312, 184.8074, 87.8681, 93.4283, 215.5093, 78.5652, 62.9763, 219.1563, 71.4907, 79.6361, 219.4378, 75.312, 61.2047, 235.1346, 62.0112, 124.3496, 115.6278, 53.9964, 61.8811, 143.7719, 82.9306, 159.5078, 255.5729, 80.1504, 113.7138, 213.7756, 79.2633, 124.9029, 202.1925, 58.7732, 63.6912, 189.101, 63.5523, 148.7358, 170.1817, 72.2743, 106.3545, 222.9141, 69.8737, 76.9321, 236.3284, 78.1414, 66.9394, 161.6186, 50.8447, 61.7547, 88.8351, 52.1343, 70.3994, 136.6994, 82.1496, 144.5693, 254.8282, 82.0592, 116.9204, 104.9417, 52.6074, 70.4093, 237.539, 78.1391, 108.7362, 177.5054, 79.5206, 91.4644, 175.2569, 52.8925, 103.2967, 206.7911, 68.6654, 72.7884, 170.2293, 70.7357, 132.6294, 219.8675, 50.392, 69.9325, 125.8576, 55.7486, 115.6552, 140.1945, 60.5221, 83.516, 146.3588, 95.394, 85.1374, 169.0883]},
+    {"id": "tabicl_perf_variable_candidate_float32_none", "arguments": {"dtype": "float32", "mode": "none", "rows": [1024, 2048, 4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 150, "variable": true, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "8e49a0514c92544576780a1046e96cf6610f954c19bcc564e675234027238ee9", "cache": "default (shared)", "status": "ok", "steps": 150, "first_ms": 499.8581019754056, "mean_all_ms": 244.4116455190427, "total_ms": 36661.746827856405, "mean_after5_ms": 246.5811515026244, "median_after5_ms": 172.89164901012555, "p95_after5_ms": 626.8105510098394, "peak_gib": 16.123117923736572, "graph_transitions": [[0, 0]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [499.8581, 117.8904, 128.5935, 57.6538, 103.4842, 310.6071, 134.6247, 349.8757, 1005.436, 138.5226, 271.4064, 146.1818, 60.0936, 106.6646, 522.133, 153.4978, 231.6622, 335.1299, 160.1595, 183.6645, 339.5593, 70.627, 168.468, 493.0586, 107.4285, 98.4787, 393.1605, 115.3086, 267.3736, 626.8106, 56.4591, 93.296, 258.2319, 65.3847, 261.9295, 327.0302, 75.4168, 141.8491, 355.3503, 172.8916, 152.6314, 269.8875, 182.7706, 166.8784, 424.7717, 62.0352, 155.6819, 603.5893, 73.0318, 251.2673, 213.7371, 149.3126, 116.8384, 571.597, 86.2803, 254.7748, 643.5394, 183.46, 269.6871, 354.2363, 186.9393, 147.3395, 735.8243, 69.9735, 311.9843, 402.6361, 167.4654, 167.071, 641.4246, 145.708, 80.8565, 498.2704, 108.5363, 127.4924, 509.6507, 117.1655, 76.785, 568.8666, 86.3025, 300.847, 198.1346, 66.5891, 77.7934, 286.8254, 159.0083, 276.5891, 700.9137, 134.5445, 237.7963, 577.576, 134.6705, 271.3665, 544.3821, 83.3743, 82.9252, 457.6996, 92.9396, 343.8849, 379.0165, 113.3549, 203.3317, 504.584, 104.1986, 120.88, 550.2373, 122.4491, 91.7956, 315.8078, 57.4196, 77.768, 123.2552, 63.0759, 97.9517, 265.9961, 151.7818, 309.9885, 691.2039, 158.1245, 243.8658, 167.0338, 63.2956, 99.9443, 670.1165, 141.6749, 203.1612, 425.6661, 146.5907, 162.9144, 434.3014, 66.2236, 198.264, 623.6488, 100.4534, 110.0326, 329.8448, 107.2995, 318.0686, 523.691, 56.2698, 102.8706, 224.2804, 71.4867, 234.5257, 278.6267, 83.703, 128.3879, 302.5965, 197.5647, 137.5712, 336.1407]},
+    {"id": "tabicl_perf_variable_final_bfloat16_all", "arguments": {"dtype": "bfloat16", "mode": "all", "rows": [1024, 2048, 4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 150, "variable": true, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 150, "first_ms": 10027.325691014994, "mean_all_ms": 237.73088329355232, "total_ms": 35659.63249403285, "mean_after5_ms": 97.93015942057788, "median_after5_ms": 78.86984400101937, "p95_after5_ms": 184.60719400900416, "peak_gib": 8.8441743850708, "graph_transitions": [[0, 2], [1, 3]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [10027.3257, 11223.9674, 91.8586, 49.6551, 66.9526, 118.8023, 62.1563, 117.3707, 206.3808, 62.9796, 96.4829, 89.4715, 50.7907, 64.2362, 175.8146, 70.7918, 91.4477, 136.3124, 71.0548, 79.4238, 134.05, 56.1068, 82.4695, 155.3573, 59.6692, 63.4924, 141.6492, 61.9385, 101.0617, 180.6358, 49.3627, 62.0641, 110.5494, 49.3777, 96.5172, 122.3357, 52.9957, 72.2313, 125.2951, 72.4279, 74.5429, 132.3987, 77.6513, 77.7746, 147.6094, 50.9153, 73.8468, 189.9275, 52.3909, 94.4503, 105.117, 67.1426, 68.6647, 178.64, 55.2619, 98.2893, 188.1679, 76.6945, 112.0663, 147.6859, 75.6612, 74.6022, 198.8157, 51.7745, 110.6656, 153.567, 71.5047, 78.7242, 171.7264, 65.4031, 60.3828, 172.4342, 61.3038, 68.8192, 172.892, 65.0102, 60.5988, 184.4403, 55.6153, 99.4387, 101.108, 51.2889, 58.9062, 119.7958, 70.2708, 133.0479, 199.3141, 66.0586, 92.1009, 169.8122, 65.6739, 100.5559, 162.9297, 52.1225, 60.5322, 152.8617, 56.1267, 117.1995, 142.4232, 59.5082, 87.1611, 174.689, 61.643, 67.6287, 184.6072, 64.5861, 62.1766, 131.5133, 49.6146, 58.6263, 84.0759, 50.294, 63.1922, 113.9173, 67.3119, 113.2204, 198.9886, 69.4805, 93.9834, 94.1687, 49.8282, 63.3362, 187.5005, 64.8308, 89.8128, 144.2529, 65.7978, 77.7695, 141.6956, 49.914, 85.6581, 164.5004, 59.0123, 65.4938, 137.9676, 60.3283, 105.3987, 173.7174, 51.8186, 63.3475, 107.2673, 52.0168, 93.7116, 117.944, 54.4887, 70.7907, 122.0333, 78.8698, 72.4884, 140.0454]},
+    {"id": "tabicl_perf_variable_final_float32_all", "arguments": {"dtype": "float32", "mode": "all", "rows": [1024, 2048, 4096], "features": 100, "batch": 1, "micro_batch": 1, "steps": 150, "variable": true, "diagnostics": 0, "recompute": false, "strict_fp32": false, "profile": false}, "source_sha256": "ed4946d88f4d03b73f7b6853b8a49945ed7dd1f9f1b687cd5f9b5d2cbf128433", "cache": "/tmp/torchinductor_wbq", "status": "ok", "steps": 150, "first_ms": 9154.451189999236, "mean_all_ms": 344.15156217951636, "total_ms": 51622.73432692746, "mean_after5_ms": 225.2460100961014, "median_after5_ms": 156.36992000509053, "p95_after5_ms": 581.6037800104823, "peak_gib": 16.4069185256958, "graph_transitions": [[0, 2], [1, 3]], "all_metrics_finite": true, "oom_micro_batches": 0, "elapsed_ms": [9154.4512, 9531.0053, 126.4129, 54.9557, 95.2379, 286.3136, 120.2337, 314.6834, 922.8174, 125.2672, 247.0636, 135.1386, 57.4672, 99.6234, 468.6792, 138.9104, 210.9795, 301.6399, 144.9232, 168.4566, 305.8429, 66.3273, 149.7914, 448.2084, 97.0055, 91.4755, 356.1322, 103.3197, 238.9628, 570.5199, 55.9246, 87.0736, 240.1258, 60.8984, 237.9481, 302.3762, 69.451, 128.5933, 327.8805, 154.6712, 138.7561, 241.4617, 163.2351, 153.4908, 382.6333, 59.2473, 141.3699, 545.3312, 68.5965, 229.0069, 196.4676, 136.4064, 105.7702, 517.6431, 79.2787, 228.4963, 586.0579, 166.5484, 242.5289, 324.8206, 170.0392, 133.5743, 673.4376, 65.2576, 281.3056, 370.3442, 149.6618, 151.9909, 593.5257, 138.5479, 78.4603, 444.066, 96.641, 116.4581, 457.3169, 104.194, 74.2875, 510.6254, 78.7529, 275.7882, 182.502, 63.6834, 74.4872, 261.6288, 144.9105, 249.6352, 637.9587, 121.1185, 216.8902, 530.7299, 120.6132, 245.4506, 503.9902, 76.2678, 79.457, 421.6381, 84.0528, 311.6853, 352.1203, 100.7336, 184.2843, 453.9793, 94.7148, 112.4655, 495.9653, 109.9476, 87.6558, 285.7189, 55.5368, 75.3655, 118.9491, 60.7695, 90.9777, 245.7801, 139.0639, 277.886, 634.6234, 144.9952, 220.9778, 156.3699, 61.7062, 94.0257, 618.8613, 128.2882, 183.5909, 392.927, 132.512, 149.1134, 402.0248, 62.5659, 180.9041, 581.6038, 90.9222, 102.6324, 297.8667, 97.2909, 291.6497, 476.1337, 55.3421, 97.4629, 206.8457, 67.9802, 212.1996, 256.7484, 78.5506, 116.0665, 277.8189, 180.034, 125.3011, 309.9753]}
+  ]
+}

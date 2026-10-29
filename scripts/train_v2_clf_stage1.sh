@@ -16,9 +16,9 @@ set -euo pipefail
 # must initialize a NEW run via INIT_CKPT (weights only).
 # Common: weight decay parameter 0.01 (see note below),
 # cosine schedule, per-micro-batch train/test sizes (--seq_len_per_gp),
-# up to 100 features, 8 attention heads everywhere, graph_scm prior. The default
-# dtype is float32; float16 can be used for speedup (--dtype float16 --amp True) but may lead
-# to training instabilities.
+# up to 100 features, 8 attention heads everywhere, graph_scm prior.
+# TRAIN_DTYPE defaults to bfloat16 in icl_recipe.sh; set it to float32 for the
+# FP32 path. Float16 can lead to training instabilities.
 #
 # The classifier uses LayerNorm WITH biases (the --norm_type default; paper Table A.1),
 # unlike the regressor, which uses bias-free LayerNorm (--norm_type layernorm_nobias).
@@ -41,6 +41,7 @@ ADAMW_LR=${ADAMW_LR:-1e-4}                  # hybrid AdamW peak LR
 MUON=${MUON:-True}                          # False: all-AdamW control, using LR
 BATCH_SIZE=${BATCH_SIZE:-64}                # global batch, before DDP splitting
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
+MAX_SEQ_LEN=${MAX_SEQ_LEN:-1024}
 WARMUP_PROPORTION=${WARMUP_PROPORTION:--1}
 WARMUP_STEPS=${WARMUP_STEPS:-5000}
 INIT_CKPT=${INIT_CKPT:-}                     # first launch only; reset optimizer/step
@@ -101,7 +102,7 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --min_features 1 \
             --max_features 100 \
             --max_classes 10 \
-            --max_seq_len 1024 \
+            --max_seq_len "$MAX_SEQ_LEN" \
             --min_train_size 0.3 \
             --max_train_size 0.9 \
             --seq_len_per_gp True \

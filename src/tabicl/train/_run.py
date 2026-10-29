@@ -31,7 +31,7 @@ import wandb
 from tabicl._model.tabicl import TabICL
 from tabicl._model.attention import HAS_FLASH_ATTN3, set_flash_attn3_enabled
 from tabicl.prior._dataset import PriorDataset
-from tabicl.prior._genload import LoadPriorDataset, seed_worker
+from tabicl.prior._genload import LoadPriorDataset, seed_worker, pad_prior_batch
 from tabicl.prior.graph_lib._config import PriorConfig
 from tabicl.train._optim import get_scheduler
 from tabicl.train._optimizer import build_optimizer, optimizer_spec, validate_optimizer_checkpoint
@@ -432,6 +432,7 @@ class Trainer:
         loader_kwargs = dict(
             dataset=dataset,
             batch_size=None,  # No additional batching since PriorDataset handles batching internally
+            collate_fn=pad_prior_batch,
             shuffle=False,
             num_workers=num_workers,
             prefetch_factor=prefetch_factor,
@@ -1016,30 +1017,43 @@ class Trainer:
     @staticmethod
     def _gradient_statistics(parameters):
         """Aggregate already-unscaled gradients and account for missing grads."""
-        total = count = finite_count = 0
-        square_sum = maximum = 0.0
-        for parameter in parameters:
-            total += parameter.numel()
-            if parameter.grad is None:
+        return Trainer._gradient_statistics_many({"group": list(parameters)})["group"]
+
+    @staticmethod
+    def _gradient_statistics_many(categories):
+        # Scan each parameter once, even when it belongs to overlapping model,
+        # component and optimizer groups. No CUDA scalar reads / nonzero-based
+        # boolean compaction inside this loop: transfer summaries together.
+        parameters = {id(p): p for group in categories.values() for p in group}
+        summaries = []
+        indices = {}
+        for identity, parameter in parameters.items():
+            if parameter.grad is None or parameter.numel() == 0:
                 continue
             grad = parameter.grad.detach().float()
             finite = torch.isfinite(grad)
-            count += grad.numel()
-            finite_count += int(finite.sum())
-            if finite.any():
-                selected = grad[finite]
-                square_sum += float(selected.square().sum())
-                maximum = max(maximum, float(selected.abs().max()))
-        return {
-            "grad_numel": float(count),
-            "grad_rms": math.sqrt(square_sum / max(finite_count, 1)),
-            "grad_max_abs": maximum,
-            "grad_nonfinite_fraction": (count - finite_count) / max(count, 1),
-            "grad_missing_fraction": (total - count) / max(total, 1),
-        }
+            selected = torch.where(finite, grad, 0.0)
+            indices[identity] = len(summaries)
+            summaries.append(torch.stack((finite.sum().double(), selected.square().sum().double(),
+                                          selected.abs().max().double())))
+        rows = torch.stack(summaries).cpu().tolist() if summaries else []
+        result = {}
+        for category, group in categories.items():
+            total = sum(p.numel() for p in group)
+            count = sum(p.numel() for p in group if p.grad is not None)
+            selected = [rows[indices[id(p)]] for p in group if id(p) in indices]
+            finite_count = sum(row[0] for row in selected)
+            square_sum = sum(row[1] for row in selected)
+            result[category] = {
+                "grad_numel": float(count),
+                "grad_rms": math.sqrt(square_sum / max(finite_count, 1)),
+                "grad_max_abs": max((row[2] for row in selected), default=0.0),
+                "grad_nonfinite_fraction": (count - finite_count) / max(count, 1),
+                "grad_missing_fraction": (total - count) / max(total, 1),
+            }
+        return result
 
-    def component_gradient_diagnostics(self):
-        """Localize gradient instability before clipping and optimizer updates."""
+    def _component_gradient_groups(self):
         named = {
             name: parameter
             for name, parameter in self.raw_model.named_parameters()
@@ -1070,20 +1084,34 @@ class Trainer:
             "fusion_gate": [p for name, p in named.items() if "fusion_gate" in name],
             "qk_norm": [p for name, p in named.items() if "qk_norm" in name],
         }
-        return {
-            f"component_grad/{category}/{key}": value
-            for category, parameters in categories.items()
-            if parameters
-            for key, value in self._gradient_statistics(parameters).items()
-        }
+        return {f"component_grad/{category}": parameters
+                for category, parameters in categories.items() if parameters}
+
+    def _optimizer_gradient_groups(self):
+        return {f"optimizer_diag/{index}/{group.get('group_name', 'adamw')}": group["params"]
+                for index, group in enumerate(self.optimizer.param_groups)}
+
+    def _collect_gradient_diagnostics(self, *, components=True, optimizer=True):
+        groups = self._component_gradient_groups() if components else {}
+        if optimizer:
+            groups.update(self._optimizer_gradient_groups())
+        statistics = self._gradient_statistics_many(groups)
+        # Preserve historical metric names (and last-group-wins behavior for
+        # unnamed optimizer groups), keeping group identities distinct above.
+        result = {}
+        for category, values in statistics.items():
+            if category.startswith("optimizer_diag/"):
+                category = "optimizer_diag/" + category.split("/", 2)[2]
+            result.update({f"{category}/{key}": value for key, value in values.items()})
+        return result
+
+    def component_gradient_diagnostics(self):
+        """Localize gradient instability before clipping and optimizer updates."""
+        return self._collect_gradient_diagnostics(optimizer=False)
 
     def optimizer_gradient_diagnostics(self):
         """Aggregate unscaled, pre-clipping gradients by optimizer group."""
-        return {
-            f"optimizer_diag/{group.get('group_name', 'adamw')}/{key}": value
-            for group in self.optimizer.param_groups
-            for key, value in self._gradient_statistics(group["params"]).items()
-        }
+        return self._collect_gradient_diagnostics(components=False)
 
     def run_batch(self, batch):
         """Train the model on a batch of datasets.
@@ -1155,8 +1183,7 @@ class Trainer:
         if self.config.gradient_clipping > 0 or diagnose_optimizer:
             self.scaler.unscale_(self.optimizer)
         if diagnose_optimizer:
-            results.update(self.component_gradient_diagnostics())
-            results.update(self.optimizer_gradient_diagnostics())
+            results.update(self._collect_gradient_diagnostics())
 
         # Report the global norm before clipping, then bound the gradients.
         if self.config.gradient_clipping > 0:

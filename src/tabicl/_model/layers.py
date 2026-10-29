@@ -924,7 +924,10 @@ class InducedSelfAttentionBlock(nn.Module):
         if train_size is None:
             hidden = self.multihead_attn1(ind_vectors, src, src)
         else:
-            hidden = self.multihead_attn1(ind_vectors, src[..., :train_size, :], src[..., :train_size, :])
+            # Identity matters: MAB reuses K/V normalization and PyTorch packs
+            # their projection into one GEMM only when key is value.
+            support = src[..., :train_size, :]
+            hidden = self.multihead_attn1(ind_vectors, support, support)
 
         out = self.multihead_attn2(src, hidden, hidden)
 
@@ -1016,7 +1019,8 @@ class InducedSelfAttentionBlock(nn.Module):
 
         if store_cache:
             assert train_size is not None, "train_size must be provided when store_cache=True"
-            hidden = self.multihead_attn1(ind_vectors, src[..., :train_size, :], src[..., :train_size, :])
+            support = src[..., :train_size, :]
+            hidden = self.multihead_attn1(ind_vectors, support, support)
             out, k_proj, v_proj = self.multihead_attn2(src, hidden, hidden, need_kv=True)
             col_cache.kv[block_idx] = KVCacheEntry(key=k_proj, value=v_proj)
 
