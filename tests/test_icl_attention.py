@@ -118,9 +118,13 @@ def test_nonfinite_content_scores_never_turn_padding_into_key_indices(device):
 @pytest.mark.parametrize("norm_first", [True, False])
 @pytest.mark.parametrize("router", ["centroid", "hierarchical"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
-def test_multilayer_visibility_cache_and_permutations(mode, partition, norm_first, router, device):
+def test_multilayer_visibility_cache_and_permutations(mode, partition, norm_first, router, device, monkeypatch):
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")
+    # This FP32 reference contract must not silently run FA3 in FP16 when the
+    # optional extension happens to be installed on the test machine.
+    import tabicl._model.attention as attention
+    monkeypatch.setattr(attention, "_use_flash_attn3", False)
     torch.manual_seed(90)
     model = (
         Encoder(

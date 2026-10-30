@@ -235,6 +235,10 @@ def build_parser():
     )
     parser.add_argument("--prior_device", default="cpu", type=str, help="Device for prior data generation")
     parser.add_argument("--prior_backend", choices=("dataloader", "node_pool"), default="dataloader")
+    parser.add_argument("--prior_schedule", choices=("none", "round_robin", "balanced"), default="none",
+                        help="Reassign a fixed node cohort to ranks with equal micro-batch counts; node_pool only")
+    parser.add_argument("--rank_timing_every", type=int, default=0,
+                        help="Gather per-rank prior/train wall times every N steps (0 disables)")
     parser.add_argument("--prior_pool_workers", type=int, default=0,
                         help="Total CPU workers per node (0: available cores minus local GPU ranks)")
     parser.add_argument("--prior_pool_window", type=int, default=128,

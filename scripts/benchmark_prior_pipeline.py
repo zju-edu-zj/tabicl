@@ -51,6 +51,7 @@ def quantiles(values):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=("dataloader", "node_pool"), default="dataloader")
+    parser.add_argument("--schedule", choices=("none", "round_robin", "balanced"), default="none")
     parser.add_argument("--stage", type=int, choices=(1, 2, 3), default=1)
     parser.add_argument("--regression", type=str2bool, default=False)
     parser.add_argument("--batch-size", type=int, default=4, help="Local batch size")
@@ -88,7 +89,7 @@ def main():
         min_features=1, max_features=100, max_classes=10,
         min_seq_len=(None if args.min_seq_len is not None and args.min_seq_len == args.max_seq_len else
                      args.min_seq_len or (None if args.stage == 1 else 400)),
-        max_seq_len=args.max_seq_len or {1: 1024, 2: 10240, 3: 60000}[args.stage],
+        max_seq_len=args.max_seq_len or {1: 2048, 2: 10240, 3: 60000}[args.stage],
         log_seq_len=args.stage > 1, min_train_size=0.3 if args.stage == 1 else 0.79,
         max_train_size=0.9 if args.stage == 1 else 0.81,
         seq_len_per_gp=True, prior_type="graph_scm", n_jobs=1, device="cpu",
@@ -102,7 +103,8 @@ def main():
     if args.backend == "node_pool":
         loader = NodePriorPool(prior.prior, workers=args.pool_workers, window=args.pool_window,
                                byte_budget=args.pool_mb * 1024**2,
-                               seed=42 + 100003 * int(os.environ.get("GROUP_RANK", 0)))
+                               seed=42 + 100003 * int(os.environ.get("GROUP_RANK", 0)),
+                               schedule=args.schedule, micro_size=4 if args.stage == 1 else 1)
     else:
         loader = DataLoader(
             prior, batch_size=None, num_workers=args.workers,

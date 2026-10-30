@@ -52,10 +52,20 @@ SAVE_TEMP_EVERY=${SAVE_TEMP_EVERY:-500}
 SAVE_PERM_EVERY=${SAVE_PERM_EVERY:-5000}
 WANDB_LOG=${WANDB_LOG:-False}
 WANDB_MODE=${WANDB_MODE:-offline}
-PRIOR_WORKERS=${PRIOR_WORKERS:-8}             # 8 x 16 ranks = 128 workers on the training node
+PRIOR_WORKERS=${PRIOR_WORKERS:-8}             # per-rank workers for the DataLoader override
 PRIOR_PREFETCH_FACTOR=${PRIOR_PREFETCH_FACTOR:-8}
-PRIOR_IN_ORDER=${PRIOR_IN_ORDER:-False}       # avoid graph_scm head-of-line blocking
+PRIOR_IN_ORDER=${PRIOR_IN_ORDER:-False}       # DataLoader completion-order override
 source "$REPO_ROOT/scripts/icl_recipe.sh"
+# BF16 is supply-bound here: fixed cohorts can cost more than balancing saves.
+# With one indivisible micro-batch per rank, reassignment cannot lower the max.
+# Keep an explicit override for controlled same-task comparisons.
+if [[ -z "${PRIOR_SCHEDULE:-}" && "${PRIOR_BACKEND:-node_pool}" == node_pool ]]; then
+    if [[ "$TRAIN_DTYPE" != float32 ]] || (( BATCH_SIZE <= NUM_GPUS * MICRO_BATCH_SIZE )); then
+        PRIOR_SCHEDULE=none
+    else
+        PRIOR_SCHEDULE=balanced
+    fi
+fi
 source "$REPO_ROOT/scripts/prior_recipe.sh"
 mkdir -p "$LOG_DIR"
 

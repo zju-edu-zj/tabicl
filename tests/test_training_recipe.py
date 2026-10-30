@@ -61,3 +61,27 @@ def test_row_math_preserves_output_and_gradient_without_dtype_conversion():
     for left, right in zip(torch.autograd.grad(a.square().sum(), (q,k,v), retain_graph=True),
                            torch.autograd.grad(b.square().sum(), (q,k,v))):
         torch.testing.assert_close(left, right)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA SDPA kernels required")
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_cuda_row_policy_preserves_precision_outputs_and_gradients(dtype, monkeypatch):
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+    from tabicl._model import attention
+    monkeypatch.setattr(attention, "_use_flash_attn3", False)
+    if dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
+        pytest.skip("BF16 unsupported")
+    torch.manual_seed(17)
+    inputs = [torch.randn(3, 4, rows, 16, device="cuda", dtype=dtype, requires_grad=True)
+              for rows in (17, 31, 31)]
+    # Native vendor dispatch excludes cuDNN in Trainer as well.
+    with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]):
+        expected = sdpa_with_flattened_batch(*inputs)
+        actual = sdpa_with_flattened_batch(*inputs, fp32_math=True)
+        assert actual.dtype == dtype
+        tolerance = 3e-4 if dtype == torch.float32 else .02
+        torch.testing.assert_close(actual, expected, atol=tolerance, rtol=tolerance)
+        grads_a = torch.autograd.grad(actual.float().square().mean(), inputs, retain_graph=True)
+        grads_b = torch.autograd.grad(expected.float().square().mean(), inputs)
+        for a, b in zip(grads_a, grads_b):
+            torch.testing.assert_close(a, b, atol=tolerance, rtol=tolerance)

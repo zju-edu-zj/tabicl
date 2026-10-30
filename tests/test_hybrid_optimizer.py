@@ -129,7 +129,12 @@ def test_batched_muon_matches_individual_step_with_missing_gradients(device, nes
     pytest.param("cuda", True, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")),
 ])
 @pytest.mark.parametrize("batch_kind", ["dense", "compact", "nested"])
-def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, device, compiled, batch_kind):
+def test_trainer_hybrid_checkpoint_resumes_identical_next_update(tmp_path, device, compiled, batch_kind, monkeypatch):
+    # Match the stage1 recipe. This direct Trainer construction bypasses
+    # build_model(), which normally disables external FA3 (not fake-tensor
+    # compatible on the vendor stack) before compiling the frontend.
+    from tabicl._model import attention
+    monkeypatch.setattr(attention, "_use_flash_attn3", False)
     torch.manual_seed(12)
     trainer = Trainer.__new__(Trainer)
     trainer.config = config("--batch_size", "2", "--micro_batch_size", "1",

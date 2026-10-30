@@ -5,10 +5,19 @@ and `COMPILE_WARMUP=True`. All remain environment overrides; for 16 GPUs set
 `NUM_GPUS=16`. FP32 uses `TRAIN_DTYPE=float32`, BF16 uses `bfloat16` (default).
 Optimizer compilation remains opt-in.
 
+Prior generation defaults to a quota-aware, shared `node_pool`. Stage1 uses
+`balanced` for FP32 when each rank has multiple micro-batches; BF16 and the
+one-micro-batch-per-rank case use completion-order `none`. Override with
+`PRIOR_SCHEDULE=balanced/round_robin/none`, or `PRIOR_BACKEND=dataloader`.
+See [the scheduling audit](training_schedule_20261030.md) for measured results,
+stage2/3 behavior and the limits of fixed-cohort balancing.
+
 The shared `performance_recipe.sh` selects `ATTENTION_BACKEND=auto`. On the
 measured ZW810 vendor PyTorch 2.8 stack, FP32 with at most 2048 maximum rows uses
-MATH SDPA; longer sequences use MATH only in ROW attention to avoid quadratic
-COL/ICL temporary memory. BF16 and other hardware retain native dispatch.
+MATH SDPA; longer sequences use MATH only in ROW attention to limit materialized
+attention-weight memory. For this recipe, induced COL attention scales with
+rows × inducing slots × columns; it is not dense quadratic attention over rows.
+BF16 and other hardware retain native dispatch.
 Overrides: `native`, `fp32_math`, `fp32_row_math`. Explicit FP32 math policies
 require `USE_FLASH_ATTN3=False`; external FA3 would otherwise cast FP32 to FP16.
 MATH changes accumulation order and therefore rounding, without downcasting.

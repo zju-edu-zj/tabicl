@@ -20,6 +20,8 @@ def main():
     parser.add_argument("--stage", type=int, choices=[1, 2, 3], default=1)
     parser.add_argument("--dtype", choices=["float32", "bfloat16"], default="bfloat16")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--train-args", nargs=argparse.REMAINDER, default=[],
+                        help="Additional Trainer flags, appended after curriculum defaults")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     args.output.mkdir(parents=True, exist_ok=True)
@@ -31,7 +33,8 @@ def main():
     text = subprocess.check_output(["bash", str(root / f"scripts/train_v2_clf_stage{args.stage}.sh")],
                                    env=env, cwd=root, text=True)
     tokens = shlex.split(text)
-    command = [sys.executable, "-m", "torch.distributed.run", *tokens[1:]]
+    command = [sys.executable, "-m", "torch.distributed.run", *tokens[1:],
+               "--max_steps", str(args.steps), *args.train_args]
     env["PYTHONPATH"] = str(root / "src") + os.pathsep + env.get("PYTHONPATH", "")
     started = time.perf_counter()
     result = subprocess.run(command, env=env, cwd=root)

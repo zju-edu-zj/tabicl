@@ -33,6 +33,7 @@ from tabicl._model.attention import HAS_FLASH_ATTN3, set_flash_attn3_enabled
 from tabicl.prior._dataset import PriorDataset
 from tabicl.prior._genload import LoadPriorDataset, seed_worker, pad_prior_batch
 from tabicl.prior._node_pool import NodePriorPool, iter_micro_batches
+from tabicl.prior._scheduling import available_cpu_cores
 from tabicl.prior.graph_lib._config import PriorConfig
 from tabicl.train._optim import get_scheduler
 from tabicl.train._optimizer import build_optimizer, optimizer_spec, validate_optimizer_checkpoint
@@ -151,6 +152,9 @@ class Trainer:
 
             # Adjust batch size for distributed training
             original_batch_size = self.config.batch_size
+            if (getattr(self.config, "prior_schedule", "none") != "none"
+                    and original_batch_size % self.ddp_world_size):
+                raise ValueError("balanced scheduling requires global batch size divisible by world size")
             self.config.batch_size = math.ceil(original_batch_size / self.ddp_world_size)
 
             if self.master_process:
@@ -388,6 +392,9 @@ class Trainer:
     def configure_prior(self):
         """Set up a tabular dataset generator for synthetic data during training."""
 
+        if self.config.prior_schedule != "none" and self.config.prior_backend != "node_pool":
+            raise ValueError("prior_schedule requires prior_backend=node_pool")
+
         if self.config.prior_dir is None:
             # Generate prior data on the fly
             dataset = PriorDataset(
@@ -429,15 +436,18 @@ class Trainer:
             if self.config.prior_dir is not None or self.config.prior_seed_by_step:
                 raise ValueError("node_pool requires online generation and prior_seed_by_step=False")
             local_world = int(os.environ.get("LOCAL_WORLD_SIZE", 1))
-            available = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+            available = available_cpu_cores()
             workers = self.config.prior_pool_workers or max(1, available - local_world)
             self.dataloader = NodePriorPool(
                 dataset.prior, workers=workers, window=self.config.prior_pool_window,
                 byte_budget=self.config.prior_pool_mb * 1024**2,
                 seed=self.config.np_seed + 100003 * int(os.environ.get("GROUP_RANK", 0)),
+                schedule=self.config.prior_schedule, micro_size=self.config.micro_batch_size,
+                cost_model={**self.model_config, "col_feature_group_size": self.config.col_feature_group_size},
             )
             if self.master_process:
-                print(f"Prior pipeline: node_pool workers/node={workers}, window={self.config.prior_pool_window}, "
+                print(f"Prior pipeline: node_pool workers/node={workers}, CPU quota/affinity={available}, "
+                      f"schedule={self.config.prior_schedule}, window={self.config.prior_pool_window}, "
                       f"output budget={self.config.prior_pool_mb} MiB; padding per micro-batch")
             return
 
@@ -735,6 +745,21 @@ class Trainer:
             with Timer() as train_timer:
                 results = self.run_batch(batch)
             train_time = train_timer.elapsed
+            timing_every = getattr(self.config, "rank_timing_every", 0)
+            if timing_every > 0 and (step + 1) % timing_every == 0:
+                timing = torch.tensor([prior_time, train_time], dtype=torch.float64, device=self.config.device)
+                rows = [torch.empty_like(timing) for _ in range(self.ddp_world_size)]
+                if self.ddp:
+                    torch.distributed.all_gather(rows, timing)
+                else:
+                    rows = [timing]
+                if self.master_process:
+                    values = torch.stack(rows).cpu()
+                    for col, name in enumerate(("prior", "train")):
+                        results.update({f"rank_timing/{name}_max_s": values[:, col].max().item(),
+                                        f"rank_timing/{name}_mean_s": values[:, col].mean().item()})
+                        results.update({f"rank_timing/rank{r}_{name}_s": values[r, col].item()
+                                        for r in range(len(rows))})
             if self.master_process and isinstance(self.dataloader, NodePriorPool) and step % 200 == 0:
                 results.update({f"prior_pool/{key}": value for key, value in self.dataloader.stats().items()
                                 if key != "worker_pids"})

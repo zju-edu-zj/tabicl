@@ -3,7 +3,8 @@
 The manager and workers use spawn: training may already have initialized CUDA.
 Only NumPy arrays cross the manager connection, avoiding CUDA/fd ownership and
 NestedTensor IPC. A batch keeps its original parameter-sharing boundaries.
-Completion order is intentionally nondeterministic; no slow tasks are dropped.
+Unscheduled batches use completion order. Balanced cohorts are addressed by
+rank and step, so a fast client cannot steal another rank's assignment.
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ import torch.nn.functional as F
 import threadpoolctl
 
 from ._dataset import GraphPrior
+from ._scheduling import schedule_cohort
 
 
 _worker_prior = None
@@ -50,7 +52,7 @@ def _generate(params, seed):
 
 
 def _select_admission(admission, reserved, byte_budget, allow_oversized=False):
-    estimates = [sum(4 * p["seq_len"] * (p["max_features"] + 1) for p in params)
+    estimates = [sum(p["seq_len"] * (4 * p["max_features"] + (4 if p.get("regression", True) else 8)) for p in params)
                  for params in admission]
     for index, size in enumerate(estimates):
         if reserved + size <= byte_budget:
@@ -80,9 +82,14 @@ def iter_micro_batches(batch, size):
 
 
 class _Service:
-    def __init__(self, prior, workers, window, byte_budget, seed, clients):
-        self.signature = pickle.dumps((prior, workers, window, byte_budget, seed, clients))
+    def __init__(self, prior, workers, window, byte_budget, seed, clients,
+                 schedule="none", micro_size=1, cost_model=None):
+        self.signature = pickle.dumps((prior, workers, window, byte_budget, seed, clients,
+                                       schedule, micro_size, cost_model))
         self.prior, self.window, self.byte_budget = prior, window, byte_budget
+        self.schedule, self.micro_size, self.cost_model = schedule, micro_size, cost_model or {}
+        self.cohort_window = max(1, window // clients) if schedule != "none" else window
+        self.last_schedule = {}
         self.seed, self.clients = seed, clients
         self.condition = threading.Condition()
         self.ready = deque()
@@ -104,6 +111,9 @@ class _Service:
         # thread limits only in the initializer is too late for import-time BLAS.
         for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
             os.environ[name] = "1"
+        # Graph traversal uses hashed containers. Seeding NumPy/Torch alone does
+        # not stabilize their iteration order across independently spawned workers.
+        os.environ["PYTHONHASHSEED"] = str(seed % 2**32)
         self.executor = ProcessPoolExecutor(
             max_workers=workers, mp_context=mp.get_context("spawn"),
             initializer=_init_worker, initargs=(prior,),
@@ -123,11 +133,15 @@ class _Service:
                     if self.closed:
                         return
                     # Count ready AND in-flight batches against both limits.
-                    while len(self.batches) < self.window:
+                    while len(self.batches) < self.cohort_window:
                         if not self.admission:
-                            self.admission.append(self.prior.sample_parameters())
+                            params = self.prior.sample_parameters()
+                            if self.schedule != "none":
+                                for _ in range(self.clients - 1):
+                                    params.extend(self.prior.sample_parameters())
+                            self.admission.append(params)
                         available = _select_admission(self.admission, self.reserved, self.byte_budget)
-                        if available is None and len(self.admission) < self.admission_lookahead:
+                        if available is None and self.schedule == "none" and len(self.admission) < self.admission_lookahead:
                             self.admission.append(self.prior.sample_parameters())
                             continue
                         if available is None and not self.batches:
@@ -143,16 +157,21 @@ class _Service:
                             self.admission_bypasses += 1
                         params = self.admission[available]
                         del self.admission[available]
-                        estimate = sum(4 * p["seq_len"] * (p["max_features"] + 1) for p in params)
-                        state = dict(params=params, results=[None] * len(params), left=len(params), bytes=estimate)
+                        estimate = sum(p["seq_len"] * (4 * p["max_features"] + (4 if p["regression"] else 8)) for p in params)
+                        state = dict(params=params, results=[None] * len(params), left=len(params),
+                                     bytes=estimate, delivered=set())
                         self.batches[batch_id] = state
                         self.reserved += estimate
                         self.peak_reserved = max(self.peak_reserved, self.reserved)
-                        for i, p in enumerate(params):
-                            seed = int(np.random.SeedSequence([self.seed, task_id]).generate_state(1)[0])
+                        # Identity/seeds precede execution order. Long generation
+                        # tasks start first; no sampled task is dropped or retried.
+                        order = sorted(range(len(params)), key=lambda i: -(params[i]["seq_len"] * params[i]["num_features"]))
+                        for i in order:
+                            p = params[i]
+                            seed = int(np.random.SeedSequence([self.seed, task_id + i]).generate_state(1)[0])
                             future = self.executor.submit(_generate, p, seed)
                             self.pending[future] = (batch_id, i)
-                            task_id += 1
+                        task_id += len(params)
                         batch_id += 1
                     if not self.pending:
                         self.condition.wait(timeout=0.1)
@@ -168,6 +187,11 @@ class _Service:
                         state["left"] -= 1
                         self.completed_datasets += 1
                         if state["left"] == 0:
+                            if self.schedule != "none":
+                                state["assignments"], state["schedule_stats"] = schedule_cohort(
+                                    state["params"], state["results"], self.prior.batch_size,
+                                    self.clients, self.micro_size, self.cost_model,
+                                    balanced=self.schedule == "balanced")
                             self.ready.append(bid)
                     self.condition.notify_all()
         except BaseException:
@@ -175,22 +199,41 @@ class _Service:
                 self.error = traceback.format_exc()
                 self.condition.notify_all()
 
-    def get_batch(self):
+    def get_batch(self, rank=None, sequence=None):
         with self.condition:
-            while not self.ready and not self.error and not self.closed:
+            def available():
+                return (sequence in self.ready) if self.schedule != "none" else bool(self.ready)
+            if self.schedule != "none" and (rank is None or not 0 <= rank < self.clients):
+                raise ValueError("balanced fetch requires a valid local rank and sequence")
+            while not available() and not self.error and not self.closed:
                 self.condition.wait(timeout=1)
             if self.error:
                 raise RuntimeError("node prior worker failed:\n" + self.error)
             if self.closed:
                 raise RuntimeError("node prior pool is closed")
-            state = self.batches.pop(self.ready.popleft())
-            self.reserved -= state["bytes"]
+            if self.schedule != "none":
+                state = self.batches[sequence]
+                if rank in state["delivered"]:
+                    raise RuntimeError("duplicate rank/cohort delivery")
+                indices = state["assignments"][rank]
+                results = [state["results"][i] for i in indices]
+                params = [state["params"][i] for i in indices]
+                state["delivered"].add(rank)
+                self.last_schedule = state["schedule_stats"]
+                if len(state["delivered"]) == self.clients:
+                    del self.batches[sequence]
+                    self.ready.remove(sequence)
+                    self.reserved -= state["bytes"]
+            else:
+                state = self.batches.pop(self.ready.popleft())
+                self.reserved -= state["bytes"]
+                results, params = state["results"], state["params"]
             self.delivered_batches += 1
             self.condition.notify_all()
-        xs, ys, ds = zip(*state["results"])
+        xs, ys, ds = zip(*results)
         return xs, ys, np.asarray(ds, dtype=np.int64), np.asarray(
-            [p["seq_len"] for p in state["params"]], dtype=np.int64
-        ), np.asarray([p["train_size"] for p in state["params"]], dtype=np.int64)
+            [p["seq_len"] for p in params], dtype=np.int64
+        ), np.asarray([p["train_size"] for p in params], dtype=np.int64)
 
     def stats(self):
         with self.condition:
@@ -200,10 +243,11 @@ class _Service:
                             if len(durations) else {})
             return dict(completed_datasets=self.completed_datasets, delivered_batches=self.delivered_batches,
                         buffered_batches=len(self.batches), ready_batches=len(self.ready),
+                        buffered_local_batches=len(self.batches) * (self.clients if self.schedule != "none" else 1),
                         reserved_bytes=self.reserved, peak_reserved_bytes=self.peak_reserved,
                         admission_batches=len(self.admission), admission_bypasses=self.admission_bypasses,
                         admission_blocked=self.admission_blocked, **task_latency,
-                        worker_pids=list(self.executor._processes or {}))
+                        **self.last_schedule, worker_pids=list(self.executor._processes or {}))
 
     def release(self, rank):
         with self.condition:
@@ -263,7 +307,8 @@ class NodePriorPool:
     Use torchrun's node-local rank/world environment, or an explicit unique key.
     """
     def __init__(self, prior, workers, window=128, byte_budget=2 * 1024**3,
-                 seed=42, key=None, local_rank=None, local_world_size=None, timeout=180):
+                 seed=42, key=None, local_rank=None, local_world_size=None, timeout=180,
+                 schedule="none", micro_size=1, cost_model=None):
         if not isinstance(prior, GraphPrior) or str(prior.device) != "cpu":
             raise ValueError("node_pool requires online graph_scm on CPU")
         if min(workers, window, byte_budget) < 1:
@@ -271,13 +316,21 @@ class NodePriorPool:
         self.dataset = prior
         self.local_rank = int(os.environ.get("LOCAL_RANK", 0)) if local_rank is None else local_rank
         self.local_world = int(os.environ.get("LOCAL_WORLD_SIZE", 1)) if local_world_size is None else local_world_size
+        if self.local_world < 1 or not 0 <= self.local_rank < self.local_world:
+            raise ValueError("local rank must be within the positive local world size")
+        if schedule not in ("none", "round_robin", "balanced") or micro_size < 1:
+            raise ValueError("invalid prior scheduling settings")
+        if schedule != "none" and (prior.batch_size % micro_size or
+                min(prior.batch_size, prior.batch_size_per_gp) % micro_size):
+            raise ValueError("balanced scheduling requires micro size dividing local batch and prior group size")
+        self.schedule, self.sequence = schedule, 0
         run_key = key or (os.environ.get("TORCHELASTIC_RUN_ID", "") + ":" + os.environ.get("MASTER_PORT", ""))
         if not key and self.local_world == 1 and not os.environ.get("TORCHELASTIC_RUN_ID"):
             run_key += ":" + str(os.getpid())
         digest = hashlib.sha256(run_key.encode()).hexdigest()[:24]
         self.address = os.path.join(tempfile.gettempdir(), f"tabicl-prior-{digest}.sock")
         self.authkey = digest.encode()
-        self.args = (prior, workers, window, byte_budget, seed, self.local_world)
+        self.args = (prior, workers, window, byte_budget, seed, self.local_world, schedule, micro_size, cost_model)
         self.timeout = timeout
         self.manager = self.service = None
 
@@ -309,7 +362,8 @@ class NodePriorPool:
     def __next__(self):
         if self.service is None:
             iter(self)
-        xs, ys, ds, lengths, trains = self.service.get_batch()
+        xs, ys, ds, lengths, trains = self.service.get_batch(self.local_rank, self.sequence)
+        self.sequence += 1
         return ([torch.from_numpy(x) for x in xs], [torch.from_numpy(y) for y in ys],
                 torch.from_numpy(ds), torch.from_numpy(lengths), torch.from_numpy(trains))
 
@@ -320,7 +374,7 @@ class NodePriorPool:
         """Use a fresh stream on resume; exact task/optimizer-step replay is unsupported."""
         if self.service is not None:
             raise RuntimeError("cannot reseed an active node pool")
-        self.args = (*self.args[:4], self.args[4] + int(step), self.args[5])
+        self.args = (*self.args[:4], self.args[4] + int(step), *self.args[5:])
 
     def close(self):
         if self.service is None:

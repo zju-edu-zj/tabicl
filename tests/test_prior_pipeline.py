@@ -78,7 +78,7 @@ def test_step_seeded_prior_rejects_out_of_order_loading():
         trainer.configure_prior()
 
 
-def test_stage1_prior_pipeline_defaults_match_128_core_node(tmp_path):
+def test_stage1_defaults_adapt_workers_to_node_and_support_16_ranks(tmp_path):
     root = Path(__file__).resolve().parents[1]
     env = dict(
         os.environ, DRY_RUN="1", NUM_GPUS="16",
@@ -91,7 +91,24 @@ def test_stage1_prior_pipeline_defaults_match_128_core_node(tmp_path):
     assert args.prior_prefetch_factor == 8
     assert args.prior_in_order is False
     assert args.prior_backend == "node_pool"
-    assert args.prior_pool_workers == 112
+    assert args.prior_pool_workers == 0
+    assert args.prior_schedule == "none"  # one indivisible micro-batch per rank
+    assert args.max_seq_len == 2048
+    assert args.compile_frontend == "all" and args.compile_warmup
+
+
+@pytest.mark.parametrize("ranks,dtype,expected", [
+    (8, "float32", "balanced"), (8, "bfloat16", "none"), (16, "float32", "none"),
+])
+def test_stage1_schedule_default_accounts_for_supply_and_micro_granularity(tmp_path, ranks, dtype, expected):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", NUM_GPUS=str(ranks), TRAIN_DTYPE=dtype,
+               CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path), PRIOR_BACKEND="node_pool")
+    env.pop("PRIOR_SCHEDULE", None)
+    text = subprocess.check_output(["bash", str(root / "scripts/train_v2_clf_stage1.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert args.prior_schedule == expected
 
 
 @pytest.mark.parametrize("task", ["clf", "reg"])
@@ -107,3 +124,19 @@ def test_all_curriculum_scripts_support_shared_pool_and_override(tmp_path, task,
     assert args.prior_pool_window == 7
     assert args.prior_pool_mb == 128
     assert args.prior_backend == "node_pool"
+
+
+@pytest.mark.parametrize("stage", [1, 2, 3])
+@pytest.mark.parametrize("dtype", ["float32", "bfloat16"])
+def test_precision_recipe_and_dataloader_escape_hatch(tmp_path, stage, dtype):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", TRAIN_DTYPE=dtype, PRIOR_BACKEND="dataloader",
+               CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
+    env.pop("PRIOR_SCHEDULE", None)
+    env.pop("USE_FLASH_ATTN3", None)
+    text = subprocess.check_output(["bash", str(root / f"scripts/train_v2_clf_stage{stage}.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert args.dtype == dtype and args.attention_backend == "auto"
+    assert args.prior_backend == "dataloader" and args.prior_schedule == "none"
+    assert args.use_flash_attn3 == (dtype == "bfloat16" and stage > 1)
