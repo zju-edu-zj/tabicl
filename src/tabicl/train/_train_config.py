@@ -73,6 +73,11 @@ def build_parser():
     ###### Training Config ####################################################
     ###########################################################################
     parser.add_argument("--device", default="cuda", type=str, help="Device for training: cpu, cuda, cuda:0")
+    parser.add_argument("--attention_backend", choices=["native", "auto", "fp32_math", "fp32_row_math"],
+                        default="native", help="Training SDPA policy. auto uses the measured ZW810 policy; "
+                        "other hardware keeps native dispatch. No precision conversions are introduced.")
+    parser.add_argument("--compile_warmup", type=str2bool, default=False,
+                        help="Warm three forward/backward shapes on every rank concurrently, without updates.")
     parser.add_argument(
         "--compile_frontend", choices=["none", "row", "all"], default="none",
         help="Opt into dynamic column/row compilation with PyTorch >= 2.8. "

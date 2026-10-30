@@ -53,6 +53,7 @@ def sdpa_with_flattened_batch(
     attn_mask: Optional[Tensor] = None,
     dropout_p: float = 0.0,
     ssmax_layer: Optional[nn.Module] = None,
+    fp32_math: bool = False,
 ) -> Tensor:
     """Applies scaled dot-product attention with flattened batch dimensions.
 
@@ -106,7 +107,12 @@ def sdpa_with_flattened_batch(
         q = ssmax_layer(q, src_len)
 
     # FlashAttn3 doesn't support dropout and custom attention mask
-    if HAS_FLASH_ATTN3 and _use_flash_attn3 and q.is_cuda and attn_mask is None and dropout_p == 0.0:
+    if fp32_math and q.dtype == torch.float32:
+        from torch.nn.attention import sdpa_kernel, SDPBackend
+
+        with sdpa_kernel(SDPBackend.MATH):
+            out = F.scaled_dot_product_attention(q, k, v, attn_mask, dropout_p)
+    elif HAS_FLASH_ATTN3 and _use_flash_attn3 and q.is_cuda and attn_mask is None and dropout_p == 0.0:
         # FlashAttention only supports fp16, bf16, and fp8_e4m3
         # Convert to bf16 if needed, then convert back to original dtype
         orig_dtype = q.dtype
@@ -170,6 +176,7 @@ def multi_head_attention_forward(
     ssmax_layer: Optional[nn.Module] = None,
     qk_norm: Optional[nn.Module] = None,
     need_kv: bool = False,
+    fp32_math: bool = False,
 ) -> Union[Tensor, Tuple[Tensor, Tensor, Tensor]]:
     """Multi-head attention with support for rotary position embeddings.
 
@@ -324,7 +331,7 @@ def multi_head_attention_forward(
             attn_mask = attn_mask + key_padding_mask
 
     attn_output = sdpa_with_flattened_batch(
-        q, k, v, attn_mask, dropout_p, ssmax_layer=ssmax_layer
+        q, k, v, attn_mask, dropout_p, ssmax_layer=ssmax_layer, fp32_math=fp32_math
     )  # (..., nh, tgt_len, hs)
 
     # Reshape and project output

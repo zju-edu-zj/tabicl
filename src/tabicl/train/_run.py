@@ -36,6 +36,7 @@ from tabicl.prior.graph_lib._config import PriorConfig
 from tabicl.train._optim import get_scheduler
 from tabicl.train._optimizer import build_optimizer, optimizer_spec, validate_optimizer_checkpoint
 from tabicl.train._train_config import build_parser
+from tabicl.train._performance import resolve_attention_backend, warmup_frontend
 from tabicl.train._screening import (
     EVAL_ATTENTION_POLICIES,
     StepSeededPrior,
@@ -358,6 +359,20 @@ class Trainer:
             for param in model.icl_predictor.parameters():
                 param.requires_grad = False
 
+        device_name = torch.cuda.get_device_name(self.config.device) if "cuda" in self.config.device else "cpu"
+        compute_dtype = self.config.dtype if self.config.amp and "cuda" in self.config.device else "float32"
+        self.attention_backend = resolve_attention_backend(
+            getattr(self.config, "attention_backend", "native"), compute_dtype,
+            self.config.max_seq_len, device_name)
+        if self.attention_backend.startswith("fp32_") and compute_dtype == "float32" and self.config.use_flash_attn3:
+            raise ValueError("FP32 SDPA policies require --use_flash_attn3 False (FA3 casts FP32 to FP16)")
+        if self.attention_backend == "fp32_row_math":
+            from tabicl._model.layers import MultiheadAttention
+            for module in model.row_interactor.modules():
+                if isinstance(module, MultiheadAttention):
+                    module.fp32_math = True
+        if self.master_process:
+            print(f"Training attention backend: {self.attention_backend} ({device_name}, {compute_dtype})")
         model.compile_frontend(getattr(self.config, "compile_frontend", "none"))
         self.raw_model = model
 
@@ -502,6 +517,10 @@ class Trainer:
 
     def _sdpa_ctx(self):
         """Context manager that disables cuDNN SDPA for the training forward."""
+        if (getattr(self, "attention_backend", "native") == "fp32_math"
+                and (not self.amp or self.config.dtype == "float32")):
+            from torch.nn.attention import sdpa_kernel, SDPBackend
+            return sdpa_kernel(SDPBackend.MATH)
         if self._disable_cudnn_sdp:
             from torch.nn.attention import sdpa_kernel, SDPBackend
 
@@ -683,6 +702,7 @@ class Trainer:
             step_progress = range(self.curr_step, self.config.max_steps)
 
         self.validate_screen()
+        warmup_frontend(self)
         dataloader = iter(self.dataloader)
         for step in step_progress:
             # Get the next batch

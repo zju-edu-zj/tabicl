@@ -22,7 +22,9 @@ TRAIN_DTYPE=${TRAIN_DTYPE:-bfloat16}
 RECOMPUTE=${RECOMPUTE:-False}
 COMPILE_FRONTEND=${COMPILE_FRONTEND:-none}
 COMPILE_OPTIMIZER=${COMPILE_OPTIMIZER:-False}
+source "$(dirname "${BASH_SOURCE[0]}")/performance_recipe.sh"
 ICL_ARGS=(
+    "${PERFORMANCE_ARGS[@]}"
     --compile_frontend "$COMPILE_FRONTEND"
     --compile_optimizer "$COMPILE_OPTIMIZER"
     --icl_attention "$ICL_ATTENTION"

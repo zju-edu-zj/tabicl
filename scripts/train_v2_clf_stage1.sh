@@ -7,7 +7,7 @@ set -euo pipefail
 # model" (https://arxiv.org/abs/2602.11139), §4.1 / Appendix B.1. Three-stage
 # curriculum that progressively increases dataset size (batch size 64 throughout):
 #
-#   Stage 1: 500K steps, 1,024 samples/dataset,       30-90% train, max LR 8e-4, grad clip 10
+#   Stage 1: 500K steps, 2,048 samples/dataset,       30-90% train, max LR 8e-4, grad clip 10
 #   Stage 2:  40K steps, 400-10,240 samples (log-u), 79-81% train, max LR 1e-4, grad clip 10
 #   Stage 3:  10K steps, 400-60,000 samples (log-u), 79-81% train, max LR 2e-5, grad clip  1
 #
@@ -32,7 +32,7 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
-NUM_GPUS=${NUM_GPUS:-16}                      # the paper used 4 GPUs for pre-training
+NUM_GPUS=${NUM_GPUS:-8}                       # override for 16-GPU experiments
 CKPT_DIR=${CKPT_DIR:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1}
 LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
 MAX_STEPS=${MAX_STEPS:-500000}
@@ -41,7 +41,9 @@ ADAMW_LR=${ADAMW_LR:-1e-4}                  # hybrid AdamW peak LR
 MUON=${MUON:-True}                          # False: all-AdamW control, using LR
 BATCH_SIZE=${BATCH_SIZE:-64}                # global batch, before DDP splitting
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
-MAX_SEQ_LEN=${MAX_SEQ_LEN:-1024}
+MAX_SEQ_LEN=${MAX_SEQ_LEN:-2048}
+COMPILE_FRONTEND=${COMPILE_FRONTEND:-all}
+COMPILE_WARMUP=${COMPILE_WARMUP:-True}
 WARMUP_PROPORTION=${WARMUP_PROPORTION:--1}
 WARMUP_STEPS=${WARMUP_STEPS:-5000}
 INIT_CKPT=${INIT_CKPT:-}                     # first launch only; reset optimizer/step
