@@ -1,6 +1,7 @@
-"""Deterministic, fixed-cardinality scheduling of already sampled micro-batches.
+"""Deterministic, fixed-cardinality assignment within a supplied step.
 
-No tasks are rejected, split, duplicated, or moved across optimizer steps.
+This allocator never rejects, splits or duplicates tasks. Cross-step window
+composition belongs to _task_plan, which calls this allocator for each step.
 Costs are an operation-count proxy, not a promise of measured GPU latency.
 """
 import math
@@ -43,7 +44,14 @@ def available_cpu_cores():
 
 
 def micro_cost(params, results, indices, model):
-    """COL + ROW + ICL work proxy using actual accepted widths, not requests."""
+    """Forward MAC proxy, NOT a latency predictor or generation-cost estimate.
+
+    Includes projections/FFNs, CLS-only final ROW block, configured hybrid ICL
+    layer counts, and centroid routing. Before generation callers supply the
+    requested width; assignment after generation uses the accepted width.
+    Backward, launch overhead, dtype/backend efficiency and sorting are not
+    fitted here. Validate against device timings before interpreting gains.
+    """
     rows, support = params[indices[0]]["seq_len"], params[indices[0]]["train_size"]
     if any((params[i]["seq_len"], params[i]["train_size"]) != (rows, support) for i in indices):
         raise ValueError("scheduling cannot mix lengths/supports within a micro-batch")
@@ -53,14 +61,37 @@ def micro_cost(params, results, indices, model):
     # column; only "valid" reduces the token count by the group size.
     grouped = (math.ceil(width / model.get("col_feature_group_size", 3))
                if model.get("col_feature_group", "same") == "valid" else width)
-    col = model.get("col_num_blocks", 3) * grouped * (rows + support) * e * (e + model.get("col_num_inds", 128))
+    ff = model.get("ff_factor", 2)
+    def dense(q, k, d):
+        return (2*q + 2*k + 2*ff*q)*d*d + 2*q*k*d
+    inds = model.get("col_num_inds", 128)
+    col = model.get("col_num_blocks", 3) * grouped * (dense(inds, support, e) + dense(rows, inds, e))
     tokens = grouped + cls
-    row = model.get("row_num_blocks", 3) * rows * tokens * e * (e + tokens)
+    blocks = model.get("row_num_blocks", 3)
+    row = rows * (max(0, blocks-1)*dense(tokens, tokens, e) + (dense(cls, tokens, e) if blocks else 0))
     dim = cls * e
     budget = model.get("icl_block_size", 128) * model.get("icl_num_selected_blocks", 4)
     attention = model.get("icl_attention", "global_sparse")
-    keys = support if attention == "dense" else min(support, budget)
-    icl = model.get("icl_num_blocks", 12) * rows * dim * (dim + keys)
+    nhead = model.get("icl_nhead", 8)
+    # Global linear attention contracts per head (or through induced slots).
+    global_keys = (model.get("icl_num_induced_slots", 128) if model.get("icl_global_type", "elu") == "induced"
+                   else dim / nhead)
+    global_work = 2 * (rows + support) * dim * global_keys
+    retrieval = 2 * rows * dim * min(support, budget)
+    if support > budget:
+        leaves = math.ceil(support / model.get("icl_block_size", 128))
+        routing_keys = (leaves if model.get("icl_router", "centroid") == "centroid" else
+                        model.get("icl_router_beam", 16) * math.ceil(math.log2(max(2, leaves))))
+        retrieval += rows * dim * routing_keys
+    hybrids = {"global_full": "fused_full", "global_sparse": "fused_sparse",
+               "global_sparse_alternating": "sparse"}
+    icl = 0.
+    for layer in range(model.get("icl_num_blocks", 12)):
+        kind = (hybrids[attention] if (layer+1) % model.get("icl_sparse_every", 3) == 0 else "global") if attention in hybrids else attention
+        pair_work = {"dense": 2*rows*support*dim, "global": global_work,
+                     "sparse": retrieval, "fused_sparse": global_work+retrieval,
+                     "fused_full": global_work+2*rows*support*dim}[kind]
+        icl += (2*rows + 2*support + 2*ff*rows)*dim*dim + pair_work
     return float(len(indices) * (col + row + icl))
 
 

@@ -444,11 +444,16 @@ class Trainer:
                 seed=self.config.np_seed + 100003 * int(os.environ.get("GROUP_RANK", 0)),
                 schedule=self.config.prior_schedule, micro_size=self.config.micro_batch_size,
                 cost_model={**self.model_config, "col_feature_group_size": self.config.col_feature_group_size},
+                transport=self.config.prior_pool_transport, bucket_steps=self.config.prior_bucket_steps,
+                kernel_threads=self.config.prior_pool_kernel_threads,
             )
             if self.master_process:
                 print(f"Prior pipeline: node_pool workers/node={workers}, CPU quota/affinity={available}, "
                       f"schedule={self.config.prior_schedule}, window={self.config.prior_pool_window}, "
-                      f"output budget={self.config.prior_pool_mb} MiB; padding per micro-batch")
+                      f"output budget={self.config.prior_pool_mb} MiB, "
+                      f"transport={self.config.prior_pool_transport}, bucket_steps={self.config.prior_bucket_steps}; "
+                      f"kernel_threads<={self.config.prior_pool_kernel_threads}; "
+                      "padding per micro-batch")
             return
 
         # For on-the-fly generation, parallelize dataset creation across dataloader workers.

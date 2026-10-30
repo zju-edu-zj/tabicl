@@ -1,8 +1,8 @@
 """Node-local, bounded, single-dataset generation shared by all training ranks.
 
 The manager and workers use spawn: training may already have initialized CUDA.
-Only NumPy arrays cross the manager connection, avoiding CUDA/fd ownership and
-NestedTensor IPC. A batch keeps its original parameter-sharing boundaries.
+Outputs cross the manager connection as NumPy arrays or tmpfs path descriptors,
+avoiding CUDA/fd ownership and NestedTensor IPC.
 Unscheduled batches use completion order. Balanced cohorts are addressed by
 rank and step, so a fast client cannot steal another rank's assignment.
 """
@@ -28,18 +28,24 @@ import torch.nn.functional as F
 import threadpoolctl
 
 from ._dataset import GraphPrior
-from ._scheduling import schedule_cohort
+from ._scheduling import schedule_cohort, available_cpu_cores
+from ._task_plan import TaskPlanner
+from ._pool_transport import OutputStore, encode_table, decode_batch
+from .graph_lib import _cpu_budget
 
 
 _worker_prior = None
 _worker_limits = None
+_worker_output_dir = None
 
 
-def _init_worker(prior):
-    global _worker_prior, _worker_limits
+def _init_worker(prior, output_dir=None, cpu_permits=None, kernel_threads=1):
+    global _worker_prior, _worker_limits, _worker_output_dir
     torch.set_num_threads(1)
     _worker_limits = threadpoolctl.threadpool_limits(limits=1)
     _worker_prior = prior
+    _worker_output_dir = output_dir
+    _cpu_budget.configure_worker_budget(cpu_permits, kernel_threads)
 
 
 def _generate(params, seed):
@@ -47,12 +53,24 @@ def _generate(params, seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    x, y, d = _worker_prior.generate_dataset(params, compact=True)
-    return x.numpy(), y.numpy(), int(d), time.perf_counter() - started
+    with _cpu_budget.generation_slot():
+        x, y, d = _worker_prior.generate_dataset(params, compact=True)
+        generated = time.perf_counter()
+        x, y = encode_table(x.numpy(), y.numpy(), _worker_output_dir)
+        finished = time.perf_counter()
+    budget_stats = _cpu_budget.worker_budget.stats if _cpu_budget.worker_budget else {}
+    return x, y, int(d), generated - started, finished - generated, finished, budget_stats
+
+
+def _output_bytes(params):
+    # Compact outputs can only DELETE requested features. max_features is the
+    # padded prior/filter width and can greatly overreserve long narrow tables.
+    return sum(p["seq_len"] * (4 * p.get("num_features", p["max_features"]) +
+                              (4 if p.get("regression", True) else 8)) for p in params)
 
 
 def _select_admission(admission, reserved, byte_budget, allow_oversized=False):
-    estimates = [sum(p["seq_len"] * (4 * p["max_features"] + (4 if p.get("regression", True) else 8)) for p in params)
+    estimates = [_output_bytes(params)
                  for params in admission]
     for index, size in enumerate(estimates):
         if reserved + size <= byte_budget:
@@ -74,6 +92,10 @@ def iter_micro_batches(batch, size):
             # Keep pinned storage and avoid another copy on the legacy dense path.
             yield xs[start:stop, :rows, :width], ys[start:stop, :rows], d, length, train
             continue
+        if stop - start == 1:
+            # No allocation/copy for the Stage2/3 micro=1 path, including mmap.
+            yield xs[start][:rows, :width].unsqueeze(0), ys[start][:rows].unsqueeze(0), d, length, train
+            continue
         xx = [xs[i][:int(lengths[i]), :int(ds[i])] for i in range(start, stop)]
         yy = [ys[i][:int(lengths[i])] for i in range(start, stop)]
         x = torch.stack([F.pad(t, (0, width - t.shape[1], 0, rows - t.shape[0])) for t in xx])
@@ -83,13 +105,28 @@ def iter_micro_batches(batch, size):
 
 class _Service:
     def __init__(self, prior, workers, window, byte_budget, seed, clients,
-                 schedule="none", micro_size=1, cost_model=None):
+                 schedule="none", micro_size=1, cost_model=None, transport="numpy", bucket_steps=4, kernel_threads=1):
         self.signature = pickle.dumps((prior, workers, window, byte_budget, seed, clients,
-                                       schedule, micro_size, cost_model))
+                                       schedule, micro_size, cost_model, transport, bucket_steps, kernel_threads))
         self.prior, self.window, self.byte_budget = prior, window, byte_budget
         self.schedule, self.micro_size, self.cost_model = schedule, micro_size, cost_model or {}
+        # Window policies assign from metadata before generation. A rank can
+        # begin its GPU work once its OWN tables are ready, rather than waiting
+        # for the node's slowest graph. Legacy policies retain actual-width
+        # assignment after the complete cohort for controlled comparisons.
+        self.early_dispatch = schedule.startswith("window_")
         self.cohort_window = max(1, window // clients) if schedule != "none" else window
         self.last_schedule = {}
+        self.planner = TaskPlanner(prior, clients, micro_size, self.cost_model, seed, schedule, bucket_steps)
+        self.output = OutputStore(transport)
+        self.leases = {}
+        self.encoding_seconds = deque(maxlen=4096)
+        self.result_transit_seconds = deque(maxlen=4096)
+        self.fetch_wait_seconds = 0.
+        self.worker_seconds = 0.
+        self.kernel_stats = dict(parallel_distance_calls=0, parallel_distance_max_threads=1,
+                                 parallel_distance_extra_thread_seconds=0.)
+        self.started = time.perf_counter()
         self.seed, self.clients = seed, clients
         self.condition = threading.Condition()
         self.ready = deque()
@@ -114,9 +151,12 @@ class _Service:
         # Graph traversal uses hashed containers. Seeding NumPy/Torch alone does
         # not stabilize their iteration order across independently spawned workers.
         os.environ["PYTHONHASHSEED"] = str(seed % 2**32)
+        context = mp.get_context("spawn")
+        self.cpu_slots = max(1, available_cpu_cores()-clients)
+        self.cpu_permits = context.BoundedSemaphore(self.cpu_slots) if kernel_threads > 1 else None
         self.executor = ProcessPoolExecutor(
-            max_workers=workers, mp_context=mp.get_context("spawn"),
-            initializer=_init_worker, initargs=(prior,),
+            max_workers=workers, mp_context=context,
+            initializer=_init_worker, initargs=(prior, self.output.path, self.cpu_permits, kernel_threads),
         )
         self.thread = threading.Thread(target=self._produce, daemon=True)
         self.thread.start()
@@ -127,7 +167,7 @@ class _Service:
             np.random.seed(self.seed)
             torch.manual_seed(self.seed)
             random.seed(self.seed)
-            batch_id = task_id = 0
+            batch_id = 0
             while True:
                 with self.condition:
                     if self.closed:
@@ -135,31 +175,32 @@ class _Service:
                     # Count ready AND in-flight batches against both limits.
                     while len(self.batches) < self.cohort_window:
                         if not self.admission:
-                            params = self.prior.sample_parameters()
-                            if self.schedule != "none":
-                                for _ in range(self.clients - 1):
-                                    params.extend(self.prior.sample_parameters())
-                            self.admission.append(params)
-                        available = _select_admission(self.admission, self.reserved, self.byte_budget)
+                            self.admission.append(self.planner.next())
+                        available = _select_admission([p.params for p in self.admission], self.reserved, self.byte_budget)
                         if available is None and self.schedule == "none" and len(self.admission) < self.admission_lookahead:
-                            self.admission.append(self.prior.sample_parameters())
+                            self.admission.append(self.planner.next())
                             continue
                         if available is None and not self.batches:
                             # Only start an oversized batch after searching the
                             # bounded lookahead for a batch that fits.
                             available = _select_admission(
-                                self.admission, self.reserved, self.byte_budget, allow_oversized=True
+                                [p.params for p in self.admission], self.reserved, self.byte_budget, allow_oversized=True
                             )
                         if available is None:
                             self.admission_blocked += 1
                             break
                         if available:
                             self.admission_bypasses += 1
-                        params = self.admission[available]
+                        planned = self.admission[available]
+                        params = planned.params
                         del self.admission[available]
-                        estimate = sum(p["seq_len"] * (4 * p["max_features"] + (4 if p["regression"] else 8)) for p in params)
+                        estimate = _output_bytes(params)
                         state = dict(params=params, results=[None] * len(params), left=len(params),
                                      bytes=estimate, delivered=set())
+                        if self.early_dispatch:
+                            state["assignments"], state["schedule_stats"] = schedule_cohort(
+                                params, [(None, None, p["num_features"]) for p in params], self.prior.batch_size,
+                                self.clients, self.micro_size, self.cost_model)
                         self.batches[batch_id] = state
                         self.reserved += estimate
                         self.peak_reserved = max(self.peak_reserved, self.reserved)
@@ -168,10 +209,9 @@ class _Service:
                         order = sorted(range(len(params)), key=lambda i: -(params[i]["seq_len"] * params[i]["num_features"]))
                         for i in order:
                             p = params[i]
-                            seed = int(np.random.SeedSequence([self.seed, task_id + i]).generate_state(1)[0])
+                            seed = int(np.random.SeedSequence([self.seed, planned.task_ids[i]]).generate_state(1)[0])
                             future = self.executor.submit(_generate, p, seed)
                             self.pending[future] = (batch_id, i)
-                        task_id += len(params)
                         batch_id += 1
                     if not self.pending:
                         self.condition.wait(timeout=0.1)
@@ -181,17 +221,23 @@ class _Service:
                     for future in done:
                         bid, idx = self.pending.pop(future)
                         state = self.batches[bid]
-                        x, y, d, elapsed = future.result()
+                        x, y, d, elapsed, encoding, finished, kernel_stats = future.result()
+                        for name, value in kernel_stats.items():
+                            self.kernel_stats[name] = (max(self.kernel_stats[name], value) if name.endswith("max_threads")
+                                                       else self.kernel_stats[name]+value)
+                        self.result_transit_seconds.append(time.perf_counter() - finished)
                         state["results"][idx] = (x, y, d)
                         self.generation_seconds.append(elapsed)
+                        self.encoding_seconds.append(encoding)
+                        self.worker_seconds += elapsed + encoding
                         state["left"] -= 1
                         self.completed_datasets += 1
                         if state["left"] == 0:
-                            if self.schedule != "none":
+                            if self.schedule != "none" and not self.early_dispatch:
                                 state["assignments"], state["schedule_stats"] = schedule_cohort(
                                     state["params"], state["results"], self.prior.batch_size,
                                     self.clients, self.micro_size, self.cost_model,
-                                    balanced=self.schedule == "balanced")
+                                    balanced=self.schedule in ("balanced", "window_fifo", "window_bucketed"))
                             self.ready.append(bid)
                     self.condition.notify_all()
         except BaseException:
@@ -200,8 +246,12 @@ class _Service:
                 self.condition.notify_all()
 
     def get_batch(self, rank=None, sequence=None):
+        started = time.perf_counter()
         with self.condition:
             def available():
+                if self.early_dispatch:
+                    state = self.batches.get(sequence)
+                    return state is not None and all(state["results"][i] is not None for i in state["assignments"][rank])
                 return (sequence in self.ready) if self.schedule != "none" else bool(self.ready)
             if self.schedule != "none" and (rank is None or not 0 <= rank < self.clients):
                 raise ValueError("balanced fetch requires a valid local rank and sequence")
@@ -211,6 +261,7 @@ class _Service:
                 raise RuntimeError("node prior worker failed:\n" + self.error)
             if self.closed:
                 raise RuntimeError("node prior pool is closed")
+            self.fetch_wait_seconds += time.perf_counter() - started
             if self.schedule != "none":
                 state = self.batches[sequence]
                 if rank in state["delivered"]:
@@ -221,19 +272,33 @@ class _Service:
                 state["delivered"].add(rank)
                 self.last_schedule = state["schedule_stats"]
                 if len(state["delivered"]) == self.clients:
-                    del self.batches[sequence]
                     self.ready.remove(sequence)
-                    self.reserved -= state["bytes"]
+                lease = (rank, sequence)
+                self.leases[lease] = (sequence, results)
             else:
-                state = self.batches.pop(self.ready.popleft())
-                self.reserved -= state["bytes"]
+                bid = self.ready.popleft()
+                state = self.batches[bid]
                 results, params = state["results"], state["params"]
+                lease = (rank, sequence)
+                self.leases[lease] = (bid, results)
             self.delivered_batches += 1
             self.condition.notify_all()
         xs, ys, ds = zip(*results)
         return xs, ys, np.asarray(ds, dtype=np.int64), np.asarray(
             [p["seq_len"] for p in params], dtype=np.int64
         ), np.asarray([p["train_size"] for p in params], dtype=np.int64)
+
+    def acknowledge(self, rank, sequence):
+        """Client mapped the payload: reclaim names, not still-live mappings."""
+        with self.condition:
+            bid, results = self.leases.pop((rank, sequence))
+            self.output.release(results)
+            state = self.batches[bid]
+            state.setdefault("acknowledged", set()).add(rank)
+            if self.schedule == "none" or len(state["acknowledged"]) == self.clients:
+                del self.batches[bid]
+                self.reserved -= state["bytes"]
+            self.condition.notify_all()
 
     def stats(self):
         with self.condition:
@@ -247,6 +312,12 @@ class _Service:
                         reserved_bytes=self.reserved, peak_reserved_bytes=self.peak_reserved,
                         admission_batches=len(self.admission), admission_bypasses=self.admission_bypasses,
                         admission_blocked=self.admission_blocked, **task_latency,
+                        encoding_mean_ms=float(np.mean(self.encoding_seconds) * 1000) if self.encoding_seconds else 0.,
+                        result_transit_mean_ms=float(np.mean(self.result_transit_seconds) * 1000) if self.result_transit_seconds else 0.,
+                        worker_busy_seconds=self.worker_seconds, service_fetch_wait_seconds=self.fetch_wait_seconds,
+                        service_uptime_seconds=time.perf_counter() - self.started,
+                        active_leases=len(self.leases), cpu_slots=self.cpu_slots, **self.kernel_stats, **self.planner.stats,
+                        assignment_uses_requested_features=int(self.early_dispatch),
                         **self.last_schedule, worker_pids=list(self.executor._processes or {}))
 
     def release(self, rank):
@@ -273,6 +344,8 @@ class _Service:
             process.join(timeout=2)
             if process.is_alive():
                 process.kill()
+                process.join(timeout=2)
+        self.output.close()
 
 
 _service = None
@@ -308,7 +381,7 @@ class NodePriorPool:
     """
     def __init__(self, prior, workers, window=128, byte_budget=2 * 1024**3,
                  seed=42, key=None, local_rank=None, local_world_size=None, timeout=180,
-                 schedule="none", micro_size=1, cost_model=None):
+                 schedule="none", micro_size=1, cost_model=None, transport="numpy", bucket_steps=4, kernel_threads=1):
         if not isinstance(prior, GraphPrior) or str(prior.device) != "cpu":
             raise ValueError("node_pool requires online graph_scm on CPU")
         if min(workers, window, byte_budget) < 1:
@@ -318,19 +391,24 @@ class NodePriorPool:
         self.local_world = int(os.environ.get("LOCAL_WORLD_SIZE", 1)) if local_world_size is None else local_world_size
         if self.local_world < 1 or not 0 <= self.local_rank < self.local_world:
             raise ValueError("local rank must be within the positive local world size")
-        if schedule not in ("none", "round_robin", "balanced") or micro_size < 1:
+        if schedule not in ("none", "round_robin", "balanced", "window_fifo", "window_bucketed") or micro_size < 1:
             raise ValueError("invalid prior scheduling settings")
+        if transport not in ("numpy", "mmap") or min(bucket_steps, kernel_threads) < 1:
+            raise ValueError("invalid transport, bucket_steps or kernel_threads")
         if schedule != "none" and (prior.batch_size % micro_size or
                 min(prior.batch_size, prior.batch_size_per_gp) % micro_size):
             raise ValueError("balanced scheduling requires micro size dividing local batch and prior group size")
         self.schedule, self.sequence = schedule, 0
+        self.transport = transport
+        self.client_times = dict(rpc_seconds=0., decode_seconds=0., acknowledge_seconds=0.)
         run_key = key or (os.environ.get("TORCHELASTIC_RUN_ID", "") + ":" + os.environ.get("MASTER_PORT", ""))
         if not key and self.local_world == 1 and not os.environ.get("TORCHELASTIC_RUN_ID"):
             run_key += ":" + str(os.getpid())
         digest = hashlib.sha256(run_key.encode()).hexdigest()[:24]
         self.address = os.path.join(tempfile.gettempdir(), f"tabicl-prior-{digest}.sock")
         self.authkey = digest.encode()
-        self.args = (prior, workers, window, byte_budget, seed, self.local_world, schedule, micro_size, cost_model)
+        self.args = (prior, workers, window, byte_budget, seed, self.local_world, schedule, micro_size, cost_model,
+                     transport, bucket_steps, kernel_threads)
         self.timeout = timeout
         self.manager = self.service = None
 
@@ -362,13 +440,23 @@ class NodePriorPool:
     def __next__(self):
         if self.service is None:
             iter(self)
-        xs, ys, ds, lengths, trains = self.service.get_batch(self.local_rank, self.sequence)
+        sequence = self.sequence
+        started = time.perf_counter()
+        payload = self.service.get_batch(self.local_rank, sequence)
+        received = time.perf_counter()
+        try:
+            batch = decode_batch(payload, self.transport)
+        finally:
+            decoded = time.perf_counter()
+            self.service.acknowledge(self.local_rank, sequence)
+        self.client_times["rpc_seconds"] += received - started
+        self.client_times["decode_seconds"] += decoded - received
+        self.client_times["acknowledge_seconds"] += time.perf_counter() - decoded
         self.sequence += 1
-        return ([torch.from_numpy(x) for x in xs], [torch.from_numpy(y) for y in ys],
-                torch.from_numpy(ds), torch.from_numpy(lengths), torch.from_numpy(trains))
+        return batch
 
     def stats(self):
-        return self.service.stats() if self.service is not None else {}
+        return {**self.service.stats(), **self.client_times} if self.service is not None else {}
 
     def set_start_step(self, step):
         """Use a fresh stream on resume; exact task/optimizer-step replay is unsupported."""

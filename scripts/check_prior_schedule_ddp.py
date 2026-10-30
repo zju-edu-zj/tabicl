@@ -29,7 +29,11 @@ def loss(model, micro):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--schedule", choices=["balanced", "round_robin"], default="balanced")
+    parser.add_argument("--schedule", choices=["balanced", "round_robin", "window_fifo", "window_bucketed"], default="balanced")
+    parser.add_argument("--transport", choices=["numpy", "mmap"], default="numpy")
+    parser.add_argument("--steps", type=int, default=1)
+    parser.add_argument("--bucket-steps", type=int, default=2)
+    parser.add_argument("--kernel-threads", type=int, default=1)
     args = parser.parse_args()
     torch.set_num_threads(1)
     dist.init_process_group("gloo")
@@ -45,7 +49,9 @@ def main():
                        icl_block_size=16, icl_num_selected_blocks=1,
                        zero_init=False).train()
         reference = deepcopy(model) if rank == 0 else None
-        ddp = DDP(model)
+        # Match Trainer: attention caches/buffers depend on each rank's shape.
+        # Broadcasting differently sized buffers breaks the collective contract.
+        ddp = DDP(model, broadcast_buffers=False)
         micro = 4 if stage == 1 else 1
         prior = GraphPrior(batch_size=4, batch_size_per_gp=micro,
                            min_features=2, max_features=6, max_classes=3,
@@ -54,29 +60,34 @@ def main():
                            config=PriorConfig(min_n_nodes=2, max_n_nodes=4))
         with NodePriorPool(prior, workers=4, window=2*world, seed=93,
                            key=f"schedule-ddp-{__import__('os').environ['MASTER_PORT']}-{stage}",
-                           schedule=args.schedule, micro_size=micro) as pool:
-            batch = next(pool)
-            batches = [None] * world
-            dist.all_gather_object(batches, batch)
+                           schedule=args.schedule, micro_size=micro,
+                           transport=args.transport, bucket_steps=args.bucket_steps,
+                           kernel_threads=args.kernel_threads) as pool:
             opt = torch.optim.SGD(ddp.parameters(), lr=.01)
-            units = list(iter_micro_batches(batch, micro))
-            for i, unit in enumerate(units):
-                with ddp.no_sync() if i < len(units)-1 else nullcontext():
-                    (loss(ddp, unit) / len(units)).backward()
-            opt.step()
-            if rank == 0:
-                ref_opt = torch.optim.SGD(reference.parameters(), lr=.01)
-                for candidate in batches:
-                    for unit in iter_micro_batches(candidate, micro):
-                        (loss(reference, unit) / (world * len(units))).backward()
-                ref_opt.step()
-                maximum = 0.
-                for (name, a), (_, b) in zip(model.named_parameters(), reference.named_parameters()):
-                    torch.testing.assert_close(a, b, atol=2e-6, rtol=2e-5, msg=name)
-                    maximum = max(maximum, float((a-b).abs().max().detach()))
-                reports.append(dict(stage=stage, ranks=world, micro=micro,
-                                    max_parameter_error=maximum, pool=pool.stats()))
-            dist.barrier()
+            ref_opt = torch.optim.SGD(reference.parameters(), lr=.01) if rank == 0 else None
+            for step in range(args.steps):
+                batch = next(pool)
+                batches = [None] * world
+                dist.all_gather_object(batches, batch)
+                opt.zero_grad(set_to_none=True)
+                units = list(iter_micro_batches(batch, micro))
+                for i, unit in enumerate(units):
+                    with ddp.no_sync() if i < len(units)-1 else nullcontext():
+                        (loss(ddp, unit) / len(units)).backward()
+                opt.step()
+                if rank == 0:
+                    ref_opt.zero_grad(set_to_none=True)
+                    for candidate in batches:
+                        for unit in iter_micro_batches(candidate, micro):
+                            (loss(reference, unit) / (world * len(units))).backward()
+                    ref_opt.step()
+                    maximum = 0.
+                    for (name, a), (_, b) in zip(model.named_parameters(), reference.named_parameters()):
+                        torch.testing.assert_close(a, b, atol=2e-6, rtol=2e-5, msg=name)
+                        maximum = max(maximum, float((a-b).abs().max().detach()))
+                    reports.append(dict(stage=stage, step=step, ranks=world, micro=micro,
+                                        max_parameter_error=maximum, pool=pool.stats()))
+                dist.barrier()
         del ddp, model, reference
     if rank == 0:
         print(json.dumps(reports, indent=2), flush=True)

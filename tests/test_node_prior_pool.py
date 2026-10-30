@@ -150,9 +150,10 @@ def test_node_pool_shared_workers_bounded_queue_and_cleanup(tmp_path):
             os.kill(pid, 0)
 
 
-def test_node_pool_propagates_worker_errors(tmp_path):
+@pytest.mark.parametrize("transport", ["numpy", "mmap"])
+def test_node_pool_propagates_worker_errors(tmp_path, transport):
     prior = small_prior(config=PriorConfig(fct_types="invalid"))
-    with NodePriorPool(prior, workers=1, window=1, key=str(tmp_path)) as pool:
+    with NodePriorPool(prior, workers=1, window=1, key=str(tmp_path), transport=transport) as pool:
         with pytest.raises(RuntimeError, match="node prior worker failed"):
             next(pool)
 

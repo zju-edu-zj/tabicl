@@ -1,0 +1,14 @@
+........................................................................ [ 41%]
+........................................................................ [ 82%]
+...............................                                          [100%]
+=============================== warnings summary ===============================
+tests/test_node_prior_pool.py::test_padding_matches_old_training_inputs[nested]
+  /opt/conda/lib/python3.12/site-packages/torch/nested/__init__.py:250: UserWarning: The PyTorch API of nested tensors is in prototype stage and will change in the near future. We recommend specifying layout=torch.jagged when constructing a nested tensor, as this layout receives active development, has better operator coverage, and works with torch.compile. (Triggered internally at /job_3594441/source/pytorch/aten/src/ATen/NestedTensorImpl.cpp:178.)
+    return _nested.nested_tensor(
+
+tests/test_prior_pipeline.py::test_worker_padding_preserves_values_and_final_pinned_layout
+  /opt/conda/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=444504) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    self.pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+175 passed, 2 warnings in 248.52s (0:04:08)

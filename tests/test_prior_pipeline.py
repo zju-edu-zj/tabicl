@@ -131,7 +131,10 @@ def test_stage1_schedule_default_accounts_for_supply_and_micro_granularity(tmp_p
 def test_all_curriculum_scripts_support_shared_pool_and_override(tmp_path, task, stage):
     root = Path(__file__).resolve().parents[1]
     env = dict(os.environ, DRY_RUN="1", PRIOR_BACKEND="node_pool", PRIOR_POOL_WORKERS="12",
-               PRIOR_POOL_WINDOW="7", PRIOR_POOL_MB="128", CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
+               PRIOR_POOL_WINDOW="7", PRIOR_POOL_MB="128", PRIOR_SCHEDULE="window_bucketed",
+               PRIOR_POOL_KERNEL_THREADS="8",
+               PRIOR_POOL_TRANSPORT="mmap", PRIOR_BUCKET_STEPS="3",
+               CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
     text = subprocess.check_output(["bash", str(root / f"scripts/train_v2_{task}_stage{stage}.sh")], env=env, text=True)
     tokens = shlex.split(text)
     args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
@@ -139,6 +142,9 @@ def test_all_curriculum_scripts_support_shared_pool_and_override(tmp_path, task,
     assert args.prior_pool_window == 7
     assert args.prior_pool_mb == 128
     assert args.prior_backend == "node_pool"
+    assert args.prior_schedule == "window_bucketed"
+    assert args.prior_pool_transport == "mmap" and args.prior_bucket_steps == 3
+    assert args.prior_pool_kernel_threads == 8
 
 
 @pytest.mark.parametrize("stage", [1, 2, 3])

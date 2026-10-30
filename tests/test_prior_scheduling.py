@@ -45,8 +45,20 @@ def test_cost_proxy_tracks_actual_feature_grouping_tokens():
         model = dict(col_feature_group=mode, col_feature_group_size=3, icl_num_blocks=0,
                      row_num_blocks=0, col_num_blocks=1, embed_dim=16, col_num_inds=4)
         costs[mode] = micro_cost(params, results, [0], model)
-        assert costs[mode] == tokens * (32 + 16) * 16 * (16 + 4)
+        assert costs[mode] > 0
+        assert costs[mode] / tokens == costs[False] / 10
     assert costs[False] == costs["same"] > costs["valid"]
+
+
+def test_cost_proxy_respects_hybrid_layers_and_centroid_routing():
+    params, results = [dict(seq_len=60000, train_size=48000)], [(None, None, 20)]
+    base = dict(col_num_blocks=0, row_num_blocks=0, icl_num_blocks=12)
+    def cost(**kw):
+        return micro_cost(params, results, [0], {**base, **kw})
+    assert cost(icl_attention="dense") > cost(icl_attention="global_sparse") > cost(icl_attention="global")
+    assert cost(icl_attention="global_sparse", icl_sparse_every=1) > cost(icl_attention="global_sparse", icl_sparse_every=3)
+    assert cost(icl_attention="sparse", icl_block_size=64) > cost(icl_attention="sparse", icl_block_size=128,
+                                                              icl_num_selected_blocks=2)
 
 
 @pytest.mark.parametrize("micro", [1, 4])

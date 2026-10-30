@@ -20,6 +20,8 @@ def main():
     parser.add_argument("--stage", type=int, choices=[1, 2, 3], default=1)
     parser.add_argument("--dtype", choices=["float32", "bfloat16"], default="bfloat16")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--shape-prior", action="store_true",
+                        help="Cheap synthetic tables isolate GPU scheduling; NOT real prior/quality training")
     parser.add_argument("--train-args", nargs=argparse.REMAINDER, default=[],
                         help="Additional Trainer flags, appended after curriculum defaults")
     args = parser.parse_args()
@@ -35,11 +37,15 @@ def main():
     tokens = shlex.split(text)
     command = [sys.executable, "-m", "torch.distributed.run", *tokens[1:],
                "--max_steps", str(args.steps), *args.train_args]
+    if args.shape_prior:
+        entry = command.index("tabicl.train")
+        command[entry-1:entry+1] = [str(root / "scripts/train_shape_prior.py")]
     env["PYTHONPATH"] = str(root / "src") + os.pathsep + env.get("PYTHONPATH", "")
     started = time.perf_counter()
     result = subprocess.run(command, env=env, cwd=root)
     report = dict(command=command, wall_seconds=time.perf_counter() - started, exit_code=result.returncode,
-                  dtype=args.dtype, gpus=args.gpus, steps=args.steps, stage=args.stage)
+                  dtype=args.dtype, gpus=args.gpus, steps=args.steps, stage=args.stage,
+                  shape_prior=args.shape_prior)
     (args.output / "run.json").write_text(json.dumps(report, indent=2) + "\n")
     raise SystemExit(result.returncode)
 

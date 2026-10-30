@@ -1,6 +1,8 @@
 """CPU nearest-center kernels that reduce distances directly to indices."""
 import torch
 
+from ._cpu_budget import parallel_distance
+
 
 def _nearest_center_1d(x, centers, p):
     """Use sorted neighbors in 1-D; retain the first original center on ties."""
@@ -38,5 +40,6 @@ def nearest_center(x, centers, p):
     # cdist's vectorized CPU kernel is materially faster than broadcast/pow
     # reduction for multidimensional points. Chunk only its output matrix.
     rows = max(1, (4 * 1024**2) // (len(centers) * x.element_size()))
-    return torch.cat([torch.cdist(chunk, centers, p=p).argmin(dim=-1)
-                      for chunk in x.split(rows)])
+    with parallel_distance(x, centers, p):
+        return torch.cat([torch.cdist(chunk, centers, p=p).argmin(dim=-1)
+                          for chunk in x.split(rows)])
