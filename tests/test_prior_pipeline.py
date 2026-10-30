@@ -90,11 +90,26 @@ def test_stage1_defaults_adapt_workers_to_node_and_support_16_ranks(tmp_path):
     assert args.n_jobs == 8
     assert args.prior_prefetch_factor == 8
     assert args.prior_in_order is False
-    assert args.prior_backend == "node_pool"
+    assert args.prior_backend == "dataloader"  # BF16 long-run default
     assert args.prior_pool_workers == 0
     assert args.prior_schedule == "none"  # one indivisible micro-batch per rank
     assert args.max_seq_len == 2048
     assert args.compile_frontend == "all" and args.compile_warmup
+
+
+@pytest.mark.parametrize("dtype,backend,schedule", [
+    ("float32", "node_pool", "balanced"), ("bfloat16", "dataloader", "none"),
+])
+def test_stage1_default_backend_follows_long_run_measurement(tmp_path, dtype, backend, schedule):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", NUM_GPUS="8", TRAIN_DTYPE=dtype,
+               CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
+    for key in ("PRIOR_BACKEND", "PRIOR_SCHEDULE"):
+        env.pop(key, None)
+    text = subprocess.check_output(["bash", str(root / "scripts/train_v2_clf_stage1.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert (args.prior_backend, args.prior_schedule) == (backend, schedule)
 
 
 @pytest.mark.parametrize("ranks,dtype,expected", [

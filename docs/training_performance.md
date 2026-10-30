@@ -5,9 +5,11 @@ and `COMPILE_WARMUP=True`. All remain environment overrides; for 16 GPUs set
 `NUM_GPUS=16`. FP32 uses `TRAIN_DTYPE=float32`, BF16 uses `bfloat16` (default).
 Optimizer compilation remains opt-in.
 
-Prior generation defaults to a quota-aware, shared `node_pool`. Stage1 uses
-`balanced` for FP32 when each rank has multiple micro-batches; BF16 and the
-one-micro-batch-per-rank case use completion-order `none`. Override with
+Stage1 FP32 defaults to a quota-aware, shared `node_pool`, using `balanced`
+when each rank has multiple micro-batches, otherwise completion-order `none`.
+Stage1 BF16 defaults to DataLoader: the 640-step measurement favored it over
+the shared pool. Set `PRIOR_BACKEND=node_pool` to experiment with BF16; its
+default schedule is `none`. Other curriculum scripts retain shared-pool defaults. Override with
 `PRIOR_SCHEDULE=balanced/round_robin/none`, or `PRIOR_BACKEND=dataloader`.
 See [the scheduling audit](training_schedule_20261030.md) for measured results,
 stage2/3 behavior and the limits of fixed-cohort balancing.

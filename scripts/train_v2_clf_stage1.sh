@@ -56,10 +56,19 @@ PRIOR_WORKERS=${PRIOR_WORKERS:-8}             # per-rank workers for the DataLoa
 PRIOR_PREFETCH_FACTOR=${PRIOR_PREFETCH_FACTOR:-8}
 PRIOR_IN_ORDER=${PRIOR_IN_ORDER:-False}       # DataLoader completion-order override
 source "$REPO_ROOT/scripts/icl_recipe.sh"
+# The 640-step BF16 comparison favored DataLoader; retain node_pool as an
+# explicit experiment. FP32 benefits from same-cohort workload balancing.
+if [[ -z "${PRIOR_BACKEND:-}" ]]; then
+    if [[ "$TRAIN_DTYPE" == float32 ]]; then
+        PRIOR_BACKEND=node_pool
+    else
+        PRIOR_BACKEND=dataloader
+    fi
+fi
 # BF16 is supply-bound here: fixed cohorts can cost more than balancing saves.
 # With one indivisible micro-batch per rank, reassignment cannot lower the max.
 # Keep an explicit override for controlled same-task comparisons.
-if [[ -z "${PRIOR_SCHEDULE:-}" && "${PRIOR_BACKEND:-node_pool}" == node_pool ]]; then
+if [[ -z "${PRIOR_SCHEDULE:-}" && "$PRIOR_BACKEND" == node_pool ]]; then
     if [[ "$TRAIN_DTYPE" != float32 ]] || (( BATCH_SIZE <= NUM_GPUS * MICRO_BATCH_SIZE )); then
         PRIOR_SCHEDULE=none
     else

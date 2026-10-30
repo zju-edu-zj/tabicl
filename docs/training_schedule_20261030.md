@@ -24,6 +24,17 @@ MATH 仍然是 FP32，但内核及浮点累加顺序不同，不保证逐位相�
 在 96 GiB 卡上 OOM，ROW-only MATH 约 1615 ms、native 约 1978 ms。
 这些是特定 micro-batch/模型/软件栈的结果，不能外推到所有设备。
 
+这里的“修改分派”是限制 `scaled_dot_product_attention` 可选的实现，不改 attention 公式。
+此安装版本公开的后端是 MATH、FLASH_ATTENTION、EFFICIENT_ATTENTION 和 CUDNN_ATTENTION；
+硬件、dtype、mask、stride 与 head dimension 决定哪些实际可用，枚举存在不代表该卡支持。
+外部 FA3 是项目包装函数的另一条路径，不等于这些原生枚举中的一个。
+MATH 将 attention 拆成矩阵乘法/softmax 等算子；融合后端旨在减少中间张量和访存，
+但在该 vendor 的 FP32 内核、这些形状上，实测融合路径反而较慢。
+因此这里采用硬件限定策略，而不把“融合一定快”或“MATH 一定快”当作通则。
+2048→4096 不只是算力问题：MATH 会显式物化部分 attention 中间张量，
+全模型峰值显存已经越过本机容量。FP32 路线保持 dtype；累加顺序差异与
+原先 FA3 的 FP32→FP16 转换是两种不同的数值影响，本次将后者禁用。
+
 每 rank 独立持有编译缓存，因此所有 rank 同时做三次前向和反向，最后 barrier。
 它们没有 optimizer/scheduler 更新，不取 prior，不计入训练步数，并恢复 RNG、buffer 和模块模式。
 8 rank × 3 不等于串行执行 24 个训练步。此节点已观察到约 30–31 秒启动预热时间；
@@ -43,8 +54,9 @@ stage2/3 的长表范围很宽，保留各自原来的编译/预热默认值；�
 | `round_robin` | 固定每步节点任务集合，保持原连续 local batch 分配 | 隔离均衡效果的对照 |
 | `balanced` | 同一集合内重新分配完整 micro-batch | 均衡每卡训练工作量 |
 
-Classifier Stage1 根据实测选择默认值：FP32 且每卡有多个 micro-batch 时为
-`balanced`；BF16 或每卡只有一个 micro-batch 时为 `none`。始终可以显式覆盖。
+Classifier Stage1 根据实测选择默认值：FP32 使用 node_pool，且每卡有多个 micro-batch 时为
+`balanced`，只有一个时为 `none`；BF16 默认 DataLoader。
+BF16 显式设 `PRIOR_BACKEND=node_pool` 时默认 `none`。始终可以显式覆盖。
 共享 recipe 在其他 curriculum 脚本默认 `balanced`，DataLoader 则默认 `none`。
 
 先按原 local batch 的 GP/subgroup 层次完整采样，采样本节点所有 rank 的任务组成一个 cohort。
@@ -129,6 +141,16 @@ stage2/3 使用 `--stage 2/3`，并设置真实前阶段的 `STAGE1_CKPT/STAGE2_
 BF16 首轮有短暂 CPU 测试干扰，因此还需要独占顺序复测，不据此承诺长期加速幅度。
 全程时间不能与省略前 20 步的训练段比例混用。相同任务分配对照也不是收敛实验。
 
+修正 proxy 后，完整测试结束再顺序运行 FP32 120 步对照，省略前 20 步：
+
+| 分配 | 最慢 rank 训练段均值 ms | 稳态 elapsed/step ms | 全程 s |
+|---|---:|---:|---:|
+| round_robin | 879.3 | 885.3 | 195.59 |
+| balanced | 717.9 | 725.7 | 176.15 |
+
+训练段减少 18.4%，稳态每步减少 18.0%，全程减少 9.9%；两个重复对照的方向一致。
+这是相同步任务集合的实际 8 卡训练，并非仅按 proxy 预测；仍然不是长期收敛试验。
+
 修正 proxy 后的 BF16 顺序复测（160 步，统计省略前 20 步）：
 
 | 供给/分配 | 最慢 rank 训练段均值 ms | 稳态 elapsed/step ms | 全程 s |
@@ -143,6 +165,23 @@ BF16 首轮有短暂 CPU 测试干扰，因此还需要独占顺序复测，不�
 共享池 none 的完整耗时比 DataLoader 少 16.3%，但此短测稳态并未改善；
 供给方式间的有限前缀任务也不同，不能据此宣称长期吞吐改善 16.3%。
 默认 BF16 不为这点均衡收益付固定 cohort 的队头阻塞代价。
+
+随后将 DataLoader 和 node_pool/none 都延长到 640 步，省略前 100 步统计：
+
+| 供给 | 最慢 rank 训练段均值 ms | 稳态 elapsed/step ms | 全程 s |
+|---|---:|---:|---:|
+| DataLoader | 663.7 | 657.7 | 537.82 |
+| node_pool / none | 809.6 | 820.9 | 601.16 |
+
+共享池全程反而增加 11.8%，稳态每步增加 24.8%；160 步时的启动优势没有转化为长期收益。
+因此最终 Stage1 BF16 默认改回 DataLoader，保留共享池用于显式实验；
+不能因为共享池架构或较短测试好看就把它设为默认。
+这是不同有限任务前缀的供给路线比较，不是相同任务的纯调度因果对照。
+DataLoader 为每 rank 8 个 worker（节点共 64），池为节点 56 个；这是实际 recipe 对照，
+不是等 worker 数的架构隔离实验。16 卡若选 DataLoader，原 `PRIOR_WORKERS=8` 会启动
+128 个生成进程，应按该节点 CPU quota 显式调整，不能把本机 8 卡最佳路线直接外推。
+所有 Stage1 短/长测沿用 5000 步学习率 warmup，未修改优化训练配方；
+这里只验证训练执行和吞吐，不代表模型完成预训练或质量等价。
 
 Stage2/3 的短测使用原范围和 micro_batch=1，BF16、无额外编译、禁用外部 FA3，
 验证原生 vendor SDPA 路径；都从同一架构的短 Stage1 checkpoint 只加载权重，
@@ -183,5 +222,35 @@ Stage3 短测稳态减少 21.6%，方向明确但只有 10 个测量步，不作
 而该 vendor 扩展也缺少 fullgraph 所需的 fake-tensor 支持。
 本次保持原有数值阈值，并未通过放宽误差断言让测试通过。
 
+完整测试在上述 vendor 环境执行 `python -m pytest -q -rs`，结果为
+**1067 passed、260 skipped、40 warnings、0 failed，640.20 秒**。
+跳过项为不可用的 XPU/MPS（249 项）、未安装 Docker（3 项）、未启用
+`SCIPY_ARRAY_API`（4 项），以及 sklearn 对非确定性估计器原有的跳过（4 项）。
+测试使用官方 classifier/regressor v2 checkpoint，本地缓存并通过
+`TABICL_CHECKPOINT_DIR` 提供；没有用随机权重替代需要预训练模型的检查。
+640 步 BF16 对照后，仅调整 Stage1 的 backend 默认选择；再运行 prior pipeline
+与 attention/warmup recipe 检查，结果为 **30 passed、0 failed，22.65 秒**。
+
+机器可读汇总见 `docs/benchmarks/training_schedule_20261030.json`。
+远程保留原始 run.json、config、逐步 metrics 与验证日志于
+`/ossfs/workspace/tabicl-perf-audit-20261030/current/`（归档不复制大型 checkpoint）。
+
 进一步收益应优先看 prior 长尾与供给/训练重叠，再看成本 proxy 的 GPU 实测校准。
 16 卡 Stage1 的一单元限制需要改变执行粒度才能突破；不能靠排序算法承诺解决。
+
+后续实验应按下面顺序推进（这些是后续方向，未作为本次已实现收益）：
+
+1. 记录单数据集生成时间、过滤/rejection 次数和算子耗时，区分 CPU 总产能不足与
+   个别长尾。优先继续优化距离计算、ExtraTrees 过滤的执行与临时内存；保持
+   采样分布、过滤阈值和接受规则，不通过丢弃慢任务换取速度。
+2. 用相同已生成任务做 GPU replay，采集每个 micro 的 CUDA event 时间和实际列宽/
+   行数/support，校准 FP32/BF16 各自的成本模型。现有 host `train_time` 包含 DDP
+   等待，不能直接作为单 micro 的独立计算成本训练模型。
+3. 分别测试 worker 数与输出预算，报告全程、稳态、内存、等待 p95/p99。
+   当前自动值是尊重 quota 的起点，不是证明过的最优值；同节点其他作业也会影响资源。
+4. 若固定 cohort 仍有显著队头阻塞，可研究“先按请求形状分配、结果到达后只做
+   安全交换”的早交付策略，或生成/过滤与传输的流水线。必须继续保证每步任务集合、
+   等数量、DDP collective 次数与 loss 权重，且实际计入调度/IPC 开销。
+5. 16 卡 Stage1 另测 `MICRO_BATCH_SIZE=2/1`、global batch 不变；用更细分配带来的
+   均衡收益对照更多 kernel launch、较低 batch 效率和 accumulation 开销。
+   Stage2/3 已是 micro=1，不能再依赖拆 micro；需要解决供给或单任务计算长尾。
