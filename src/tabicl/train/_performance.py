@@ -17,6 +17,39 @@ def resolve_attention_backend(policy, dtype, max_rows, device_name):
     return "fp32_math" if max_rows <= 2048 else "fp32_row_math"
 
 
+def frontend_warmup_shapes(cfg):
+    """Three admissible (rows, width, support) shapes, including one column.
+
+    Long-table priors cap widths by rows. Warming 60k x 100 when the actual
+    cap is 20 needlessly raises startup memory and can fail before training.
+    The midpoint also exercises the wider, medium-length part of that prior.
+    """
+    from tabicl.prior._dataset import Prior
+
+    rows = cfg.max_seq_len
+    cap = cfg.max_features
+    adaptive = (getattr(cfg, "seq_len_per_gp", False)
+                and getattr(cfg, "adaptive_feature_limit", True))
+    if adaptive:
+        cap = max(cfg.min_features, Prior.adjust_max_features(rows, cfg.max_features))
+    shapes = [(rows, cap), (rows, cfg.min_features),
+              (rows, max(cfg.min_features, int(.37 * cfg.max_features)))]
+    if cap < cfg.max_features:
+        middle = max(2, getattr(cfg, "min_seq_len", None) or 2, rows // 2)
+        middle_cap = max(cfg.min_features, Prior.adjust_max_features(middle, cfg.max_features))
+        shapes[2] = (middle, middle_cap)
+    result = []
+    for (length, width), position in zip(shapes, ("middle", "low", "high")):
+        low = int(cfg.min_train_size * length) if cfg.min_train_size < 1 else int(cfg.min_train_size)
+        high = int(cfg.max_train_size * length) if cfg.max_train_size < 1 else int(cfg.max_train_size)
+        low, high = max(1, low), min(length - 1, high)
+        if low > high:
+            raise ValueError("invalid warmup support interval")
+        support = low if position == "low" else high if position == "high" else (low + high) // 2
+        result.append((length, width, support))
+    return result
+
+
 def warmup_frontend(trainer):
     """Run three local shapes on every rank concurrently, without training steps.
 
@@ -35,19 +68,13 @@ def warmup_frontend(trainer):
     modes = [(m, m.training) for m in model.modules()]
     buffers = [(b, b.detach().clone()) for b in model.buffers()]
     np_state, py_state = np.random.get_state(), random.getstate()
-    rows = cfg.max_seq_len
-    low = int(cfg.min_train_size * rows) if cfg.min_train_size < 1 else int(cfg.min_train_size)
-    high = int(cfg.max_train_size * rows) if cfg.max_train_size < 1 else int(cfg.max_train_size)
-    low, high = max(1, low), min(rows - 1, high)
-    if low > high:
-        raise ValueError("invalid warmup support interval")
+    shapes = frontend_warmup_shapes(cfg)
     batch = min(cfg.batch_size, cfg.micro_batch_size)
-    widths = (cfg.max_features, cfg.min_features, max(cfg.min_features, int(.37 * cfg.max_features)))
     started = time.perf_counter()
     try:
         with torch.random.fork_rng(devices=cuda_devices):
             model.train()  # Match run_batch; restore individual modes below.
-            for width, support in zip(widths, ((low + high) // 2, low, high)):
+            for rows, width, support in shapes:
                 x = torch.randn(batch, rows, width, device=device)
                 y = (torch.randn(batch, rows, device=device) if trainer.regression else
                      torch.randint(0, cfg.max_classes, (batch, rows), device=device))
@@ -80,6 +107,7 @@ def warmup_frontend(trainer):
     if trainer.ddp:
         torch.distributed.barrier()
     result = dict(rank=trainer.ddp_rank, rounds=3, local_seconds=local_seconds,
-                  startup_seconds=time.perf_counter() - started, optimizer_updates=0)
+                  startup_seconds=time.perf_counter() - started, optimizer_updates=0,
+                  shapes=shapes)
     print(f"Compilation warmup: {result}", flush=True)
     return result

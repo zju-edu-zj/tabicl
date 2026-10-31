@@ -1,6 +1,9 @@
 from contextlib import nullcontext
 from types import SimpleNamespace
 import random
+import os
+from pathlib import Path
+import subprocess
 
 import numpy as np
 import pytest
@@ -8,7 +11,41 @@ import torch
 
 from tabicl._model.tabicl import TabICL
 from tabicl._model.attention import sdpa_with_flattened_batch
-from tabicl.train._performance import resolve_attention_backend, warmup_frontend
+from tabicl.train._performance import resolve_attention_backend, warmup_frontend, frontend_warmup_shapes
+
+
+@pytest.mark.parametrize("adaptive,expected", [
+    (True, [(60000, 20, 48000), (60000, 1, 47400), (30000, 60, 24300)]),
+    (False, [(60000, 100, 48000), (60000, 1, 47400), (60000, 37, 48600)]),
+])
+def test_long_table_warmup_uses_real_prior_support(adaptive, expected):
+    cfg = SimpleNamespace(max_seq_len=60000, min_seq_len=400, seq_len_per_gp=True,
+                          adaptive_feature_limit=adaptive, min_features=1, max_features=100,
+                          min_train_size=.79, max_train_size=.81)
+    assert frontend_warmup_shapes(cfg) == expected
+
+
+def test_warmup_rejects_invalid_fixed_support():
+    cfg = SimpleNamespace(max_seq_len=24, min_features=1, max_features=7,
+                          min_train_size=25, max_train_size=25)
+    with pytest.raises(ValueError, match="support interval"):
+        frontend_warmup_shapes(cfg)
+
+
+@pytest.mark.parametrize("dtype,compile_mode,expected", [
+    ("bfloat16", "all", "False"),
+    ("bfloat16", "none", "unset"),
+    ("float32", "none", "False"),
+])
+def test_compiled_recipe_avoids_external_flash_extension(dtype, compile_mode, expected):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, TRAIN_DTYPE=dtype, COMPILE_FRONTEND=compile_mode)
+    env.pop("USE_FLASH_ATTN3", None)
+    command = 'source scripts/performance_recipe.sh; printf "%s" "${USE_FLASH_ATTN3:-unset}"'
+    result = subprocess.check_output(["bash", "-c", command], cwd=root, env=env, text=True)
+    assert result == expected
+    env["USE_FLASH_ATTN3"] = "True"
+    assert subprocess.check_output(["bash", "-c", command], cwd=root, env=env, text=True) == "True"
 
 
 @pytest.mark.parametrize("dtype,rows,name,expected", [

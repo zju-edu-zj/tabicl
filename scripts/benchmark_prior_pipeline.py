@@ -101,7 +101,8 @@ class ReplayDataset(IterableDataset):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=("dataloader", "node_pool"), default="dataloader")
-    parser.add_argument("--schedule", choices=("none", "round_robin", "balanced", "window_fifo", "window_bucketed"), default="none")
+    parser.add_argument("--schedule", choices=("none", "round_robin", "balanced", "window_fifo", "window_bucketed", "shape_cohort"), default="none")
+    parser.add_argument("--adaptive-feature-limit", type=str2bool, default=True)
     parser.add_argument("--transport", choices=("numpy", "mmap"), default="numpy")
     parser.add_argument("--bucket-steps", type=int, default=4)
     parser.add_argument("--kernel-threads", type=int, default=1)
@@ -158,6 +159,7 @@ def main():
             use_corrected_cat_meta_sampling=args.corrected_cat_meta_sampling,
         ),
     )
+    prior.prior.adaptive_feature_limit = args.adaptive_feature_limit
     if args.payload_only:
         prior.prior = PayloadPrior(batch_size=args.batch_size,
                                    batch_size_per_gp=4 if args.stage == 1 else 1,
@@ -170,7 +172,7 @@ def main():
                                seed=42 + 100003 * int(os.environ.get("GROUP_RANK", 0)),
                                schedule=args.schedule, micro_size=4 if args.stage == 1 else 1,
                                transport=args.transport, bucket_steps=args.bucket_steps,
-                               kernel_threads=args.kernel_threads)
+                               kernel_threads=args.kernel_threads, shape_seed=42)
     else:
         if args.fixed_task_stream:
             if not args.in_order:

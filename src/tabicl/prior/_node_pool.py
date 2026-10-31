@@ -105,19 +105,22 @@ def iter_micro_batches(batch, size):
 
 class _Service:
     def __init__(self, prior, workers, window, byte_budget, seed, clients,
-                 schedule="none", micro_size=1, cost_model=None, transport="numpy", bucket_steps=4, kernel_threads=1):
+                 schedule="none", micro_size=1, cost_model=None, transport="numpy", bucket_steps=4, kernel_threads=1,
+                 shape_seed=None, start_step=0):
         self.signature = pickle.dumps((prior, workers, window, byte_budget, seed, clients,
-                                       schedule, micro_size, cost_model, transport, bucket_steps, kernel_threads))
+                                       schedule, micro_size, cost_model, transport, bucket_steps, kernel_threads,
+                                       shape_seed, start_step))
         self.prior, self.window, self.byte_budget = prior, window, byte_budget
         self.schedule, self.micro_size, self.cost_model = schedule, micro_size, cost_model or {}
         # Window policies assign from metadata before generation. A rank can
         # begin its GPU work once its OWN tables are ready, rather than waiting
         # for the node's slowest graph. Legacy policies retain actual-width
         # assignment after the complete cohort for controlled comparisons.
-        self.early_dispatch = schedule.startswith("window_")
+        self.early_dispatch = schedule.startswith("window_") or schedule == "shape_cohort"
         self.cohort_window = max(1, window // clients) if schedule != "none" else window
         self.last_schedule = {}
-        self.planner = TaskPlanner(prior, clients, micro_size, self.cost_model, seed, schedule, bucket_steps)
+        self.planner = TaskPlanner(prior, clients, micro_size, self.cost_model, seed, schedule, bucket_steps,
+                                   shape_seed=shape_seed, start_step=start_step)
         self.output = OutputStore(transport)
         self.leases = {}
         self.encoding_seconds = deque(maxlen=4096)
@@ -381,7 +384,8 @@ class NodePriorPool:
     """
     def __init__(self, prior, workers, window=128, byte_budget=2 * 1024**3,
                  seed=42, key=None, local_rank=None, local_world_size=None, timeout=180,
-                 schedule="none", micro_size=1, cost_model=None, transport="numpy", bucket_steps=4, kernel_threads=1):
+                 schedule="none", micro_size=1, cost_model=None, transport="numpy", bucket_steps=4, kernel_threads=1,
+                 shape_seed=None, start_step=0):
         if not isinstance(prior, GraphPrior) or str(prior.device) != "cpu":
             raise ValueError("node_pool requires online graph_scm on CPU")
         if min(workers, window, byte_budget) < 1:
@@ -391,7 +395,7 @@ class NodePriorPool:
         self.local_world = int(os.environ.get("LOCAL_WORLD_SIZE", 1)) if local_world_size is None else local_world_size
         if self.local_world < 1 or not 0 <= self.local_rank < self.local_world:
             raise ValueError("local rank must be within the positive local world size")
-        if schedule not in ("none", "round_robin", "balanced", "window_fifo", "window_bucketed") or micro_size < 1:
+        if schedule not in ("none", "round_robin", "balanced", "window_fifo", "window_bucketed", "shape_cohort") or micro_size < 1:
             raise ValueError("invalid prior scheduling settings")
         if transport not in ("numpy", "mmap") or min(bucket_steps, kernel_threads) < 1:
             raise ValueError("invalid transport, bucket_steps or kernel_threads")
@@ -408,7 +412,7 @@ class NodePriorPool:
         self.address = os.path.join(tempfile.gettempdir(), f"tabicl-prior-{digest}.sock")
         self.authkey = digest.encode()
         self.args = (prior, workers, window, byte_budget, seed, self.local_world, schedule, micro_size, cost_model,
-                     transport, bucket_steps, kernel_threads)
+                     transport, bucket_steps, kernel_threads, seed if shape_seed is None else shape_seed, start_step)
         self.timeout = timeout
         self.manager = self.service = None
 
@@ -462,7 +466,7 @@ class NodePriorPool:
         """Use a fresh stream on resume; exact task/optimizer-step replay is unsupported."""
         if self.service is not None:
             raise RuntimeError("cannot reseed an active node pool")
-        self.args = (*self.args[:4], self.args[4] + int(step), *self.args[5:])
+        self.args = (*self.args[:4], self.args[4] + int(step), *self.args[5:-1], int(step))
 
     def close(self):
         if self.service is None:

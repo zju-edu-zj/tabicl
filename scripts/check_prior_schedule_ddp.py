@@ -29,7 +29,7 @@ def loss(model, micro):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--schedule", choices=["balanced", "round_robin", "window_fifo", "window_bucketed"], default="balanced")
+    parser.add_argument("--schedule", choices=["balanced", "round_robin", "window_fifo", "window_bucketed", "shape_cohort"], default="balanced")
     parser.add_argument("--transport", choices=["numpy", "mmap"], default="numpy")
     parser.add_argument("--steps", type=int, default=1)
     parser.add_argument("--bucket-steps", type=int, default=2)

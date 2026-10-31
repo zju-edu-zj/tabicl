@@ -44,6 +44,7 @@ MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
 MAX_SEQ_LEN=${MAX_SEQ_LEN:-2048}
 COMPILE_FRONTEND=${COMPILE_FRONTEND:-all}
 COMPILE_WARMUP=${COMPILE_WARMUP:-True}
+ICL_PARTITION=${ICL_PARTITION:-content_tree}
 WARMUP_PROPORTION=${WARMUP_PROPORTION:--1}
 WARMUP_STEPS=${WARMUP_STEPS:-5000}
 INIT_CKPT=${INIT_CKPT:-}                     # first launch only; reset optimizer/step
@@ -56,8 +57,9 @@ PRIOR_WORKERS=${PRIOR_WORKERS:-8}             # per-rank workers for the DataLoa
 PRIOR_PREFETCH_FACTOR=${PRIOR_PREFETCH_FACTOR:-8}
 PRIOR_IN_ORDER=${PRIOR_IN_ORDER:-False}       # DataLoader completion-order override
 source "$REPO_ROOT/scripts/icl_recipe.sh"
-# The 640-step BF16 comparison favored DataLoader; retain node_pool as an
-# explicit experiment. FP32 benefits from same-cohort workload balancing.
+# The default is the measured fastest CPU-generation path for the long stages.
+# Stage 1 remains dtype-aware because its short, fixed-length BF16 workload was
+# faster through the DataLoader in the controlled comparison.
 if [[ -z "${PRIOR_BACKEND:-}" ]]; then
     if [[ "$TRAIN_DTYPE" == float32 ]]; then
         PRIOR_BACKEND=node_pool

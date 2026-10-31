@@ -235,8 +235,10 @@ def build_parser():
     )
     parser.add_argument("--prior_device", default="cpu", type=str, help="Device for prior data generation")
     parser.add_argument("--prior_backend", choices=("dataloader", "node_pool"), default="dataloader")
-    parser.add_argument("--prior_schedule", choices=("none", "round_robin", "balanced", "window_fifo", "window_bucketed"), default="none",
-                        help="Node-local equal-count rank assignment; window_* also presample bounded step windows")
+    parser.add_argument("--prior_schedule", choices=("none", "round_robin", "balanced", "window_fifo", "window_bucketed", "shape_cohort"), default="none",
+                        help="Rank assignment; window_* reorder metadata, shape_cohort shares a shape before generation across the global step")
+    parser.add_argument("--adaptive_feature_limit", type=str2bool, default=True,
+                        help="graph_scm: reduce feature caps for >10240 rows; False is an uncropped ablation")
     parser.add_argument("--prior_pool_transport", choices=("numpy", "mmap"), default="numpy",
                         help="Node-local output transfer: legacy NumPy RPC or tmpfs path descriptors")
     parser.add_argument("--prior_bucket_steps", type=int, default=4,
