@@ -95,6 +95,25 @@ def test_stage1_defaults_adapt_workers_to_node_and_support_16_ranks(tmp_path):
     assert args.prior_schedule == "none"  # one indivisible micro-batch per rank
     assert args.max_seq_len == 2048
     assert args.compile_frontend == "all" and args.compile_warmup
+    assert args.icl_partition == "content_tree"
+
+
+@pytest.mark.parametrize("stage,previous", [(2, "STAGE1_CKPT"), (3, "STAGE2_CKPT")])
+def test_classifier_long_stage_defaults_are_fast_and_content_tree(tmp_path, stage, previous):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", NUM_GPUS="8", CKPT_DIR=str(tmp_path),
+               **{previous: str(tmp_path / "input.ckpt")})
+    script = root / f"scripts/train_v2_clf_stage{stage}.sh"
+    text = subprocess.check_output(["bash", str(script)], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert args.prior_backend == "node_pool"
+    assert args.prior_schedule == "balanced"
+    assert args.prior_pool_transport == "numpy"
+    assert args.prior_pool_kernel_threads == 8
+    assert args.compile_frontend == "all" and args.compile_warmup
+    assert args.icl_partition == "content_tree"
+    assert args.micro_batch_size == 1
 
 
 @pytest.mark.parametrize("dtype,backend,schedule", [
