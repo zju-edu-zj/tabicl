@@ -178,7 +178,8 @@ class Prior:
 
     @staticmethod
     def sample_seq_len(
-            min_seq_len: Optional[int], max_seq_len: int, log: bool = False, replay_small: bool = False
+            min_seq_len: Optional[int], max_seq_len: int, log: bool = False, replay_small: bool = False,
+            rng=None,
     ) -> int:
         """
         Selects a random sequence length within the specified range.
@@ -207,27 +208,30 @@ class Prior:
         int
             The sampled sequence length
         """
+        rng = np.random if rng is None else rng
+        random_state = None if rng is np.random else rng
         if min_seq_len is None:
             return max_seq_len
 
         if log:
-            seq_len = int(loguniform.rvs(min_seq_len, max_seq_len))
+            seq_len = int(loguniform.rvs(min_seq_len, max_seq_len, random_state=random_state))
         else:
-            seq_len = np.random.randint(min_seq_len, max_seq_len)
+            seq_len = rng.randint(min_seq_len, max_seq_len)
 
         if replay_small:
-            p = np.random.random()
+            p = rng.random()
             if p < 0.05:
-                return np.random.randint(200, 1000)
+                return rng.randint(200, 1000)
             elif p < 0.3:
-                return int(loguniform.rvs(1000, 10000))
+                return int(loguniform.rvs(1000, 10000, random_state=random_state))
             else:
                 return seq_len
         else:
             return seq_len
 
     @staticmethod
-    def sample_train_size(min_train_size: Union[int, float], max_train_size: Union[int, float], seq_len: int) -> int:
+    def sample_train_size(min_train_size: Union[int, float], max_train_size: Union[int, float], seq_len: int,
+                          rng=None) -> int:
         """
         Selects a random training size within the specified range.
 
@@ -257,10 +261,11 @@ class Prior:
         ValueError
             If training size range has incompatible types
         """
+        rng = np.random if rng is None else rng
         if isinstance(min_train_size, int) and isinstance(max_train_size, int):
-            train_size = np.random.randint(min_train_size, max_train_size)
-        elif isinstance(min_train_size, float) and isinstance(min_train_size, float):
-            train_size = np.random.uniform(min_train_size, max_train_size)
+            train_size = rng.randint(min_train_size, max_train_size)
+        elif isinstance(min_train_size, float) and isinstance(max_train_size, float):
+            train_size = rng.uniform(min_train_size, max_train_size)
             train_size = int(seq_len * train_size)
         else:
             raise ValueError("Invalid training size range.")
@@ -989,7 +994,7 @@ class GraphPrior(Prior):
             return x, y.squeeze(0), d.squeeze(0)
 
     @torch.no_grad()
-    def sample_parameters(self, batch_size: Optional[int] = None) -> List[Dict[str, Any]]:
+    def sample_parameters(self, batch_size: Optional[int] = None, *, shape=None) -> List[Dict[str, Any]]:
         """Sample one batch's parameters, preserving all group correlations.
 
         Length/split are shared by group (or globally), feature count by
@@ -997,6 +1002,14 @@ class GraphPrior(Prior):
         Execution order is separate from this sampling hierarchy.
         """
         batch_size = batch_size or self.batch_size
+
+        if shape is not None:
+            self.validate_shape(shape)
+            # Only the conditioning variables are shared. Graphs, classes,
+            # rejection loops and task RNGs remain independent per dataset.
+            return [dict(regression=self.regression, device=self.device, config=self.config,
+                         **shape, num_classes=None if self.regression else
+                         np.random.randint(2, self.max_classes + 1)) for _ in range(batch_size)]
 
         # Calculate number of groups and subgroups
         size_per_gp = min(self.batch_size_per_gp, batch_size)
@@ -1030,7 +1043,7 @@ class GraphPrior(Prior):
                 )
                 gp_train_size = self.sample_train_size(self.min_train_size, self.max_train_size, gp_seq_len)
                 # Adjust max features based on seq_len for this group
-                gp_max_features = self.adjust_max_features(gp_seq_len, self.max_features)
+                gp_max_features = self.feature_limit(gp_seq_len)
             else:
                 gp_seq_len = global_seq_len
                 gp_train_size = global_train_size
@@ -1047,7 +1060,7 @@ class GraphPrior(Prior):
                     break
 
                 # Each subgroup shares the same number of features
-                if self.log_n_features:
+                if self.log_n_features and self.min_features < gp_max_features:
                     subgp_num_features = int(loguniform.rvs(self.min_features, gp_max_features))
                 else:
                     subgp_num_features = round(np.random.uniform(self.min_features, gp_max_features))
@@ -1090,6 +1103,34 @@ class GraphPrior(Prior):
                     param_list.append(params)
 
         return param_list
+
+    def feature_limit(self, seq_len):
+        return (max(self.min_features, self.adjust_max_features(seq_len, self.max_features))
+                if getattr(self, "adaptive_feature_limit", True) else self.max_features)
+
+    def sample_shape(self, rng):
+        """Draw the original single-table shape law from an isolated RNG.
+
+        Sharing this draw changes within-step correlations, not task marginals.
+        It is intentionally independent of graph/class/node-local randomness.
+        """
+        rows = self.sample_seq_len(self.min_seq_len, self.max_seq_len, log=self.log_seq_len,
+                                   replay_small=self.replay_small, rng=rng)
+        split = self.sample_train_size(self.min_train_size, self.max_train_size, rows, rng=rng)
+        cap = self.feature_limit(rows) if self.seq_len_per_gp else self.max_features
+        if self.log_n_features and self.min_features < cap:
+            width = int(loguniform.rvs(self.min_features, cap, random_state=rng))
+        else:
+            width = round(rng.uniform(self.min_features, cap))
+        return dict(seq_len=int(rows), train_size=int(split), max_features=int(cap), num_features=int(width))
+
+    def validate_shape(self, shape):
+        if set(shape) != {"seq_len", "train_size", "max_features", "num_features"}:
+            raise ValueError("shape requires exactly rows, split, feature count and feature cap")
+        if (any(not isinstance(v, (int, np.integer)) for v in shape.values()) or
+                not 0 < shape["train_size"] < shape["seq_len"] or
+                not self.min_features <= shape["num_features"] <= shape["max_features"] <= self.max_features):
+            raise ValueError("invalid cohort shape")
 
     @torch.no_grad()
     def get_batch(self, batch_size: Optional[int] = None) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:

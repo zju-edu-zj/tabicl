@@ -1,10 +1,11 @@
-"""Metadata-only finite-window planner. Never selects by completion time.
+"""Metadata-only window/cohort planner. Never selects by completion time.
 
-Identity and random seed precede reordering. Each disjoint window is drained
-exactly once; every task's optimizer-step displacement is at most window-1.
-Only parameters are buffered here: generation/output memory admission is a
-separate concern. A micro-batch stays intact; cross-micro group correlations
-are retained statistically, but may now span optimizer steps.
+Identity and random seed precede reordering. Window policies drain each disjoint
+window exactly once, preserve sampled parameters and keep each micro intact;
+optimizer-step displacement is at most window-1. Cohort policies instead share
+a shape before sampling task parameters: they preserve the single-table shape
+law while changing between-table correlations. Only parameters are buffered
+here; generation/output memory admission is a separate concern.
 """
 from collections import deque
 from dataclasses import dataclass
@@ -54,12 +55,18 @@ class PlannedBatch:
 
 
 class TaskPlanner:
-    def __init__(self, prior, ranks, micro_size, model, seed, schedule, bucket_steps=4):
+    def __init__(self, prior, ranks, micro_size, model, seed, schedule, bucket_steps=4,
+                 shape_seed=None, start_step=0):
         if min(ranks, micro_size, bucket_steps) < 1:
             raise ValueError("planner sizes must be positive")
         self.prior, self.ranks, self.micro_size = prior, ranks, micro_size
         self.model, self.seed, self.schedule = model, seed, schedule
         self.bucket_steps = bucket_steps
+        # A common seed/step on EVERY node; graph seeds stay node-specific.
+        self.shape_seed = seed if shape_seed is None else shape_seed
+        self.start_step = start_step
+        if min(self.shape_seed, start_step) < 0:
+            raise ValueError("shape seed and start step must be nonnegative")
         self.next_task = self.next_window = 0
         self.ready = deque()
         self.stats = {}
@@ -70,8 +77,14 @@ class TaskPlanner:
             count = self.bucket_steps if self.schedule.startswith("window_") else 1
             params = []
             for _ in range(count):
+                shape = None
+                if self.schedule == "shape_cohort":
+                    rng = np.random.RandomState(np.random.SeedSequence(
+                        [0xC040, self.shape_seed, self.start_step + self.next_window]).generate_state(1)[0])
+                    shape = self.prior.sample_shape(rng)
                 for _ in range(self.ranks if self.schedule != "none" else 1):
-                    params.extend(self.prior.sample_parameters())
+                    params.extend(self.prior.sample_parameters(shape=shape) if shape is not None
+                                  else self.prior.sample_parameters())
             ids = list(range(self.next_task, self.next_task + len(params)))
             self.next_task += len(params)
             step_size = self.prior.batch_size * (self.ranks if self.schedule != "none" else 1)
@@ -90,5 +103,7 @@ class TaskPlanner:
             self.stats.update(planned_windows=self.next_window, sampled_tasks=self.next_task,
                               metadata_tasks=len(params), window_steps=count,
                               window_planning_ms=(time.perf_counter()-started)*1000)
+            if self.schedule == "shape_cohort":
+                self.stats.update({f"cohort_{k}": v for k, v in shape.items()})
             self.ready.extend(PlannedBatch([params[i] for i in g], [ids[i] for i in g]) for g in groups)
         return self.ready.popleft()

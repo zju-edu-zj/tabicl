@@ -429,6 +429,9 @@ class Trainer:
                 device=self.config.prior_device,
             )
 
+        if self.config.prior_dir is None and self.config.prior_type == "graph_scm":
+            dataset.prior.adaptive_feature_limit = getattr(self.config, "adaptive_feature_limit", True)
+
         if self.master_process:
             print(dataset)
 
@@ -446,6 +449,7 @@ class Trainer:
                 cost_model={**self.model_config, "col_feature_group_size": self.config.col_feature_group_size},
                 transport=self.config.prior_pool_transport, bucket_steps=self.config.prior_bucket_steps,
                 kernel_threads=self.config.prior_pool_kernel_threads,
+                shape_seed=self.config.np_seed,
             )
             if self.master_process:
                 print(f"Prior pipeline: node_pool workers/node={workers}, CPU quota/affinity={available}, "
@@ -743,7 +747,7 @@ class Trainer:
         for step in step_progress:
             # Get the next batch
             with Timer() as prior_timer:
-                batch = next(dataloader)
+                batch = self.fetch_batch(dataloader)
             prior_time = prior_timer.elapsed
 
             # Train the model on the batch
@@ -804,6 +808,10 @@ class Trainer:
                 self.validate_screen()
         if self.master_process and self.curr_step > 0:
             self.save_checkpoint(f"step-{self.curr_step}.ckpt")
+
+    def fetch_batch(self, iterator):
+        """Fetch one complete local batch; also a profiling boundary."""
+        return next(iterator)
 
     def validate_screen(self):
         """Rank zero evaluates without DDP collectives; other ranks wait."""
@@ -1007,9 +1015,7 @@ class Trainer:
         micro_X, micro_y = self.align_micro_batch(micro_X, micro_y, micro_d, seq_len)
 
         # Move to device
-        micro_X = micro_X.to(self.config.device, non_blocking=True)
-        micro_y = micro_y.to(self.config.device, non_blocking=True)
-        micro_d = micro_d.to(self.config.device, non_blocking=True)
+        micro_X, micro_y, micro_d = self.move_micro_batch(micro_X, micro_y, micro_d)
 
         y_train = micro_y[:, :train_size]
         y_test = micro_y[:, train_size:]
@@ -1087,6 +1093,10 @@ class Trainer:
                 if getattr(self.config, "fail_fast", False) and not torch.isfinite(grad_rms):
                     raise FloatingPointError(f"Non-finite ICL projection gradient: {name}")
         return micro_results
+
+    def move_micro_batch(self, x, y, d):
+        """Transfer a complete aligned micro-batch; also a profiling boundary."""
+        return tuple(t.to(self.config.device, non_blocking=True) for t in (x, y, d))
 
     @staticmethod
     def _gradient_statistics(parameters):

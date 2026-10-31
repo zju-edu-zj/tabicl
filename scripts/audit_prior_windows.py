@@ -14,6 +14,7 @@ import torch
 
 from tabicl.prior._dataset import GraphPrior
 from tabicl.prior._task_plan import TaskPlanner, bucket_window
+from tabicl.prior._scheduling import micro_cost, balanced_partition
 from tabicl.prior.graph_lib._config import PriorConfig
 
 
@@ -38,10 +39,20 @@ def audit(stage, ranks, args):
                            cauchy_dag_offset=0.))
     planner = TaskPlanner(prior, ranks, micro, {}, args.seed, "window_fifo", args.bucket_steps)
     records = []
+    random_makespan = balanced_makespan = ideal = 0.
     for _ in range(args.windows):
         params = [p for _ in range(args.bucket_steps) for p in planner.next().params]
         _, stats = bucket_window(params, micro, local, ranks, {})
         records.append(stats)
+        for start in range(0, len(params), local*ranks):
+            step = params[start:start+local*ranks]
+            requested = [(None, None, p["num_features"]) for p in step]
+            costs = [micro_cost(step, requested, list(range(i, i+micro)), {})
+                     for i in range(0, len(step), micro)]
+            slots = local//micro
+            random_makespan += max(sum(costs[r*slots:(r+1)*slots]) for r in range(ranks))
+            balanced_makespan += max(sum(costs[i] for i in group) for group in balanced_partition(costs, ranks))
+            ideal += sum(costs)/ranks
     before = sum(r["window_predicted_before"] for r in records)
     after = sum(r["window_predicted_after"] for r in records)
     return dict(stage=stage, ranks=ranks, global_batch=args.global_batch,
@@ -50,7 +61,13 @@ def audit(stage, ranks, args):
                 predicted_gain=before/max(after, 1.),
                 window_gain_p50=float(np.median([r["window_predicted_gain"] for r in records])),
                 window_gain_max=max(r["window_predicted_gain"] for r in records),
-                seed=args.seed, requested_features=True)
+                seed=args.seed, requested_features=True,
+                random_to_ideal_ratio=random_makespan/ideal,
+                balanced_to_ideal_ratio=balanced_makespan/ideal,
+                # A bound under THIS MAC proxy, not a speedup promise.
+                # Cohorts also change samples/correlations.
+                balanced_excess_fraction=1-ideal/balanced_makespan,
+                shape_cohort_requested_shape_imbalance=1.0)
 
 
 def main():

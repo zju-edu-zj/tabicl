@@ -7,7 +7,8 @@ set -euo pipefail
 # samples for training, max LR 2e-5, gradient clipping 1. Continues from the Stage 2
 # checkpoint (weights only). Gradient checkpointing is off (--recompute False; the
 # reference run on H200s did not need it) -- set it to True if the largest datasets
-# do not fit in your GPU memory. FlashAttention-3 is enabled (--use_flash_attn3 True).
+# do not fit in your GPU memory. Compiled frontends default to native SDPA;
+# compatible external FlashAttention-3 builds can opt in via USE_FLASH_ATTN3=True.
 #
 # Adjust the placeholder paths and --nproc_per_node / --n_jobs for your hardware.
 
@@ -16,8 +17,8 @@ export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
 NUM_GPUS=${NUM_GPUS:-8}                                   # override for 16-GPU runs
 
-# Fast default: overlap graph generation with training and balance one
-# micro-batch per rank by predicted model cost. Every value remains overridable
+# Fast default: overlap graph generation with training and balance accumulated
+# micro-batches across ranks by predicted model cost. Every value remains overridable
 # from the environment for ablations and smaller machines.
 TRAIN_DTYPE=${TRAIN_DTYPE:-bfloat16}
 COMPILE_FRONTEND=${COMPILE_FRONTEND:-all}

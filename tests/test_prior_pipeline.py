@@ -179,4 +179,4 @@ def test_precision_recipe_and_dataloader_escape_hatch(tmp_path, stage, dtype):
     args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
     assert args.dtype == dtype and args.attention_backend == "auto"
     assert args.prior_backend == "dataloader" and args.prior_schedule == "none"
-    assert args.use_flash_attn3 == (dtype == "bfloat16" and stage > 1)
+    assert not args.use_flash_attn3  # Compiled frontends use native SDPA.

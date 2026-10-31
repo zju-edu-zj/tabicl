@@ -5,8 +5,8 @@ set -euo pipefail
 #
 # Stage 2: 40K steps on datasets with 400-10,240 samples (log-uniform), 79-81% of
 # samples for training, max LR 1e-4, gradient clipping 10. Continues from the Stage 1
-# checkpoint (weights only). FlashAttention-3 is enabled (--use_flash_attn3 True)
-# for stages 2 & 3 only.
+# checkpoint (weights only). Compiled frontends default to native SDPA;
+# compatible external FlashAttention-3 builds can opt in via USE_FLASH_ATTN3=True.
 #
 # Adjust the placeholder paths and --nproc_per_node / --n_jobs for your hardware.
 
@@ -15,8 +15,8 @@ export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
 NUM_GPUS=${NUM_GPUS:-8}                                   # override for 16-GPU runs
 
-# Fast default: overlap graph generation with training and balance one
-# micro-batch per rank by predicted model cost. Every value remains overridable
+# Fast default: overlap graph generation with training and balance accumulated
+# micro-batches across ranks by predicted model cost. Every value remains overridable
 # from the environment for ablations and smaller machines.
 TRAIN_DTYPE=${TRAIN_DTYPE:-bfloat16}
 COMPILE_FRONTEND=${COMPILE_FRONTEND:-all}

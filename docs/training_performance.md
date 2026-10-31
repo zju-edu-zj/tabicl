@@ -1,5 +1,11 @@
 # Training performance controls
 
+See [the shape-cohort/profile audit](shape_cohort_profile_20261031.md) for
+generation-before-conditioning scheduling, crop/no-crop CPU diagnostics, and
+the reproducible per-rank GPU profile matrix. Two-seed target-device results
+show mixed gains, so the new schedule remains opt-in; training quality is not
+yet validated.
+
 `train_v2_clf_stage1.sh` defaults to 2048 rows, eight GPUs, `COMPILE_FRONTEND=all`
 and `COMPILE_WARMUP=True`. All remain environment overrides; for 16 GPUs set
 `NUM_GPUS=16`. FP32 uses `TRAIN_DTYPE=float32`, BF16 uses `bfloat16` (default).
@@ -20,6 +26,10 @@ MATH SDPA; longer sequences use MATH only in ROW attention to limit materialized
 attention-weight memory. For this recipe, induced COL attention scales with
 rows × inducing slots × columns; it is not dense quadratic attention over rows.
 BF16 and other hardware retain native dispatch.
+Compiled classifier scripts default to `USE_FLASH_ATTN3=False`: the external
+vendor FA3 extension lacks FakeTensor support and fails during compilation.
+Native SDPA still selects its fused backend for BF16. An explicit external-FA3
+override remains available for compatible environments.
 Overrides: `native`, `fp32_math`, `fp32_row_math`. Explicit FP32 math policies
 require `USE_FLASH_ATTN3=False`; external FA3 would otherwise cast FP32 to FP16.
 MATH changes accumulation order and therefore rounding, without downcasting.
