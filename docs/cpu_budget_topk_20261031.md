@@ -128,7 +128,7 @@ python scripts/profile_graph_generation.py --stage 3 --tasks 512 \
 | Stage3 BF16，裁列，fast | 4.235 s | 2.189 s | 1.591 s | 176.1 / step | 1.546 s | 28.40 s |
 | Stage3 BF16，不裁列，fast | 5.543 s | 2.591 s | 1.911 s | 210.4 / step | 2.400 s | 33.72 s |
 
-逐步分布比均值更重要：Stage3 裁列 fast 的 step wall P50/P95/max 为 2.745/12.124/20.684 s，CPU stall P50/P95/max 为 0/9.784/18.522 s；这正是 rank barrier 下长尾表决定 step 的证据。Stage3 不裁列不仅 GPU activity 增加，CPU 核秒和共同 stall 也分别增加约 19% 和 55%，因此主要问题仍是 CPU 图供给长尾，而不是 centroid 路由本身。
+逐步分布比均值更重要（线性插值分位数；30 步，未裁列场景 20 步）：Stage2 裁列 fast 的 step wall P50/P95/max 为 1.471/2.134/2.203 s，CPU stall 均为 0；Stage3 裁列 reference 为 2.599/6.072/48.081 s、stall 为 0/3.035/45.914 s；Stage3 裁列 fast 为 2.745/13.438/20.684 s、stall 为 0/11.084/18.522 s；Stage3 不裁列 fast 为 3.349/15.050/32.416 s、stall 为 0/12.417/29.816 s。reference 的最大值包含单次 45.9 秒共同供给空档，说明 30 步平均值会被极端慢图显著影响。Stage3 不裁列不仅 GPU activity 增加，CPU 核秒和共同 stall 均值也分别增加约 19% 和 55%，因此主要问题仍是 CPU 图供给长尾，而不是 centroid 路由本身。
 
 无 trace 的 80-step 对照中，Stage3 BF16 seed42 fast/reference 为 3.431/3.437 s/step；seed43 fast/reference 为 3.191/3.564 s/step。Stage2 BF16 fast/reference 为 1.346/1.360 s/step。Stage2 FP32 fast/reference 为 1.618/1.571 s/step，差异方向不稳定，不能归因于路由优化。路由 microbenchmark（24 cases、20 repeats）在 60k rows/375 leaves 上约 9.44 ms vs 33.45 ms（BF16），在 2048 rows/128 leaves 上约 0.224 ms vs 0.427 ms；实际训练收益被 CPU 长尾、预取和其他 ICL kernel 稀释。
 
