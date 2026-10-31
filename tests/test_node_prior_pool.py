@@ -121,6 +121,13 @@ def test_node_pool_shared_workers_bounded_queue_and_cleanup(tmp_path):
             peer.start()
             for _ in range(3):
                 batch = next(pool)
+                timing = pool.last_batch_timing
+                assert timing["tasks"] == len(batch[2])
+                assert timing["process_cpu_s"] > 0 and timing["task_wall_s"] > 0
+                assert (timing["submitted_monotonic_s"] <= timing["first_generation_monotonic_s"]
+                        <= timing["generation_ready_monotonic_s"] <= timing["payload_ready_monotonic_s"])
+                assert timing["rpc_s"] >= timing["service_wait_s"] >= 0
+                assert timing["dispatch_generation_ready_monotonic_s"] >= timing["generation_ready_monotonic_s"]
                 assert len(batch[0]) == 4
                 assert torch.equal(batch[3][::2], batch[3][1::2])
                 for x, y, d, length in zip(*batch[:4]):

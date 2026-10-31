@@ -6,6 +6,7 @@ kernel-only attribution. Rank maxima of wait+train are step diagnostics, not an
 independent decomposition of exposed CPU wait and DDP wait.
 """
 import argparse
+import csv
 from collections import defaultdict
 import json
 from pathlib import Path
@@ -38,6 +39,10 @@ def summarize(directory, skip, expected_ranks=None):
     table_count = 0
     rank_steps = []
     workloads = defaultdict(float)
+    gpu_steps = {}
+    for path in sorted(directory.glob("rank[0-9]*-trace-summary.json")):
+        rank = int(path.name.split("-", 1)[0][4:])
+        gpu_steps[rank] = json.loads(path.read_text()).get("optimizer_steps", {})
     for rows in by_step.values():
         rank_steps.append(dict(step=next(iter(rows.values()))["step"],
                               wait_train_max_s=max(r["prior_wait_s"]+r["train_wall_s"] for r in rows.values()),
@@ -48,6 +53,32 @@ def summarize(directory, skip, expected_ranks=None):
             rank_steps[-1]["aligned_step_span_s"] = (
                 max(r["train_end_monotonic_s"] for r in rows.values())
                 - min(r["prior_start_monotonic_s"] for r in rows.values()))
+        if all(r.get("cpu_generation") for r in rows.values()):
+            timing = [r["cpu_generation"] for r in rows.values()]
+            detail = rank_steps[-1]
+            detail["cpu_generation_core_s"] = sum(t["process_cpu_s"] for t in timing)
+            detail["cpu_generation_span_s"] = (max(t["generation_ready_monotonic_s"] for t in timing)
+                                               - min(t["first_generation_monotonic_s"] for t in timing))
+            detail["cpu_submit_to_ready_s"] = (max(t["generation_ready_monotonic_s"] for t in timing)
+                                               - min(t["submitted_monotonic_s"] for t in timing))
+            ready = [t.get("dispatch_generation_ready_monotonic_s", t["generation_ready_monotonic_s"])
+                     for t in timing]
+            waits = [max(0., end-r["prior_start_monotonic_s"])
+                     for end, r in zip(ready, rows.values())]
+            detail["generation_wait_rank_max_s"] = max(waits)
+            detail["generation_wait_rank_mean_s"] = float(np.mean(waits))
+            # A conservative exposed stall: all ranks have finished the previous
+            # step, none has started this model, and every rank still lacks data.
+            detail["generation_wait_all_ranks_s"] = max(0., min(
+                min(ready),
+                min(r["train_start_monotonic_s"] for r in rows.values()))
+                - max(r["prior_start_monotonic_s"] for r in rows.values()))
+            detail["input_service_wait_max_s"] = max(t["service_wait_s"] for t in timing)
+        step = rank_steps[-1]["step"]
+        if all(str(step) in gpu_steps.get(rank, {}) for rank in rows):
+            for key in ("kernel_busy_union_ms", "communication_busy_union_ms", "activity_busy_union_ms"):
+                rank_steps[-1][f"gpu_{key.removesuffix('_ms')}_rank_max_s"] = max(
+                    gpu_steps[rank][str(step)].get(key, 0.) for rank in rows)/1000
         for row in rows.values():
             if row["oom_micro_batches"]:
                 raise ValueError("OOM-skipped tasks invalidate the performance comparison")
@@ -83,7 +114,8 @@ def summarize(directory, skip, expected_ranks=None):
                 workload_totals=dict(workloads),
                 workload_mean_per_table={k: v/max(workloads["tables"], 1) for k, v in workloads.items()
                                          if k != "tables"},
-                step_mean={k: float(np.mean([s[k] for s in rank_steps])) for k in rank_steps[0] if k != "step"},
+                step_mean={k: float(np.mean([s[k] for s in rank_steps if k in s]))
+                           for k in set().union(*(s.keys() for s in rank_steps)) if k != "step"},
                 steps_detail=rank_steps,
                 notes="CUDA stream boundaries include CPU submission gaps; column backward includes DDP tail; use trace for kernel-only costs")
 
@@ -94,9 +126,16 @@ if __name__ == "__main__":
     parser.add_argument("--skip", type=int, default=10)
     parser.add_argument("--expected-ranks", type=int)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--csv-output", type=Path, help="write one row per optimizer step")
     args = parser.parse_args()
     result = summarize(args.directory, args.skip, args.expected_ranks)
     text = json.dumps(result, indent=2)+"\n"
     if args.output:
         args.output.write_text(text)
+    if args.csv_output:
+        rows = result["steps_detail"]
+        with args.csv_output.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, sorted(set().union(*(r.keys() for r in rows))))
+            writer.writeheader()
+            writer.writerows(rows)
     print(text)

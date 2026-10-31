@@ -180,8 +180,60 @@ def test_kineto_summary_preserves_nested_attribution_and_overlapping_streams(tmp
         module.summarize(path)
 
 
-@pytest.mark.parametrize("stage,dtype,profile", [(2, "bfloat16", False), (3, "float32", True)])
-def test_benchmark_launch_preserves_real_recipe_and_cohort_flags(tmp_path, monkeypatch, stage, dtype, profile):
+def test_step_report_separates_prefetched_work_exposed_wait_and_gpu_busy(tmp_path):
+    module = script("summarize_pipeline_profile")
+    for rank in range(2):
+        row = dict(step=4, rank=rank, prior_wait_s=2, prior_start_monotonic_s=10.,
+                   train_start_monotonic_s=12., train_end_monotonic_s=15., train_wall_s=3,
+                   train_stream_ms=3000, oom_micro_batches=0, loss=1.,
+                   cpu_generation=dict(process_cpu_s=5, first_generation_monotonic_s=5.,
+                                       generation_ready_monotonic_s=11., submitted_monotonic_s=4.,
+                                       service_wait_s=1.),
+                   micros=[dict(micro_size=1, col_forward_ms=1, row_forward_ms=1, icl_forward_ms=2,
+                                icl_backward_ms=2, row_backward_ms=1, col_backward_and_sync_ms=1)])
+        (tmp_path / f"rank{rank}.jsonl").write_text(json.dumps(row)+"\n")
+        trace = dict(optimizer_steps={"4": dict(kernel_busy_union_ms=2000,
+                                              communication_busy_union_ms=500, activity_busy_union_ms=2400)})
+        (tmp_path / f"rank{rank}-trace-summary.json").write_text(json.dumps(trace))
+    step = module.summarize(tmp_path, 0)["steps_detail"][0]
+    assert step["cpu_generation_core_s"] == 10
+    assert step["cpu_generation_span_s"] == 6
+    assert step["cpu_submit_to_ready_s"] == 7
+    assert step["generation_wait_rank_max_s"] == step["generation_wait_all_ranks_s"] == 1
+    assert step["gpu_kernel_busy_union_rank_max_s"] == 2
+    assert step["gpu_activity_busy_union_rank_max_s"] == 2.4
+    # A balanced rank can have its own tables ready before the cohort finishes;
+    # this wait is still caused by data generation, not transport.
+    path = tmp_path / "rank0.jsonl"
+    row = json.loads(path.read_text())
+    row["cpu_generation"]["generation_ready_monotonic_s"] = 9.
+    row["cpu_generation"]["dispatch_generation_ready_monotonic_s"] = 11.
+    path.write_text(json.dumps(row)+"\n")
+    step = module.summarize(tmp_path, 0)["steps_detail"][0]
+    assert step["generation_wait_rank_mean_s"] == step["generation_wait_all_ranks_s"] == 1
+
+
+def test_trace_attributes_kernel_and_communication_to_optimizer_step(tmp_path):
+    module = script("summarize_kineto_trace")
+    events = [dict(ph="X", cat="user_annotation", name="tabicl/optimizer_step/4", pid=1, tid=1, ts=0, dur=100),
+              dict(ph="X", cat="cpu_op", name="aten::mm", pid=1, tid=1, ts=5, dur=2,
+                   args={"External id": 5}),
+              dict(ph="X", cat="kernel", name="gemm", pid=0, tid=7, ts=10, dur=40,
+                   args={"External id": 5, "device": 0}),
+              dict(ph="X", cat="cuda_runtime", name="launch", pid=1, tid=1, ts=7, dur=1,
+                   args={"correlation": 9}),
+              dict(ph="X", cat="kernel", name="lcclAllReduce", pid=0, tid=8, ts=30, dur=50,
+                   args={"correlation": 9, "device": 0})]
+    path = tmp_path / "trace.json"
+    path.write_text(json.dumps(dict(traceEvents=events)))
+    result = module.summarize(path)["optimizer_steps"]["4"]
+    assert result == dict(kernel_busy_union_ms=.04, communication_busy_union_ms=.05, activity_busy_union_ms=.07)
+
+
+@pytest.mark.parametrize("stage,dtype,profile,reference", [
+    (2, "bfloat16", False, False), (3, "float32", True, False),
+    (3, "bfloat16", False, True), (2, "float32", True, True)])
+def test_benchmark_launch_preserves_real_recipe_and_cohort_flags(tmp_path, monkeypatch, stage, dtype, profile, reference):
     module = script("benchmark_training_schedule")
     root = Path(__file__).resolve().parents[1]
     env = dict(os.environ, DRY_RUN="1", NUM_GPUS="16", PRIOR_BACKEND="node_pool", PRIOR_SCHEDULE="shape_cohort",
@@ -196,6 +248,8 @@ def test_benchmark_launch_preserves_real_recipe_and_cohort_flags(tmp_path, monke
             "--steps", "30", "--output", str(tmp_path)]
     if profile:
         argv += ["--profile-pipeline", "--trace-all-ranks", "--trace-step", "20", "--shape-prior"]
+    if reference:
+        argv += ["--reference-centroid-topk", "--shape-prior"]
     monkeypatch.setattr(sys, "argv", argv)
     with pytest.raises(SystemExit) as error:
         module.main()
@@ -206,6 +260,11 @@ def test_benchmark_launch_preserves_real_recipe_and_cohort_flags(tmp_path, monke
         own = script("profile_training_pipeline")
         options, flags = own.profile_parser().parse_known_args(command[entry+1:])
         assert options.trace_all_ranks and options.profile_shape_prior
+        assert options.reference_centroid_topk == reference
+    elif reference:
+        entry = command.index(str(root / "scripts/train_reference_centroid_topk.py"))
+        flags = command[entry+1:]
+        assert flags.pop() == "--shape-prior"
     else:
         flags = command[command.index("tabicl.train")+1:]
     config = build_parser().parse_args(flags)

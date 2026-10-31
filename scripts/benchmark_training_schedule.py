@@ -26,6 +26,8 @@ def main():
     parser.add_argument("--trace-step", type=int, default=-1, help="Optional rank-0 Kineto trace; adds overhead")
     parser.add_argument("--trace-steps", type=int, default=1)
     parser.add_argument("--trace-all-ranks", action="store_true")
+    parser.add_argument("--reference-centroid-topk", action="store_true",
+                        help="Benchmark the unchanged Torch selector with the same sparse kernels")
     parser.add_argument("--initial-checkpoint", type=Path,
                         help="Optional common weights; default is isolated random initialization")
     parser.add_argument("--train-args", nargs=argparse.REMAINDER, default=[],
@@ -54,6 +56,13 @@ def main():
             command.append("--profile-shape-prior")
         if args.trace_all_ranks:
             command.append("--trace-all-ranks")
+        if args.reference_centroid_topk:
+            command.append("--reference-centroid-topk")
+    elif args.reference_centroid_topk:
+        entry = command.index("tabicl.train")
+        command[entry-1:entry+1] = [str(root / "scripts/train_reference_centroid_topk.py")]
+        if args.shape_prior:
+            command.append("--shape-prior")
     elif args.shape_prior:
         entry = command.index("tabicl.train")
         command[entry-1:entry+1] = [str(root / "scripts/train_shape_prior.py")]
@@ -64,7 +73,8 @@ def main():
                   dtype=args.dtype, gpus=args.gpus, steps=args.steps, stage=args.stage,
                   shape_prior=args.shape_prior)
     report.update(profile_pipeline=args.profile_pipeline, trace_step=args.trace_step,
-                  trace_steps=args.trace_steps, trace_all_ranks=args.trace_all_ranks)
+                  trace_steps=args.trace_steps, trace_all_ranks=args.trace_all_ranks,
+                  reference_centroid_topk=args.reference_centroid_topk)
     (args.output / "run.json").write_text(json.dumps(report, indent=2) + "\n")
     raise SystemExit(result.returncode)
 

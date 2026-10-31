@@ -11,7 +11,7 @@ and `COMPILE_WARMUP=True`. All remain environment overrides; for 16 GPUs set
 `NUM_GPUS=16`. FP32 uses `TRAIN_DTYPE=float32`, BF16 uses `bfloat16` (default).
 Optimizer compilation remains opt-in.
 
-Stage1 FP32 defaults to a quota-aware, shared `node_pool`, using `balanced`
+Stage1 FP32 defaults to a shared `node_pool` with 56 workers per node, using `balanced`
 when each rank has multiple micro-batches, otherwise completion-order `none`.
 Stage1 BF16 defaults to DataLoader: the 640-step measurement favored it over
 the shared pool. Set `PRIOR_BACKEND=node_pool` to experiment with BF16; its
@@ -19,6 +19,14 @@ default schedule is `none`. Other curriculum scripts retain shared-pool defaults
 `PRIOR_SCHEDULE=balanced/round_robin/none`, or `PRIOR_BACKEND=dataloader`.
 See [the scheduling audit](training_schedule_20261030.md) for measured results,
 stage2/3 behavior and the limits of fixed-cohort balancing.
+
+Stage2/3 also default to 56 pool workers, reserving spare permits for large
+distance kernels (`PRIOR_POOL_KERNEL_THREADS=8`). Large NaN/Inf fallbacks use
+the same node CPU budget. Set `PRIOR_POOL_WORKERS=0` for quota-aware auto sizing;
+56 is a measured-machine default, not a guarantee that every host has spare
+cores. The [CPU-budget and centroid top-k audit](cpu_budget_topk_20261031.md)
+defines per-step CPU generation, GPU activity and exposed generation stall,
+and documents the selector's bounded reusable workspace and exact-route tests.
 
 The shared `performance_recipe.sh` selects `ATTENTION_BACKEND=auto`. On the
 measured ZW810 vendor PyTorch 2.8 stack, FP32 with at most 2048 maximum rows uses

@@ -6,7 +6,9 @@ Forward/component attribution follows Kineto External ids to the enclosing CPU
 record_function range. Component ranges are inclusive and must not be added.
 """
 import argparse
+from bisect import bisect_right
 from collections import defaultdict
+import heapq
 import json
 from pathlib import Path
 
@@ -36,6 +38,31 @@ def summarize(path):
             launches[event["args"]["correlation"]] = event
     gpu, devices, scope_gpu, kinds, names = [], defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)
     scope_names = defaultdict(lambda: defaultdict(list))
+    step_scopes = sorted((e for values in scopes.values() for e in values
+                          if e["name"].startswith("tabicl/optimizer_step/")), key=lambda e: e["ts"])
+    step_starts = [e["ts"] for e in step_scopes]
+    step_gpu = defaultdict(lambda: defaultdict(list))
+    # Build inclusive containment once by sweeping CPU source starts. Scanning
+    # all scopes for every kernel is quadratic for multi-step/all-rank traces.
+    sources = defaultdict(list)
+    for event in timed:
+        if event.get("cat") in ("cpu_op", "cuda_runtime", "cuda_driver"):
+            sources[event.get("pid"), event.get("tid")].append(event)
+    enclosing = {}
+    for key, values in sources.items():
+        ranges = sorted(scopes[key], key=lambda e: e["ts"])
+        active, endings, cursor = {}, [], 0
+        for source in sorted(values, key=lambda e: e["ts"]):
+            while cursor < len(ranges) and ranges[cursor]["ts"] <= source["ts"]:
+                scope = ranges[cursor]
+                active[cursor] = scope
+                heapq.heappush(endings, (scope["ts"]+scope["dur"]+5, cursor))
+                cursor += 1
+            while endings and endings[0][0] < source["ts"]:
+                _, index = heapq.heappop(endings)
+                active.pop(index, None)
+            enclosing[id(source)] = [scope["name"] for scope in active.values()
+                                     if source["ts"]+source["dur"] <= scope["ts"]+scope["dur"]+5]
     unlinked, unlinked_us = 0, 0.
     links = defaultdict(int)
     for event in timed:
@@ -49,6 +76,18 @@ def summarize(path):
         kind = "kernel" if category == "kernel" else "memcpy" if "memcpy" in category else "memset"
         kinds[kind].append(event["dur"])
         names[event.get("name", "")].append(event["dur"])
+        # run_batch waits for its last CUDA event before ending the CPU range;
+        # use that synchronized interval to include unlinked communication and
+        # kernels launched from helper threads as well as the main thread.
+        index = bisect_right(step_starts, start)-1
+        if index >= 0:
+            scope = step_scopes[index]
+            if start < scope["ts"]+scope["dur"]:
+                step = int(scope["name"].rsplit("/", 1)[1])
+                comm = any(tag in event.get("name", "").lower()
+                           for tag in ("nccl", "pccl", "lccl", "hccl", "allreduce"))
+                label = "communication" if comm else kind
+                step_gpu[step][label].append((start, min(stop, scope["ts"]+scope["dur"])))
         source = external.get(event.get("args", {}).get("External id"))
         method = "external_id"
         if source is None:
@@ -63,10 +102,9 @@ def summarize(path):
         links[method] += 1
         # Keep inclusive nesting: route kernels can belong to both ICL forward
         # and the more specific route scope. The report labels that explicitly.
-        for scope in scopes[source.get("pid"), source.get("tid")]:
-            if scope["ts"] <= source["ts"] and source["ts"]+source["dur"] <= scope["ts"]+scope["dur"]+5:
-                scope_gpu[scope["name"]].append(event["dur"])
-                scope_names[scope["name"]][event.get("name", "")].append(event["dur"])
+        for name in enclosing.get(id(source), []):
+            scope_gpu[name].append(event["dur"])
+            scope_names[name][event.get("name", "")].append(event["dur"])
     if not gpu:
         raise ValueError("trace contains no supported GPU activities; cannot report kernel timings")
     components = {}
@@ -88,6 +126,11 @@ def summarize(path):
                              activity_span_ms=(max(e for _, e in intervals)-min(s for s, _ in intervals))/1000)
                  for device, intervals in devices.items()},
         inclusive_components=components,
+        optimizer_steps={str(step): {**{f"{kind}_busy_union_ms": union_us(intervals)/1000
+                                       for kind, intervals in kinds.items()},
+                                    "activity_busy_union_ms": union_us([pair for values in kinds.values()
+                                                                         for pair in values])/1000}
+                         for step, kinds in sorted(step_gpu.items())},
         top_gpu_activities=[dict(name=name, calls=len(values), duration_sum_ms=sum(values)/1000)
                             for name, values in sorted(names.items(), key=lambda item: -sum(item[1]))[:30]],
         notes="Inclusive component sums overlap; GPU sums can overlap across streams. Busy union is only within recorded GPU activities, not an entire step. Attribution uses Kineto External ids or runtime/driver launch correlations.",

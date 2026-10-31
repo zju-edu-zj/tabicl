@@ -81,10 +81,11 @@ def generation_slot():
 
 @contextmanager
 def parallel_distance(x, centers, p):
-    # Point distances are independent; retain p=2 GEMM and the fast 1-D path.
+    # Point distances are independent; retain p=2 GEMM. The sorted finite
+    # 1-D path never enters this context; its nonfinite fallback can borrow.
     # A workload threshold avoids threading overhead for small kernels.
     if (worker_budget is None or x.device.type != "cpu" or p == 2 or
-            x.shape[1] <= 1 or x.numel()*len(centers) < 10_000_000):
+            x.numel()*len(centers) < 10_000_000):
         yield
     else:
         with worker_budget.distance():

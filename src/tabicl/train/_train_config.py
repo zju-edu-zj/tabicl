@@ -247,7 +247,7 @@ def build_parser():
                         help="Optional per-kernel thread cap, borrowing from a node-wide CPU permit budget")
     parser.add_argument("--rank_timing_every", type=int, default=0,
                         help="Gather per-rank prior/train wall times every N steps (0 disables)")
-    parser.add_argument("--prior_pool_workers", type=int, default=0,
+    parser.add_argument("--prior_pool_workers", type=int, default=56,
                         help="Total CPU workers per node (0: available cores minus local GPU ranks)")
     parser.add_argument("--prior_pool_window", type=int, default=128,
                         help="Maximum in-flight plus ready local batches per node")

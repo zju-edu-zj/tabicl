@@ -52,10 +52,12 @@ def trace_component_scopes():
 
 
 class ProfileTrainer(Trainer):
-    def __init__(self, config, output, trace_step=-1, trace_steps=1, trace_all_ranks=False):
+    def __init__(self, config, output, trace_step=-1, trace_steps=1, trace_all_ranks=False,
+                 reference_centroid_topk=False):
         self.active = None
         self.trace_step, self.trace_steps = trace_step, trace_steps
         self.trace_all_ranks = trace_all_ranks
+        self.reference_centroid_topk = reference_centroid_topk
         self.tracer = None
         self.trace_scopes = None
         self.stage_scopes = {}
@@ -81,6 +83,7 @@ class ProfileTrainer(Trainer):
         result = super().fetch_batch(iterator)
         self.prior_finished_s = time.perf_counter()
         self.prior_wait_s = self.prior_finished_s - self.prior_started_s
+        self.cpu_generation = getattr(self.dataloader, "last_batch_timing", {})
         return result
 
     def event(self, name, record=None):
@@ -91,6 +94,11 @@ class ProfileTrainer(Trainer):
 
     def build_model(self):
         super().build_model()
+        if getattr(self, "reference_centroid_topk", False):
+            from tabicl._model.icl_attention import SetRetrievalAttention
+            for module in self.raw_model.modules():
+                if isinstance(module, SetRetrievalAttention):
+                    module.use_fast_centroid_topk = False
         for name, module in (("col", self.raw_model.col_embedder),
                              ("row", self.raw_model.row_interactor),
                              ("icl", self.raw_model.icl_predictor)):
@@ -145,7 +153,7 @@ class ProfileTrainer(Trainer):
         if (self.ddp_rank == 0 or self.trace_all_ranks) and self.curr_step == self.trace_step:
             self.tracer = torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU,
                                                            torch.profiler.ProfilerActivity.CUDA],
-                                                record_shapes=True)
+                                                record_shapes=False)
             self.tracer.__enter__()
             self.trace_scopes = trace_component_scopes()
             self.trace_scopes.__enter__()
@@ -153,13 +161,14 @@ class ProfileTrainer(Trainer):
         batch_events = {}
         self.batch_events = batch_events
         self.event("start", batch_events)
-        started = time.perf_counter()
-        results = super().run_batch(batch)
-        self.event("end", batch_events)
-        # run_batch already copies scalar metrics to CPU once per step. The
-        # event wait resolves only the final timestamp, never each stage.
-        batch_events["end"].synchronize()
-        wall = time.perf_counter() - started
+        with torch.profiler.record_function(f"tabicl/optimizer_step/{self.curr_step}"):
+            started = time.perf_counter()
+            results = super().run_batch(batch)
+            self.event("end", batch_events)
+            # run_batch already copies scalar metrics to CPU once per step. The
+            # event wait resolves only the final timestamp, never each stage.
+            batch_events["end"].synchronize()
+            wall = time.perf_counter() - started
         records = []
         for record in self.micro_records:
             row = {k: v for k, v in record.items() if not isinstance(v, torch.cuda.Event)}
@@ -184,6 +193,7 @@ class ProfileTrainer(Trainer):
                       prior_start_monotonic_s=self.prior_started_s, prior_end_monotonic_s=self.prior_finished_s,
                       train_start_monotonic_s=started, train_end_monotonic_s=started+wall,
                       train_wall_s=wall, train_stream_ms=batch_events["start"].elapsed_time(batch_events["end"]),
+                      cpu_generation=self.cpu_generation,
                       peak_cuda_bytes=torch.cuda.max_memory_allocated(), micros=records,
                       pool=pool_stats, oom_micro_batches=results["oom_micro_batches"],
                       loss=float(results["pinball" if self.regression else "ce"]))
@@ -221,6 +231,7 @@ def profile_parser():
     parser.add_argument("--trace-step", type=int, default=-1)
     parser.add_argument("--trace-steps", type=int, default=1)
     parser.add_argument("--trace-all-ranks", action="store_true")
+    parser.add_argument("--reference-centroid-topk", action="store_true")
     return parser
 
 
@@ -236,7 +247,7 @@ def main():
     if not torch.cuda.is_available() or not str(config.device).startswith("cuda"):
         parser.error("CUDA required; CPU enqueue timings cannot replace GPU stage timings")
     ProfileTrainer(config, options.profile_output, options.trace_step, options.trace_steps,
-                   options.trace_all_ranks).train()
+                   options.trace_all_ranks, options.reference_centroid_topk).train()
 
 
 if __name__ == "__main__":

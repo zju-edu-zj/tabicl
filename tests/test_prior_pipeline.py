@@ -91,7 +91,7 @@ def test_stage1_defaults_adapt_workers_to_node_and_support_16_ranks(tmp_path):
     assert args.prior_prefetch_factor == 8
     assert args.prior_in_order is False
     assert args.prior_backend == "dataloader"  # BF16 long-run default
-    assert args.prior_pool_workers == 0
+    assert args.prior_pool_workers == 56
     assert args.prior_schedule == "none"  # one indivisible micro-batch per rank
     assert args.max_seq_len == 2048
     assert args.compile_frontend == "all" and args.compile_warmup
@@ -111,6 +111,7 @@ def test_classifier_long_stage_defaults_are_fast_and_content_tree(tmp_path, stag
     assert args.prior_schedule == "balanced"
     assert args.prior_pool_transport == "numpy"
     assert args.prior_pool_kernel_threads == 8
+    assert args.prior_pool_workers == 56
     assert args.compile_frontend == "all" and args.compile_warmup
     assert args.icl_partition == "content_tree"
     assert args.micro_batch_size == 1

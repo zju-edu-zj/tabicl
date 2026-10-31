@@ -50,16 +50,22 @@ def _init_worker(prior, output_dir=None, cpu_permits=None, kernel_threads=1):
 
 def _generate(params, seed):
     started = time.perf_counter()
+    cpu_started = time.process_time()
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     with _cpu_budget.generation_slot():
+        generation_started = time.perf_counter()
         x, y, d = _worker_prior.generate_dataset(params, compact=True)
         generated = time.perf_counter()
+        cpu_seconds = time.process_time() - cpu_started
         x, y = encode_table(x.numpy(), y.numpy(), _worker_output_dir)
         finished = time.perf_counter()
     budget_stats = _cpu_budget.worker_budget.stats if _cpu_budget.worker_budget else {}
-    return x, y, int(d), generated - started, finished - generated, finished, budget_stats
+    timing = dict(started_monotonic_s=started, generation_started_monotonic_s=generation_started,
+                  generated_monotonic_s=generated, encoded_monotonic_s=finished,
+                  process_cpu_s=cpu_seconds)
+    return x, y, int(d), generated - started, finished - generated, finished, budget_stats, timing
 
 
 def _output_bytes(params):
@@ -199,7 +205,8 @@ class _Service:
                         del self.admission[available]
                         estimate = _output_bytes(params)
                         state = dict(params=params, results=[None] * len(params), left=len(params),
-                                     bytes=estimate, delivered=set())
+                                     bytes=estimate, delivered=set(), task_timings=[None] * len(params),
+                                     submitted_monotonic_s=time.perf_counter())
                         if self.early_dispatch:
                             state["assignments"], state["schedule_stats"] = schedule_cohort(
                                 params, [(None, None, p["num_features"]) for p in params], self.prior.batch_size,
@@ -224,12 +231,13 @@ class _Service:
                     for future in done:
                         bid, idx = self.pending.pop(future)
                         state = self.batches[bid]
-                        x, y, d, elapsed, encoding, finished, kernel_stats = future.result()
+                        x, y, d, elapsed, encoding, finished, kernel_stats, timing = future.result()
                         for name, value in kernel_stats.items():
                             self.kernel_stats[name] = (max(self.kernel_stats[name], value) if name.endswith("max_threads")
                                                        else self.kernel_stats[name]+value)
                         self.result_transit_seconds.append(time.perf_counter() - finished)
                         state["results"][idx] = (x, y, d)
+                        state["task_timings"][idx] = timing
                         self.generation_seconds.append(elapsed)
                         self.encoding_seconds.append(encoding)
                         self.worker_seconds += elapsed + encoding
@@ -248,7 +256,7 @@ class _Service:
                 self.error = traceback.format_exc()
                 self.condition.notify_all()
 
-    def get_batch(self, rank=None, sequence=None):
+    def get_batch(self, rank=None, sequence=None, with_timing=False):
         started = time.perf_counter()
         with self.condition:
             def available():
@@ -284,12 +292,30 @@ class _Service:
                 results, params = state["results"], state["params"]
                 lease = (rank, sequence)
                 self.leases[lease] = (bid, results)
+                indices = range(len(results))
+            task_times = [state["task_timings"][i] for i in indices]
+            # Balanced assignment depends on every table in the cohort. A rank
+            # whose own tables finished early still waits for the last table.
+            dependency_times = task_times if self.early_dispatch else state["task_timings"]
+            timing = dict(
+                tasks=len(task_times), submitted_monotonic_s=state["submitted_monotonic_s"],
+                first_generation_monotonic_s=min(t["generation_started_monotonic_s"] for t in task_times),
+                generation_ready_monotonic_s=max(t["generated_monotonic_s"] for t in task_times),
+                dispatch_generation_ready_monotonic_s=max(t["generated_monotonic_s"]
+                                                          for t in dependency_times),
+                payload_ready_monotonic_s=max(t["encoded_monotonic_s"] for t in task_times),
+                process_cpu_s=sum(t["process_cpu_s"] for t in task_times),
+                task_wall_s=sum(t["generated_monotonic_s"]-t["generation_started_monotonic_s"]
+                                for t in task_times),
+                service_wait_s=time.perf_counter()-started,
+            )
             self.delivered_batches += 1
             self.condition.notify_all()
         xs, ys, ds = zip(*results)
-        return xs, ys, np.asarray(ds, dtype=np.int64), np.asarray(
+        payload = xs, ys, np.asarray(ds, dtype=np.int64), np.asarray(
             [p["seq_len"] for p in params], dtype=np.int64
         ), np.asarray([p["train_size"] for p in params], dtype=np.int64)
+        return (payload, timing) if with_timing else payload
 
     def acknowledge(self, rank, sequence):
         """Client mapped the payload: reclaim names, not still-live mappings."""
@@ -446,7 +472,7 @@ class NodePriorPool:
             iter(self)
         sequence = self.sequence
         started = time.perf_counter()
-        payload = self.service.get_batch(self.local_rank, sequence)
+        payload, timing = self.service.get_batch(self.local_rank, sequence, with_timing=True)
         received = time.perf_counter()
         try:
             batch = decode_batch(payload, self.transport)
@@ -456,6 +482,9 @@ class NodePriorPool:
         self.client_times["rpc_seconds"] += received - started
         self.client_times["decode_seconds"] += decoded - received
         self.client_times["acknowledge_seconds"] += time.perf_counter() - decoded
+        self.last_batch_timing = dict(timing, fetch_started_monotonic_s=started,
+                                     rpc_s=received-started, decode_s=decoded-received,
+                                     acknowledge_s=time.perf_counter()-decoded)
         self.sequence += 1
         return batch
 

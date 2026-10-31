@@ -32,10 +32,14 @@ def nearest_center(x, centers, p):
             or not 0.5 <= p <= 4 or p == 2 or len(x) == 0):
         return torch.cdist(x, centers, p=p).argmin(dim=-1)
     if not torch.isfinite(x).all() or not torch.isfinite(centers).all():
-        return torch.cdist(x, centers, p=p).argmin(dim=-1)
+        # Keep the original full cdist/argmin semantics for NaN/Inf, while
+        # allowing large fallback kernels to borrow the SAME node permits.
+        with parallel_distance(x, centers, p):
+            return torch.cdist(x, centers, p=p).argmin(dim=-1)
     if x.shape[1] == 1:
         if x.abs().max() > 1e8 or centers.abs().max() > 1e8:
-            return torch.cdist(x, centers, p=p).argmin(dim=-1)
+            with parallel_distance(x, centers, p):
+                return torch.cdist(x, centers, p=p).argmin(dim=-1)
         return _nearest_center_1d(x, centers, p)
     # cdist's vectorized CPU kernel is materially faster than broadcast/pow
     # reduction for multidimensional points. Chunk only its output matrix.

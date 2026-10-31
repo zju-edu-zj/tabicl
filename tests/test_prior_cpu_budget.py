@@ -73,3 +73,26 @@ def test_default_small_and_euclidean_paths_do_not_borrow():
         assert sum(permits.acquire(False) for _ in range(5)) == 4
     finally:
         _cpu_budget.configure_worker_budget()
+
+
+@pytest.mark.parametrize("location,value", [("x", float("nan")), ("x", float("inf")),
+                                            ("centers", float("nan")), ("centers", -float("inf"))])
+@pytest.mark.parametrize("slots", [1, 4])
+@pytest.mark.parametrize("width", [1, 32])
+def test_nonfinite_fallback_borrows_available_budget_and_keeps_exact_indices(location, value, slots, width):
+    generator = torch.Generator().manual_seed(93)
+    count = max(160, 10_000_000//(2000*width))
+    x, centers = [torch.randn(shape, generator=generator) for shape in [(2000, width), (count, width)]]
+    (x if location == "x" else centers)[3, min(7, width-1)] = value
+    expected = torch.cdist(x, centers, p=.550479).argmin(-1)
+    permits = mp.get_context("spawn").BoundedSemaphore(slots)
+    _cpu_budget.configure_worker_budget(permits, 8)
+    try:
+        with _cpu_budget.generation_slot():
+            actual = nearest_center(x, centers, .550479)
+            assert torch.equal(actual, expected)
+            assert _cpu_budget.worker_budget.stats["parallel_distance_max_threads"] == slots
+        assert torch.get_num_threads() == 1
+        assert sum(permits.acquire(False) for _ in range(slots+1)) == slots
+    finally:
+        _cpu_budget.configure_worker_budget()

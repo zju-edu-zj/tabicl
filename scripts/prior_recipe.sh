@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Worker count is per NODE; zero respects affinity and cgroup CPU quotas.
+# Workers are per NODE. 56 leaves headroom on the measured 69-core/8-rank
+# node; override with 0 for quota-aware auto sizing on other machines.
 PRIOR_BACKEND=${PRIOR_BACKEND:-node_pool}
 if [[ "$PRIOR_BACKEND" == node_pool ]]; then
     PRIOR_SCHEDULE=${PRIOR_SCHEDULE:-balanced}
 else
     PRIOR_SCHEDULE=${PRIOR_SCHEDULE:-none}
 fi
-PRIOR_POOL_WORKERS=${PRIOR_POOL_WORKERS:-0}
+PRIOR_POOL_WORKERS=${PRIOR_POOL_WORKERS:-56}
 RANK_TIMING_EVERY=${RANK_TIMING_EVERY:-100}
 PRIOR_POOL_WINDOW=${PRIOR_POOL_WINDOW:-128}
 PRIOR_POOL_MB=${PRIOR_POOL_MB:-2048}
