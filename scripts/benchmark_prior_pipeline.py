@@ -101,7 +101,9 @@ class ReplayDataset(IterableDataset):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=("dataloader", "node_pool"), default="dataloader")
-    parser.add_argument("--schedule", choices=("none", "round_robin", "balanced", "window_fifo", "window_bucketed", "shape_cohort"), default="none")
+    parser.add_argument("--schedule", choices=("none", "round_robin", "balanced", "window_fifo", "window_bucketed", "shape_cohort", "ready_micro"), default="none")
+    parser.add_argument('--ready-max-delay', type=int, default=2)
+    parser.add_argument('--categorical-sampling', choices=['legacy', 'marginal'], default='legacy')
     parser.add_argument("--adaptive-feature-limit", type=str2bool, default=True)
     parser.add_argument("--transport", choices=("numpy", "mmap"), default="numpy")
     parser.add_argument("--bucket-steps", type=int, default=4)
@@ -157,6 +159,7 @@ def main():
             filter_unpredictable_datasets=True, allow_act_warping=False,
             min_n_nodes=2, max_n_nodes=32, cauchy_dag_offset=0.0,
             use_corrected_cat_meta_sampling=args.corrected_cat_meta_sampling,
+            categorical_sampling=args.categorical_sampling,
         ),
     )
     prior.prior.adaptive_feature_limit = args.adaptive_feature_limit
@@ -172,7 +175,8 @@ def main():
                                seed=42 + 100003 * int(os.environ.get("GROUP_RANK", 0)),
                                schedule=args.schedule, micro_size=4 if args.stage == 1 else 1,
                                transport=args.transport, bucket_steps=args.bucket_steps,
-                               kernel_threads=args.kernel_threads, shape_seed=42)
+                               kernel_threads=args.kernel_threads, shape_seed=42,
+                               ready_max_delay=args.ready_max_delay)
     else:
         if args.fixed_task_stream:
             if not args.in_order:

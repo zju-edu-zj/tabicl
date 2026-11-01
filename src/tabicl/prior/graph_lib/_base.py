@@ -104,6 +104,18 @@ class GlobalSampler:
             ext_name = name + "__meta_weights"
             # backward compatibility because this used to be wrong in TabICLv2
             query_name = ext_name if self.config.use_corrected_cat_meta_sampling else name
+            if (self.config.categorical_sampling == 'marginal'
+                    and not self.config.use_corrected_cat_meta_sampling
+                    and query_name not in self.globals):
+                # Legacy reconstructs a fresh SimpleRandomWeights(Context()) on
+                # EVERY call, independently of this sampler's meta parameters.
+                # Its uniformly permuted weights are exchangeable. Thus
+                # E[w_k / sum(w)] = 1/K exactly: integrate that unused latent
+                # vector instead of constructing a context, beta draws, Torch
+                # noise/permutation/softmax, and then taking ONE weighted draw.
+                # No weights are shared/cached here; corrected meta sampling
+                # and any pre-existing legacy cache retain their correlations.
+                return np.random.randint(n_categories)
             if query_name not in self.globals:
                 from tabicl.prior.graph_lib._weights import SimpleRandomWeights
 

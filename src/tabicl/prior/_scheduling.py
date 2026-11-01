@@ -1,7 +1,7 @@
 """Deterministic, fixed-cardinality assignment within a supplied step.
 
 This allocator never rejects, splits or duplicates tasks. Cross-step window
-composition belongs to _task_plan, which calls this allocator for each step.
+composition belongs to _task_plan or _ready_micro; both retain intact micros.
 Costs are an operation-count proxy, not a promise of measured GPU latency.
 """
 import math

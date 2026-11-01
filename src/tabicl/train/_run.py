@@ -450,6 +450,7 @@ class Trainer:
                 transport=self.config.prior_pool_transport, bucket_steps=self.config.prior_bucket_steps,
                 kernel_threads=self.config.prior_pool_kernel_threads,
                 shape_seed=self.config.np_seed,
+                ready_max_delay=getattr(self.config, 'prior_ready_max_delay', 2),
             )
             if self.master_process:
                 print(f"Prior pipeline: node_pool workers/node={workers}, CPU quota/affinity={available}, "

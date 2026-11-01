@@ -1,5 +1,9 @@
 # Prior generation bottleneck audit
 
+For the latest complete-micro scheduling, categorical latent marginalization,
+distribution audit, and real eight-rank Stage 1 results, see
+[the November 2 implementation report](performance/prior_ready_redesign_20261102.md).
+
 > Superseded implementation and benchmark: see
 > [节点共享池与长表算子优化](prior_node_pool_20261022.md).
 > The current curriculum launchers default to a node-wide pool, not the

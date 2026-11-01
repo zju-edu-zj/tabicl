@@ -92,6 +92,7 @@ def main():
     parser.add_argument('--rows', type=int, default=2048)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--filter-mode', choices=['full', 'progressive'], default='full')
+    parser.add_argument('--categorical-sampling', choices=['legacy', 'marginal'], default='legacy')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if min(args.tasks, args.workers, args.rows) < 1:
@@ -105,7 +106,7 @@ def main():
          min_features=1, max_features=100, max_classes=10, max_seq_len=args.rows,
          seq_len_per_gp=True, min_train_size=.3, max_train_size=.9,
          config=PriorConfig(filter_unpredictable_graphs=True, filter_unpredictable_datasets=True,
-                            dataset_filter_mode=args.filter_mode))
+                            dataset_filter_mode=args.filter_mode, categorical_sampling=args.categorical_sampling))
     params = []
     while len(params) < args.tasks:
         params.extend(p.sample_parameters())
@@ -117,6 +118,7 @@ def main():
     summary = dict(wall_s=total, cpu_s=sum(r['cpu_s'] for r in records), tasks=args.tasks,
                    workers=args.workers, rows=args.rows, seed=args.seed,
                    filter_mode=args.filter_mode,
+                   categorical_sampling=args.categorical_sampling,
                    tree=os.environ.get('TABICL_PRIOR_TREE', 'native'),
                    one_dimensional_mode=os.environ.get('TABICL_PRIOR_1D_MODE', 'legacy'),
                    native_library=os.environ.get('TABICL_PRIOR_DISTANCE_LIBRARY', ''),
