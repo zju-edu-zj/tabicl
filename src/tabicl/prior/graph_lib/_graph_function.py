@@ -29,6 +29,14 @@ class RandomGraphFunction(RandomTransformer):
                 for parent in self.dag[node_idx]:
                     self.should_compute_[parent] = True
 
+        # Keep a tensor until its last live child. Extracted feature views
+        # independently keep any storage that is still needed alive.
+        self.last_use_ = list(range(len(self.nodes_)))
+        for node_idx, parents in enumerate(self.dag):
+            if self.should_compute_[node_idx]:
+                for parent in parents:
+                    self.last_use_[parent] = max(self.last_use_[parent], node_idx)
+
     def _transform(self, n_samples: int) -> Dict[str, torch.Tensor]:
         n_nodes = len(self.node_feature_specs)
         node_values = [None for _ in range(n_nodes)]
@@ -38,5 +46,10 @@ class RandomGraphFunction(RandomTransformer):
                 node_values[node_idx], out_features = self.nodes_[node_idx](
                     [node_values[parent] for parent in self.dag[node_idx]], n_samples
                 )
-                features = features | out_features
+                features.update(out_features)
+                for parent in self.dag[node_idx]:
+                    if self.last_use_[parent] == node_idx:
+                        node_values[parent] = None
+                if self.last_use_[node_idx] == node_idx:
+                    node_values[node_idx] = None
         return features

@@ -1,4 +1,5 @@
 from typing import Optional, List
+import os
 
 import torch
 import numpy as np
@@ -7,7 +8,7 @@ from tabicl.prior.graph_lib._base import RandomTensorTransformer, Context
 from tabicl.prior.graph_lib._activation import RandomActivation
 from tabicl.prior.graph_lib._matrix import RandomMatrix, RandomGaussianMatrix
 from tabicl.prior.graph_lib._weights import RandomWeights
-from tabicl.prior.graph_lib._distance import nearest_center
+from tabicl.prior.graph_lib._distance import nearest_center, compact_cdist, _native_available
 
 
 class RandomFunction(RandomTensorTransformer):
@@ -153,6 +154,11 @@ class RandomTreeFunction(RandomFunction):
             by conversion to long integer indices. This resolves the "baddbmm_cuda not implemented
             for Long" error while maintaining index integrity.
         """
+        if (x.device.type == 'cpu' and x.dtype in (torch.float32, torch.float64)
+                and os.environ.get('TABICL_PRIOR_TREE', 'native') == 'native'
+                and _native_available() and hasattr(torch.ops.tabicl_prior_exact, 'tree_cpu')):
+            return torch.ops.tabicl_prior_exact.tree_cpu(
+                x, self.split_dims_, self.split_points_, self.leaf_values_)
         # Bound boolean/index/gather temporaries per worker on long tables.
         # Chunk rows only: tree reduction order and all random draws stay intact.
         bytes_per_row = self.n_trees_ * (self.depth_ * 9 + self.out_features * x.element_size() + 16)
@@ -299,7 +305,7 @@ class RandomEMAssignmentFunction(RandomFunction):
         self.q_ = self.sampler.numerical("gen_em_assignment_q", 1.0, 2.0)
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
-        dists = torch.cdist(x, self.x_ind_, p=self.p_)
+        dists = compact_cdist(x, self.x_ind_, p=self.p_)
         logits = self.consts - torch.clamp(dists / self.stds_[None, :], min=0.0) ** self.q_
         result = torch.softmax(logits, dim=-1)
         return self.out_func_(result)

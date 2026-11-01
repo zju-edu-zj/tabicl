@@ -1,11 +1,24 @@
-"""CPU nearest-center kernels that reduce distances directly to indices."""
+"""Distance execution preserving the selected prior compatibility contract.
+
+Only CPU non-Euclidean, finite inputs are compacted. In that kernel each
+point pair is independent of the number/order of other rows. In particular,
+do NOT use this transformation on the size-dependent p=2 GEMM path.
+"""
+import os
 import torch
 
 from ._cpu_budget import parallel_distance
 
 
+_native_loaded = False
+
+
 def _nearest_center_1d(x, centers, p):
-    """Use sorted neighbors in 1-D; retain the first original center on ties."""
+    """Historical sorted-neighbor behavior, retained for prior compatibility.
+
+    This is intentionally not advertised as equivalent to cdist's argmin.
+    In particular, duplicate centers and underflow can give different indices.
+    """
     values, order = centers[:, 0].sort(stable=True)
     positions = torch.searchsorted(values, x[:, 0].contiguous()).clamp_(0, len(values) - 1)
     right = positions
@@ -14,36 +27,92 @@ def _nearest_center_1d(x, centers, p):
     right_distance = (x[:, 0] - values[right]).abs()
     choose_left = left_distance <= right_distance
     best = torch.where(choose_left, order[left], order[right])
-
     minimum = torch.minimum(left_distance, right_distance)
     maximum = torch.maximum(left_distance, right_distance)
     ambiguous = ((positions > 0) & (positions < len(values)) &
                  (maximum <= minimum * (1 + 1e-5) + 1e-12))
-    # cdist's pow/sum rounding can break near-ties differently from |x-c|.
     if ambiguous.any():
         rows = ambiguous.nonzero(as_tuple=False).flatten()
         best[rows] = torch.cdist(x[rows], centers, p=p).argmin(dim=-1)
     return best
 
 
+def _native_available():
+    global _native_loaded
+    library = os.environ.get("TABICL_PRIOR_DISTANCE_LIBRARY")
+    if not library:
+        return False
+    if not _native_loaded:
+        torch.ops.load_library(library)
+        _native_loaded = True
+    return True
+
+
+def _compact_rows(x, comparisons):
+    """Evaluate repeated rows once; use a deterministic, RNG-free cost gate."""
+    if len(x) < 128 or comparisons < 8 or x.shape[1] == 0:
+        return x, None
+    if x.shape[1] == 1:
+        unique, inverse = torch.unique(x[:, 0], sorted=True, return_inverse=True)
+        unique = unique[:, None]
+    else:
+        # Equal full rows must be equal in these columns. False positives in
+        # this cheap probe only cost a full unique(); they cannot affect data.
+        probe = x[:64, :min(4, x.shape[1])]
+        if len(torch.unique(probe, dim=0)) > 56:
+            return x, None
+        unique, inverse = torch.unique(x, dim=0, sorted=True, return_inverse=True)
+    if len(unique) * 8 > len(x) * 7:
+        return x, None
+    return unique, inverse
+
+
+def compact_cdist(x, centers, p):
+    """Full cdist matrix, preserving EM's distances and subsequent shapes."""
+    if (x.ndim != 2 or centers.ndim != 2 or x.device.type != "cpu"
+            or x.dtype not in (torch.float32, torch.float64) or p == 2
+            or not 0.5 <= p <= 4 or not torch.isfinite(x).all()
+            or not torch.isfinite(centers).all()):
+        return torch.cdist(x, centers, p=p)
+    compact, inverse = _compact_rows(x, len(centers))
+    with parallel_distance(compact, centers, p):
+        distances = torch.cdist(compact, centers, p=p)
+    return distances if inverse is None else distances[inverse]
+
+
 def nearest_center(x, centers, p):
-    # Keep the Euclidean cdist path because its GEMM implementation is efficient.
-    if (x.device.type != "cpu" or x.dtype not in (torch.float32, torch.float64)
-            or not 0.5 <= p <= 4 or p == 2 or len(x) == 0):
+    """Accelerate distances while making 1-D compatibility explicit.
+
+    Default ``TABICL_PRIOR_1D_MODE=legacy`` retains the current prior's
+    sorted-neighbor behavior. ``reference`` instead retains original
+    cdist(...).argmin(-1), including floating-point and first-index ties.
+    Multidimensional dispatch is identical in both modes.
+    """
+    if (x.ndim != 2 or centers.ndim != 2 or x.device.type != "cpu"
+            or x.dtype not in (torch.float32, torch.float64)
+            or not 0.5 <= p <= 4 or p == 2 or len(x) == 0
+            or len(centers) == 0):
         return torch.cdist(x, centers, p=p).argmin(dim=-1)
     if not torch.isfinite(x).all() or not torch.isfinite(centers).all():
-        # Keep the original full cdist/argmin semantics for NaN/Inf, while
-        # allowing large fallback kernels to borrow the SAME node permits.
         with parallel_distance(x, centers, p):
             return torch.cdist(x, centers, p=p).argmin(dim=-1)
     if x.shape[1] == 1:
-        if x.abs().max() > 1e8 or centers.abs().max() > 1e8:
-            with parallel_distance(x, centers, p):
-                return torch.cdist(x, centers, p=p).argmin(dim=-1)
-        return _nearest_center_1d(x, centers, p)
-    # cdist's vectorized CPU kernel is materially faster than broadcast/pow
-    # reduction for multidimensional points. Chunk only its output matrix.
+        mode = os.environ.get("TABICL_PRIOR_1D_MODE", "legacy")
+        if mode not in ("legacy", "reference"):
+            raise ValueError("TABICL_PRIOR_1D_MODE must be legacy or reference")
+        if mode == "legacy":
+            if x.abs().max() > 1e8 or centers.abs().max() > 1e8:
+                with parallel_distance(x, centers, p):
+                    return torch.cdist(x, centers, p=p).argmin(dim=-1)
+            return _nearest_center_1d(x, centers, p)
+    compact, inverse = _compact_rows(x, len(centers))
+    # Keep original center order; otherwise all floating-point tie cases,
+    # not merely duplicate-center ties, would need special handling.
     rows = max(1, (4 * 1024**2) // (len(centers) * x.element_size()))
-    with parallel_distance(x, centers, p):
-        return torch.cat([torch.cdist(chunk, centers, p=p).argmin(dim=-1)
-                          for chunk in x.split(rows)])
+    with parallel_distance(compact, centers, p):
+        if _native_available():
+            result = torch.ops.tabicl_prior_exact.nearest_cpu(compact, centers, p)
+        else:
+            result = torch.cat([torch.cdist(chunk, centers, p=p).argmin(dim=-1)
+                                for chunk in compact.split(rows)])
+    return result if inverse is None else result[inverse]

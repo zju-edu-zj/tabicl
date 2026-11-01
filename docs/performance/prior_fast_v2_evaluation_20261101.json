@@ -1,0 +1,274 @@
+{
+  "candidates": 1000,
+  "decisions": {
+    "reject": 0,
+    "accept": 0,
+    "defer": 1000
+  },
+  "false_reject": 0,
+  "false_accept": 0,
+  "selected_task_shift": {
+    "reference_tasks": 688,
+    "candidate_tasks": 688,
+    "actual_classes": {
+      "reference_mean": 5.396802325581396,
+      "candidate_mean": 5.396802325581396,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "categorical_fraction": {
+      "reference_mean": 0.42652875144960434,
+      "candidate_mean": 0.42652875144960434,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "class_entropy": {
+      "reference_mean": 0.8144026024417278,
+      "candidate_mean": 0.8144026024417278,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "computed_nodes": {
+      "reference_mean": 8.725290697674419,
+      "candidate_mean": 8.725290697674419,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "edges": {
+      "reference_mean": 50.77470930232558,
+      "candidate_mean": 50.77470930232558,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "effective_features": {
+      "reference_mean": 47.411337209302324,
+      "candidate_mean": 47.411337209302324,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "minority_fraction": {
+      "reference_mean": 0.05025038608284884,
+      "candidate_mean": 0.05025038608284884,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "nodes": {
+      "reference_mean": 10.574127906976743,
+      "candidate_mean": 10.574127906976743,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "ridge_relative_mse": {
+      "reference_mean": 0.5545360746751461,
+      "candidate_mean": 0.5545360746751461,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "tree_relative_mse": {
+      "reference_mean": 0.45141324886373135,
+      "candidate_mean": 0.45141324886373135,
+      "ks_statistic": 0.0,
+      "wasserstein": 0.0
+    },
+    "function_counts": {
+      "js_divergence": 0.0,
+      "reference": {
+        "RandomGraphFunction": 688,
+        "RandomNodeFunction": 7275,
+        "NumericalConverter": 19407,
+        "KumaraswamyWarping": 19407,
+        "CategoricalConverter": 14800,
+        "CategoricalNeighborDiscretizer": 8575,
+        "RandomPoints": 6003,
+        "RandomMultiFunction": 6003,
+        "Standardize": 18350,
+        "L2Normalize": 6003,
+        "RandomWeights": 6003,
+        "RandomAggregationMultiFunction": 2210,
+        "RandomFunction": 14911,
+        "RandomMLPFunction": 1834,
+        "RandomLinearFunction": 7973,
+        "RandomActivation": 3061,
+        "RandomTensorSequential": 3061,
+        "RandomRescale": 3061,
+        "RandomTorchActivation": 2029,
+        "RandomConcatMultiFunction": 2253,
+        "RandomTreeFunction": 3015,
+        "RandomProductFunction": 1819,
+        "CheapRandomFunction": 5705,
+        "RandomQuadraticFunction": 3034,
+        "RandomDiscretizationFunction": 3040,
+        "RandomGPFunction": 2996,
+        "RandomEMAssignmentFunction": 1854,
+        "RandomPowerActivation": 542,
+        "RandomPowerReluActivation": 490,
+        "CategoricalSoftmaxDiscretizer": 6225
+      },
+      "candidate": {
+        "RandomGraphFunction": 688,
+        "RandomNodeFunction": 7275,
+        "NumericalConverter": 19407,
+        "KumaraswamyWarping": 19407,
+        "CategoricalConverter": 14800,
+        "CategoricalNeighborDiscretizer": 8575,
+        "RandomPoints": 6003,
+        "RandomMultiFunction": 6003,
+        "Standardize": 18350,
+        "L2Normalize": 6003,
+        "RandomWeights": 6003,
+        "RandomAggregationMultiFunction": 2210,
+        "RandomFunction": 14911,
+        "RandomMLPFunction": 1834,
+        "RandomLinearFunction": 7973,
+        "RandomActivation": 3061,
+        "RandomTensorSequential": 3061,
+        "RandomRescale": 3061,
+        "RandomTorchActivation": 2029,
+        "RandomConcatMultiFunction": 2253,
+        "RandomTreeFunction": 3015,
+        "RandomProductFunction": 1819,
+        "CheapRandomFunction": 5705,
+        "RandomQuadraticFunction": 3034,
+        "RandomDiscretizationFunction": 3040,
+        "RandomGPFunction": 2996,
+        "RandomEMAssignmentFunction": 1854,
+        "RandomPowerActivation": 542,
+        "RandomPowerReluActivation": 490,
+        "CategoricalSoftmaxDiscretizer": 6225
+      }
+    }
+  },
+  "optimistic_screen_only_speedup_bound": 0.9963078810841411,
+  "speedup_bound_scope": "Within the pilot-fit path only; excludes fit-distribution changes, queueing and GPU work. Not measured full-fit or training acceleration.",
+  "pilot_fit_shift": {
+    "reference_tasks": 683,
+    "candidate_tasks": 688,
+    "actual_classes": {
+      "reference_mean": 5.398243045387994,
+      "candidate_mean": 5.396802325581396,
+      "ks_statistic": 0.009859460655793517,
+      "wasserstein": 0.03869513773025984
+    },
+    "categorical_fraction": {
+      "reference_mean": 0.3955594547684157,
+      "candidate_mean": 0.42652875144960434,
+      "ks_statistic": 0.04128502843133919,
+      "wasserstein": 0.03096929668118847
+    },
+    "class_entropy": {
+      "reference_mean": 1.3313048064819513,
+      "candidate_mean": 0.8144026024417278,
+      "ks_statistic": 0.39787914127140867,
+      "wasserstein": 0.5169025882470126
+    },
+    "computed_nodes": {
+      "reference_mean": 10.456808199121523,
+      "candidate_mean": 8.725290697674419,
+      "ks_statistic": 0.07577079573700163,
+      "wasserstein": 1.7315175014471043
+    },
+    "edges": {
+      "reference_mean": 69.62957540263544,
+      "candidate_mean": 50.77470930232558,
+      "ks_statistic": 0.0843427593721271,
+      "wasserstein": 18.854866100309845
+    },
+    "effective_features": {
+      "reference_mean": 48.642752562225475,
+      "candidate_mean": 47.411337209302324,
+      "ks_statistic": 0.03312378698627805,
+      "wasserstein": 1.2836685791140319
+    },
+    "minority_fraction": {
+      "reference_mean": 0.10672627081808199,
+      "candidate_mean": 0.05025038608284884,
+      "ks_statistic": 0.42151801218972385,
+      "wasserstein": 0.05648724011314013
+    },
+    "nodes": {
+      "reference_mean": 12.407027818448023,
+      "candidate_mean": 10.574127906976743,
+      "ks_statistic": 0.07751796111546183,
+      "wasserstein": 1.8328999114712794
+    },
+    "ridge_relative_mse": {
+      "reference_mean": 0.5796313779383938,
+      "candidate_mean": 0.5545360746751461,
+      "ks_statistic": 0.08485350199189623,
+      "wasserstein": 0.04523028861340954
+    },
+    "tree_relative_mse": {
+      "reference_mean": 0.4309877286510174,
+      "candidate_mean": 0.45141324886373135,
+      "ks_statistic": 0.10956918860022477,
+      "wasserstein": 0.03145961853955882
+    },
+    "function_counts": {
+      "js_divergence": 0.0028920398973941424,
+      "reference": {
+        "RandomGraphFunction": 683,
+        "RandomNodeFunction": 8474,
+        "NumericalConverter": 20932,
+        "KumaraswamyWarping": 20932,
+        "CategoricalConverter": 14095,
+        "CategoricalNeighborDiscretizer": 8195,
+        "RandomPoints": 7142,
+        "RandomMultiFunction": 7142,
+        "Standardize": 22584,
+        "L2Normalize": 7142,
+        "RandomWeights": 7142,
+        "RandomConcatMultiFunction": 2777,
+        "RandomFunction": 21496,
+        "RandomMLPFunction": 2650,
+        "RandomLinearFunction": 11712,
+        "RandomActivation": 4771,
+        "RandomTensorSequential": 4771,
+        "RandomRescale": 4771,
+        "RandomTorchActivation": 3197,
+        "RandomAggregationMultiFunction": 2804,
+        "RandomTreeFunction": 4162,
+        "RandomEMAssignmentFunction": 2713,
+        "RandomProductFunction": 2655,
+        "CheapRandomFunction": 7333,
+        "RandomQuadraticFunction": 4171,
+        "RandomGPFunction": 4209,
+        "RandomDiscretizationFunction": 4058,
+        "RandomPowerReluActivation": 786,
+        "CategoricalSoftmaxDiscretizer": 5900,
+        "RandomPowerActivation": 788
+      },
+      "candidate": {
+        "RandomGraphFunction": 688,
+        "RandomNodeFunction": 7275,
+        "NumericalConverter": 19407,
+        "KumaraswamyWarping": 19407,
+        "CategoricalConverter": 14800,
+        "CategoricalNeighborDiscretizer": 8575,
+        "RandomPoints": 6003,
+        "RandomMultiFunction": 6003,
+        "Standardize": 18350,
+        "L2Normalize": 6003,
+        "RandomWeights": 6003,
+        "RandomAggregationMultiFunction": 2210,
+        "RandomFunction": 14911,
+        "RandomMLPFunction": 1834,
+        "RandomLinearFunction": 7973,
+        "RandomActivation": 3061,
+        "RandomTensorSequential": 3061,
+        "RandomRescale": 3061,
+        "RandomTorchActivation": 2029,
+        "RandomConcatMultiFunction": 2253,
+        "RandomTreeFunction": 3015,
+        "RandomProductFunction": 1819,
+        "CheapRandomFunction": 5705,
+        "RandomQuadraticFunction": 3034,
+        "RandomDiscretizationFunction": 3040,
+        "RandomGPFunction": 2996,
+        "RandomEMAssignmentFunction": 1854,
+        "RandomPowerActivation": 542,
+        "RandomPowerReluActivation": 490,
+        "CategoricalSoftmaxDiscretizer": 6225
+      }
+    }
+  }
+}

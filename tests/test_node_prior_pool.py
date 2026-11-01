@@ -185,13 +185,17 @@ def test_bootstrap_chunking_preserves_exact_rng_and_pvalue(rows):
     assert _bootstrap_pvalue(imp) == expected
 
 
-def test_tree_chunking_preserves_exact_output():
+def test_tree_chunking_preserves_exact_output(monkeypatch):
+    # This checks the Torch chunking fallback; fused native reduction is
+    # covered with floating-point tolerances in test_prior_execution.py.
+    monkeypatch.setenv('TABICL_PRIOR_TREE', 'torch')
     from scripts.benchmark_prior_operators import inputs
     reference, actual = inputs("tree", 4096)
     torch.testing.assert_close(actual(), reference(), rtol=0, atol=0)
 
 
-def test_tree_chunking_accepts_numpy_hyperparameters():
+def test_tree_chunking_accepts_numpy_hyperparameters(monkeypatch):
+    monkeypatch.setenv('TABICL_PRIOR_TREE', 'torch')
     from scripts.benchmark_prior_operators import inputs
     reference, actual = inputs("tree", 4096)
     # Graph-lib integer samplers return NumPy scalars in real generation.

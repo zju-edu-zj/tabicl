@@ -21,6 +21,9 @@ class PriorConfig:
     # maximum number of discretization levels in random discretization function
     max_discretization_cardinality: int = 256
     filter_unpredictable_datasets: bool = False
+    # Progressive mode accepts strong full-table evidence after four trees;
+    # otherwise it reuses those trees and completes the ordinary forest.
+    dataset_filter_mode: Literal['full', 'progressive'] = 'full'
     filter_unpredictable_graphs: bool = False
     min_n_nodes: int = 2
     max_n_nodes: int = 32
@@ -48,6 +51,7 @@ class PriorConfig:
                            use_node_l2_norm=args.use_node_l2_norm,
                            allow_act_warping=args.allow_act_warping,
                            filter_unpredictable_datasets=args.filter_unpredictable_datasets,
+                           dataset_filter_mode=getattr(args, 'dataset_filter_mode', 'full'),
                            filter_unpredictable_graphs=args.filter_unpredictable_graphs,
                            min_n_nodes=args.min_n_nodes,
                            max_n_nodes=args.max_n_nodes,
@@ -71,6 +75,8 @@ class PriorConfig:
 
     @staticmethod
     def add_args_to_parser(parser: argparse.ArgumentParser):
+        parser.add_argument('--dataset_filter_mode', choices=['full', 'progressive'], default='full',
+                            help='Full 25-tree filter, or full-table 4-to-25-tree progressive filtering')
         parser.add_argument(
             "--graph_noise",
             default=False,

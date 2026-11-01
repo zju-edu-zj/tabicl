@@ -152,6 +152,7 @@ def test_all_curriculum_scripts_support_shared_pool_and_override(tmp_path, task,
     root = Path(__file__).resolve().parents[1]
     env = dict(os.environ, DRY_RUN="1", PRIOR_BACKEND="node_pool", PRIOR_POOL_WORKERS="12",
                PRIOR_POOL_WINDOW="7", PRIOR_POOL_MB="128", PRIOR_SCHEDULE="window_bucketed",
+               PRIOR_FILTER_MODE="progressive",
                PRIOR_POOL_KERNEL_THREADS="8",
                PRIOR_POOL_TRANSPORT="mmap", PRIOR_BUCKET_STEPS="3",
                CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
@@ -165,6 +166,7 @@ def test_all_curriculum_scripts_support_shared_pool_and_override(tmp_path, task,
     assert args.prior_schedule == "window_bucketed"
     assert args.prior_pool_transport == "mmap" and args.prior_bucket_steps == 3
     assert args.prior_pool_kernel_threads == 8
+    assert args.dataset_filter_mode == "progressive"
 
 
 @pytest.mark.parametrize("stage", [1, 2, 3])

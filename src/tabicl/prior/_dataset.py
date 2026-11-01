@@ -1624,14 +1624,41 @@ def should_filter(
     Y_np = Y.detach().cpu().numpy()
 
     # do the squeeze to avoid a sklearn warning
+    if config.dataset_filter_mode not in ('full', 'progressive'):
+        raise ValueError('dataset_filter_mode must be full or progressive')
+    # Binary targets use one column; class count, rather than target width,
+    # determines eligibility. Other shapes use the established full filter.
+    progressive = (config.dataset_filter_mode == 'progressive' and is_classif
+                   and config.filter_unpredictable_datasets and not config.remove_trivial_datasets
+                   and n_estimators == 25 and n_boot == 200
+                   and len(Y_np) in (2048, 4096) and 2 <= C <= 10
+                   and 1 <= X_np.shape[1] <= 100)
     et = ExtraTreesRegressor(
-        n_estimators=n_estimators,
+        n_estimators=4 if progressive else n_estimators,
         bootstrap=True,
         oob_score=True,
         n_jobs=1,
         random_state=1,  # don't set to 0 because it doesn't give OOB scores for all samples for some 133 <= n <= 257
         max_depth=6,  # make it faster
-    ).fit(X_np, np.squeeze(Y_np, axis=-1) if Y_np.shape[-1] == 1 else Y_np)
+        warm_start=progressive,
+    )
+    fit_target = np.squeeze(Y_np, axis=-1) if Y_np.shape[-1] == 1 else Y_np
+    if progressive:
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Some inputs do not have OOB scores.*', category=UserWarning)
+            et.fit(X_np, fit_target)
+        pred = et.oob_prediction_.reshape(Y_np.shape)
+        baseline = Y_np.mean(axis=0, keepdims=True)
+        imp = ((Y_np-baseline)**2).sum(1)-((Y_np-pred)**2).sum(1)
+        # Only early ACCEPT: weak evidence defers, it never rejects an
+        # interaction/multi-hop task before the complete forest sees it.
+        # This is an audited empirical score, not a confidence test: sklearn
+        # zero-fills rows with no OOB votes in this four-tree prefix.
+        z = imp.mean()/(imp.std(ddof=1)/np.sqrt(len(imp))+1e-30)
+        if np.isfinite(z) and z >= 2.0:
+            return False
+        et.set_params(n_estimators=n_estimators)
+    et.fit(X_np, fit_target)
 
     Yhat = et.oob_prediction_  # (n, d)
     if len(Yhat.shape) == 1:
