@@ -33,6 +33,23 @@ def test_build_identity_tracks_source_and_torch(tmp_path):
     assert first['source_sha256'] != second['source_sha256']
     assert first['torch'] == torch.__version__
     assert first['cxx11_abi'] == bool(torch._C._GLIBCXX_USE_CXX11_ABI)
+    header = tmp_path/'_forest_cpu.h'
+    header.write_text('first')
+    third = m.runtime_identity(source, torch)
+    assert third['source_sha256'] != second['source_sha256']
+    header.write_text('second')
+    assert m.runtime_identity(source, torch)['source_sha256'] != third['source_sha256']
+
+
+def test_native_mode_rejects_old_library_before_training(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    m = module()
+    monkeypatch.setenv('TABICL_PRIOR_FOREST', 'native')
+    monkeypatch.setattr(m, 'REQUIRED_OPS', ())
+    fake_torch = SimpleNamespace(ops=SimpleNamespace(
+        load_library=lambda path: None, tabicl_prior_exact=SimpleNamespace()))
+    with pytest.raises(RuntimeError, match='forest_oob_cpu'):
+        m.validate_library(tmp_path/'old.so', fake_torch)
 
 
 def test_python_cli_and_shell_fast_prior_defaults(tmp_path):
@@ -123,7 +140,7 @@ def test_benchmark_launch_command_uses_resolved_interpreter(tmp_path, monkeypatc
     spec = importlib.util.spec_from_file_location('benchmark_training_schedule', ROOT/'scripts/benchmark_training_schedule.py')
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    monkeypatch.setattr(sys, 'argv', ['benchmark', '--steps', '1', '--output', str(tmp_path)])
+    monkeypatch.setattr(sys, 'argv', ['benchmark', '--steps', '1', '--output', str(tmp_path/'run')])
     dry_text = subprocess.check_output(['bash', str(ROOT/'scripts/train_v2_clf_stage1.sh')],
         cwd=ROOT, text=True, env=dict(os.environ, DRY_RUN='1', PYTHON='/fake/vendor/python',
             CKPT_DIR=str(tmp_path/'ckpt'), LOG_DIR=str(tmp_path/'logs')))
@@ -138,3 +155,31 @@ def test_benchmark_launch_command_uses_resolved_interpreter(tmp_path, monkeypatc
     assert error.value.code == 0
     assert calls[0][:4] == [sys.executable, '-m', 'torch.distributed.run', '--standalone']
     assert '/fake/vendor/python' not in calls[0]
+
+
+@pytest.mark.parametrize('override,graph,expected', [
+    (None, 'optimized', 'native'), ('sklearn', 'optimized', 'sklearn'),
+    (None, 'reference', 'unset')])
+def test_stage1_forest_environment_default_and_override(tmp_path, override, graph, expected):
+    env = dict(os.environ, DRY_RUN='1', CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path),
+               PRIOR_GRAPH_EXECUTION=graph, PRIOR_FILTER_EXECUTION='sufficient', PRIOR_FILTER_MODE='full')
+    env.pop('TABICL_PRIOR_FOREST', None)
+    if override:
+        env['TABICL_PRIOR_FOREST'] = override
+    command = 'source scripts/train_v2_clf_stage1.sh >/dev/null; printf "%s" "${TABICL_PRIOR_FOREST:-unset}"'
+    assert subprocess.check_output(['bash', '-c', command], cwd=ROOT, env=env, text=True) == expected
+
+
+@pytest.mark.parametrize('stage,graph,filter_mode,execution,expected', [
+    (1, 'optimized', 'full', 'sufficient', 'native'),
+    (2, 'optimized', 'full', 'sufficient', 'sklearn'),
+    (3, 'optimized', 'full', 'sufficient', 'sklearn'),
+    (1, 'reference', 'full', 'sufficient', 'sklearn'),
+    (1, 'optimized', 'progressive', 'sufficient', 'sklearn'),
+    (1, 'optimized', 'full', 'reference', 'sklearn')])
+def test_benchmark_matches_stage_specific_forest_environment(stage, graph, filter_mode, execution, expected):
+    spec = importlib.util.spec_from_file_location('benchmark_training_schedule', ROOT/'scripts/benchmark_training_schedule.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    tokens = ['--graph_execution', graph, '--dataset_filter_mode', filter_mode, '--filter_execution', execution]
+    assert mod.recipe_forest_default(stage, tokens) == expected

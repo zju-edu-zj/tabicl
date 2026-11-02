@@ -1,5 +1,9 @@
 # Prior CPU 优化与 Stage 1 默认配置
 
+后续完整森林专用实现、独立质量探针及逐任务长尾诊断，见 [完整森林与长尾报告](prior_native_forest_20261103.md)。本页的旧实验数字保留其原始配置，不能与后续实现的收益重复累计。
+
+当前 Stage 1 的 `optimized/sufficient/full` 入口默认还启用 `TABICL_PRIOR_FOREST=native`，保留完整 25-tree/depth-six/bootstrap/OOB 机制。它减少完整 prior CPU 工作约 2.3%，但新增 800-step×8 轮 ABBA 尚未确认稳定训练加速（FP32 −0.11%、BF16 +0.90%，均在波动范围内）；不要将森林热点快 18%–22% 当成整步加速。使用 `TABICL_PRIOR_FOREST=sklearn` 可回退；其他 curriculum stage 不切换。native 森林依赖当前 Torch C++ ABI，不依赖 sklearn 私有树 ABI，也无需新 Python 包。完整数据与限制见后续报告。
+
 ## 一键启动与安装
 
 在已配置的远端进入 `/ossfs/workspace/tabicl-training-perf`：

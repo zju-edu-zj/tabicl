@@ -75,3 +75,14 @@ class ReadyMicros:
                     ready_micro_max_late_steps=self.max_late_steps,
                     ready_micro_max_early_steps=self.max_early_steps,
                     ready_micro_fairness_wait_checks=self.forced_waits)
+
+    def wait_state(self):
+        """Diagnostic only; called after pop_step failed, under service lock."""
+        due = [u for u in self.units.values()
+               if u.batch <= self.next_step-self.max_delay and u.left]
+        missing = [task for u in due for position, task in enumerate(u.task_ids)
+                   if not u.completed & (1 << position)]
+        return dict(reason='due_micro' if due else 'insufficient_ready',
+                    missing_task_ids=missing,
+                    ready_units=sum(u.left == 0 for u in self.units.values()),
+                    due_unfinished_units=len(due))

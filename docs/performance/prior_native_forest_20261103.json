@@ -1,0 +1,1398 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-03",
+  "base_commit": "c691a51",
+  "environment": {
+    "device": "8 x PPU-ZW810 96GB",
+    "cpu_quota_cores": 69.76,
+    "python": "3.12.11",
+    "torch": "2.8 vendor build",
+    "numpy": "1.26",
+    "sklearn": "1.7.2",
+    "workers": 56,
+    "worker_kernel_threads": 1,
+    "python_hash_seed": 42
+  },
+  "raw_results_root": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103",
+  "replay": [
+    {
+      "rows": 2048,
+      "seed": 99,
+      "candidates": 128,
+      "nearest_calls": 24,
+      "repetitions": 3,
+      "forest_cpu_s": {
+        "sklearn": 22.01263513399996,
+        "native": 18.097528509000092
+      },
+      "nearest_cpu_s": {
+        "rows": 4.122707108000036,
+        "bound": 3.8652098049999637
+      },
+      "forest_decision_flips": 2,
+      "nearest_changed": 0,
+      "note": "Paired real-candidate single-worker replay; not full-prior or training throughput."
+    },
+    {
+      "rows": 4096,
+      "seed": 99,
+      "candidates": 128,
+      "nearest_calls": 24,
+      "repetitions": 3,
+      "forest_cpu_s": {
+        "sklearn": 43.89685476399988,
+        "native": 37.206205397999994
+      },
+      "nearest_cpu_s": {
+        "rows": 6.051698221999928,
+        "bound": 6.243039977999814
+      },
+      "forest_decision_flips": 2,
+      "nearest_changed": 0,
+      "note": "Paired real-candidate single-worker replay; not full-prior or training throughput."
+    }
+  ],
+  "cpu_initial": [
+    {
+      "rows": 2048,
+      "seed": 98,
+      "mode": "A",
+      "position": 0,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 50.17268018051982,
+      "generation_s": 12.421685438603163,
+      "generation_tables_per_s": 164.87295626045903,
+      "cpu_s": 619.9831988340001,
+      "graph_s": 433.37047374621034,
+      "filter_s": 187.17647852003574,
+      "filter_calls": 2662,
+      "rejected_by_filter": 614,
+      "graph_calls": 2981,
+      "forest_fit_sizes": {
+        "25": 2662
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": false
+    },
+    {
+      "rows": 2048,
+      "seed": 98,
+      "mode": "B",
+      "position": 1,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 48.39882291853428,
+      "generation_s": 10.884263973683119,
+      "generation_tables_per_s": 188.16155184694392,
+      "cpu_s": 541.526820804,
+      "graph_s": 402.03681829571724,
+      "filter_s": 140.3066550195217,
+      "filter_calls": 2666,
+      "rejected_by_filter": 618,
+      "graph_calls": 2986,
+      "forest_fit_sizes": {
+        "25": 2666
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 2048,
+      "seed": 98,
+      "mode": "B",
+      "position": 2,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 50.34164234250784,
+      "generation_s": 12.178488820791245,
+      "generation_tables_per_s": 168.16536354688216,
+      "cpu_s": 587.30905058,
+      "graph_s": 437.3261419571936,
+      "filter_s": 150.56344867870212,
+      "filter_calls": 2666,
+      "rejected_by_filter": 618,
+      "graph_calls": 2986,
+      "forest_fit_sizes": {
+        "25": 2666
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": false
+    },
+    {
+      "rows": 2048,
+      "seed": 98,
+      "mode": "A",
+      "position": 3,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 50.02122340723872,
+      "generation_s": 12.475088458508253,
+      "generation_tables_per_s": 164.16717258651775,
+      "cpu_s": 602.716459825,
+      "graph_s": 422.75898722559214,
+      "filter_s": 180.9142769947648,
+      "filter_calls": 2662,
+      "rejected_by_filter": 614,
+      "graph_calls": 2981,
+      "forest_fit_sizes": {
+        "25": 2662
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 2048,
+      "seed": 99,
+      "mode": "A",
+      "position": 0,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 48.96693443506956,
+      "generation_s": 11.034987092018127,
+      "generation_tables_per_s": 185.5915174999496,
+      "cpu_s": 579.73180087,
+      "graph_s": 403.031201120466,
+      "filter_s": 177.606144759804,
+      "filter_calls": 2650,
+      "rejected_by_filter": 602,
+      "graph_calls": 3012,
+      "forest_fit_sizes": {
+        "25": 2650
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 2048,
+      "seed": 99,
+      "mode": "B",
+      "position": 1,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 50.25155208259821,
+      "generation_s": 10.372260481119156,
+      "generation_tables_per_s": 197.44972696434084,
+      "cpu_s": 547.050610833,
+      "graph_s": 403.20880937576294,
+      "filter_s": 144.12075269967318,
+      "filter_calls": 2650,
+      "rejected_by_filter": 602,
+      "graph_calls": 3013,
+      "forest_fit_sizes": {
+        "25": 2650
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 2048,
+      "seed": 99,
+      "mode": "B",
+      "position": 2,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 50.11591427773237,
+      "generation_s": 11.043219305574894,
+      "generation_tables_per_s": 185.45316753477115,
+      "cpu_s": 575.218133036,
+      "graph_s": 424.3610124774277,
+      "filter_s": 150.9435153082013,
+      "filter_calls": 2650,
+      "rejected_by_filter": 602,
+      "graph_calls": 3013,
+      "forest_fit_sizes": {
+        "25": 2650
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 2048,
+      "seed": 99,
+      "mode": "A",
+      "position": 3,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 48.81494040042162,
+      "generation_s": 11.403986286371946,
+      "generation_tables_per_s": 179.58632609435983,
+      "cpu_s": 603.215205867,
+      "graph_s": 419.425661791116,
+      "filter_s": 184.19552478194237,
+      "filter_calls": 2650,
+      "rejected_by_filter": 602,
+      "graph_calls": 3012,
+      "forest_fit_sizes": {
+        "25": 2650
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 4096,
+      "seed": 98,
+      "mode": "A",
+      "position": 0,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 59.163870468735695,
+      "generation_s": 20.46742356568575,
+      "generation_tables_per_s": 100.0614461037262,
+      "cpu_s": 1056.726700828,
+      "graph_s": 711.6051799021661,
+      "filter_s": 345.8153695128858,
+      "filter_calls": 2554,
+      "rejected_by_filter": 506,
+      "graph_calls": 2873,
+      "forest_fit_sizes": {
+        "25": 2554
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 4096,
+      "seed": 98,
+      "mode": "B",
+      "position": 1,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 56.863903779536486,
+      "generation_s": 19.60996003448963,
+      "generation_tables_per_s": 104.43672482748643,
+      "cpu_s": 994.7762032129999,
+      "graph_s": 708.7594079822302,
+      "filter_s": 286.208524543792,
+      "filter_calls": 2552,
+      "rejected_by_filter": 504,
+      "graph_calls": 2871,
+      "forest_fit_sizes": {
+        "25": 2552
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 4096,
+      "seed": 98,
+      "mode": "B",
+      "position": 2,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 56.76369744539261,
+      "generation_s": 19.32095292583108,
+      "generation_tables_per_s": 105.99891257236767,
+      "cpu_s": 966.34694583,
+      "graph_s": 688.4227648191154,
+      "filter_s": 278.4231281466782,
+      "filter_calls": 2552,
+      "rejected_by_filter": 504,
+      "graph_calls": 2871,
+      "forest_fit_sizes": {
+        "25": 2552
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 4096,
+      "seed": 98,
+      "mode": "A",
+      "position": 3,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 57.712779086083174,
+      "generation_s": 20.126689299941063,
+      "generation_tables_per_s": 101.75543376654585,
+      "cpu_s": 1026.8310845370002,
+      "graph_s": 689.5989302322268,
+      "filter_s": 337.93418042361736,
+      "filter_calls": 2554,
+      "rejected_by_filter": 506,
+      "graph_calls": 2873,
+      "forest_fit_sizes": {
+        "25": 2554
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 4096,
+      "seed": 99,
+      "mode": "A",
+      "position": 0,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 57.085550524294376,
+      "generation_s": 19.786167223006487,
+      "generation_tables_per_s": 103.50665578216055,
+      "cpu_s": 987.510605914,
+      "graph_s": 655.0962542705238,
+      "filter_s": 332.34362687170506,
+      "filter_calls": 2530,
+      "rejected_by_filter": 482,
+      "graph_calls": 2866,
+      "forest_fit_sizes": {
+        "25": 2530
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 4096,
+      "seed": 99,
+      "mode": "B",
+      "position": 1,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 56.585903868079185,
+      "generation_s": 18.880803871899843,
+      "generation_tables_per_s": 108.46995784157383,
+      "cpu_s": 912.995649769,
+      "graph_s": 640.9589150436223,
+      "filter_s": 271.9406921826303,
+      "filter_calls": 2519,
+      "rejected_by_filter": 471,
+      "graph_calls": 2853,
+      "forest_fit_sizes": {
+        "25": 2519
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 4096,
+      "seed": 99,
+      "mode": "B",
+      "position": 2,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 56.92147662490606,
+      "generation_s": 18.882315196096897,
+      "generation_tables_per_s": 108.46127599984855,
+      "cpu_s": 942.6374101719999,
+      "graph_s": 663.7075556106865,
+      "filter_s": 278.6998183466494,
+      "filter_calls": 2519,
+      "rejected_by_filter": 471,
+      "graph_calls": 2853,
+      "forest_fit_sizes": {
+        "25": 2519
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    },
+    {
+      "rows": 4096,
+      "seed": 99,
+      "mode": "A",
+      "position": 3,
+      "tasks": 2048,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 57.761217676103115,
+      "generation_s": 20.379013437777758,
+      "generation_tables_per_s": 100.4955419580569,
+      "cpu_s": 1023.412471093,
+      "graph_s": 678.7458627186716,
+      "filter_s": 344.2199943140149,
+      "filter_calls": 2530,
+      "rejected_by_filter": 482,
+      "graph_calls": 2866,
+      "forest_fit_sizes": {
+        "25": 2530
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/afecfba93297ddd25af4/tabicl_prior_exact_cpu.so",
+      "exclusive": true
+    }
+  ],
+  "cpu_long_exclusive": [
+    {
+      "rows": 2048,
+      "seed": 98,
+      "mode": "A",
+      "position": 0,
+      "tasks": 8192,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 78.90106484666467,
+      "generation_s": 41.38538409397006,
+      "generation_tables_per_s": 197.9442786225969,
+      "cpu_s": 2197.6331560149997,
+      "graph_s": 1532.07205273211,
+      "filter_s": 670.5913627967238,
+      "filter_calls": 10792,
+      "rejected_by_filter": 2600,
+      "graph_calls": 12133,
+      "forest_fit_sizes": {
+        "25": 10792
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/64c269d3831a8ba30ee5/tabicl_prior_exact_cpu.so"
+    },
+    {
+      "rows": 2048,
+      "seed": 98,
+      "mode": "B",
+      "position": 1,
+      "tasks": 8192,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 81.58239409327507,
+      "generation_s": 43.47160691395402,
+      "generation_tables_per_s": 188.4448397827787,
+      "cpu_s": 2306.369388622,
+      "graph_s": 1712.3177582845092,
+      "filter_s": 595.0462220050395,
+      "filter_calls": 10815,
+      "rejected_by_filter": 2623,
+      "graph_calls": 12160,
+      "forest_fit_sizes": {
+        "25": 10815
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/64c269d3831a8ba30ee5/tabicl_prior_exact_cpu.so"
+    },
+    {
+      "rows": 2048,
+      "seed": 98,
+      "mode": "B",
+      "position": 2,
+      "tasks": 8192,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 80.41336290165782,
+      "generation_s": 41.609691351652145,
+      "generation_tables_per_s": 196.87721138731135,
+      "cpu_s": 2201.833530644,
+      "graph_s": 1631.3633217960596,
+      "filter_s": 572.9418677277863,
+      "filter_calls": 10815,
+      "rejected_by_filter": 2623,
+      "graph_calls": 12160,
+      "forest_fit_sizes": {
+        "25": 10815
+      },
+      "forest": "native",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/64c269d3831a8ba30ee5/tabicl_prior_exact_cpu.so"
+    },
+    {
+      "rows": 2048,
+      "seed": 98,
+      "mode": "A",
+      "position": 3,
+      "tasks": 8192,
+      "workers": 56,
+      "warm_workers": true,
+      "wall_s": 82.74467131495476,
+      "generation_s": 45.45128433406353,
+      "generation_tables_per_s": 180.23693103564278,
+      "cpu_s": 2417.5070311160002,
+      "graph_s": 1687.1378954164684,
+      "filter_s": 733.8274084702134,
+      "filter_calls": 10792,
+      "rejected_by_filter": 2600,
+      "graph_calls": 12133,
+      "forest_fit_sizes": {
+        "25": 10792
+      },
+      "forest": "sklearn",
+      "native_library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/64c269d3831a8ba30ee5/tabicl_prior_exact_cpu.so"
+    }
+  ],
+  "quality": [
+    {
+      "rows": 2048,
+      "seed": 99,
+      "tasks": 256,
+      "modes": {
+        "sklearn": {
+          "width": 51.8125,
+          "classes": 5.6171875,
+          "entropy": 1.3889450177708154,
+          "minority": 0.10433578491210938,
+          "unique_rows": 1800.55859375,
+          "baseline_accuracy": 0.41556529992186586,
+          "linear_accuracy": 0.7023221548060252,
+          "linear_balanced_accuracy": 0.5817446903957266,
+          "boosted_accuracy": 0.7815936079155676,
+          "boosted_balanced_accuracy": 0.6970700628117885
+        },
+        "native": {
+          "width": 51.8125,
+          "classes": 5.61328125,
+          "entropy": 1.3863484345707893,
+          "minority": 0.1056365966796875,
+          "unique_rows": 1807.1796875,
+          "baseline_accuracy": 0.4163513522765121,
+          "linear_accuracy": 0.7037766015703443,
+          "linear_balanced_accuracy": 0.5827257062304134,
+          "boosted_accuracy": 0.7815696258438427,
+          "boosted_balanced_accuracy": 0.6960655715010322
+        }
+      },
+      "paired_difference_ci95": {
+        "width": [
+          -0.01171875,
+          0.01171875
+        ],
+        "classes": [
+          -0.01171875,
+          0
+        ],
+        "entropy": [
+          -0.012335492130295993,
+          0.0034745292195944764
+        ],
+        "minority": [
+          -0.001613616943359375,
+          0.004757595062255856
+        ],
+        "unique_rows": [
+          0,
+          17.44921875
+        ],
+        "baseline_accuracy": [
+          -0.004085282754847186,
+          0.0072570081582004455
+        ],
+        "linear_accuracy": [
+          -0.006827121512625804,
+          0.009581968146965044
+        ],
+        "linear_balanced_accuracy": [
+          -0.007578417331218617,
+          0.009926519298886605
+        ],
+        "boosted_accuracy": [
+          -0.008964137671839024,
+          0.008138106827934146
+        ],
+        "boosted_balanced_accuracy": [
+          -0.010892263808815238,
+          0.00890182046146262
+        ]
+      },
+      "bootstrap_unit": "intact four-task prior parameter group; paired by task_id",
+      "same_table": 250
+    },
+    {
+      "rows": 4096,
+      "seed": 99,
+      "tasks": 256,
+      "modes": {
+        "sklearn": {
+          "width": 52.09765625,
+          "classes": 5.765625,
+          "entropy": 1.4309699472782063,
+          "minority": 0.104156494140625,
+          "unique_rows": 3711.9140625,
+          "baseline_accuracy": 0.40900798653213155,
+          "linear_accuracy": 0.6826172117821474,
+          "linear_balanced_accuracy": 0.5653525486046238,
+          "boosted_accuracy": 0.7525592960512004,
+          "boosted_balanced_accuracy": 0.6772678588751158
+        },
+        "native": {
+          "width": 52.1796875,
+          "classes": 5.765625,
+          "entropy": 1.4291613911876813,
+          "minority": 0.10303497314453125,
+          "unique_rows": 3708.921875,
+          "baseline_accuracy": 0.4103972924129451,
+          "linear_accuracy": 0.6831500839941408,
+          "linear_balanced_accuracy": 0.5646020561455862,
+          "boosted_accuracy": 0.7532207411595322,
+          "boosted_balanced_accuracy": 0.6767307062893215
+        }
+      },
+      "paired_difference_ci95": {
+        "width": [
+          0,
+          0.21484375
+        ],
+        "classes": [
+          0,
+          0
+        ],
+        "entropy": [
+          -0.006633603409468295,
+          0.0014231038359825109
+        ],
+        "minority": [
+          -0.004048347473144531,
+          0.0005331039428710938
+        ],
+        "unique_rows": [
+          -8.96484375,
+          0
+        ],
+        "baseline_accuracy": [
+          -0.0010086190695741007,
+          0.004835992393259646
+        ],
+        "linear_accuracy": [
+          -0.0026137849016704216,
+          0.00477893610179583
+        ],
+        "linear_balanced_accuracy": [
+          -0.005235393406677359,
+          0.004099591923876596
+        ],
+        "boosted_accuracy": [
+          -0.004435683093952002,
+          0.00715795870680576
+        ],
+        "boosted_balanced_accuracy": [
+          -0.0069167023128946375,
+          0.007112281526620743
+        ]
+      },
+      "bootstrap_unit": "intact four-task prior parameter group; paired by task_id",
+      "same_table": 252
+    }
+  ],
+  "scope": [
+    "Native forest preserves full 25-tree depth-six bootstrap/OOB mechanism; seedwise identity is not required.",
+    "Rejected nearest-center bound prototype is absent from production code.",
+    "Component-only speedups are not end-to-end speedups.",
+    "Quality probes with confidence intervals containing zero do not prove equivalence or downstream model quality.",
+    "Traced training is separate from uninstrumented ABBA speed measurements."
+  ],
+  "training": [
+    {
+      "wall_seconds": 516.4698269926012,
+      "exit_code": 0,
+      "dtype": "float32",
+      "gpus": 8,
+      "steps": 800,
+      "stage": 1,
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103/training/float32-0-sklearn",
+      "skip": 80,
+      "prior_time": {
+        "mean_ms": 13.11291213043862,
+        "p95_ms": 20.60435339808464,
+        "max_ms": 50.99209398031235,
+        "samples": 720
+      },
+      "train_time": {
+        "mean_ms": 470.6338938739565,
+        "p95_ms": 549.3603928014635,
+        "max_ms": 1267.392747104168,
+        "samples": 720
+      },
+      "rank_timing/prior_max_s": {
+        "mean_ms": 17.843783113898503,
+        "p95_ms": 26.254572346806526,
+        "max_ms": 57.70883336663246,
+        "samples": 720
+      },
+      "rank_timing/train_max_s": {
+        "mean_ms": 484.63690333689254,
+        "p95_ms": 557.9600365832448,
+        "max_ms": 2192.0661255717278,
+        "samples": 720
+      },
+      "rank_timing/step_max_s": {
+        "mean_ms": 497.8071531229135,
+        "p95_ms": 576.4804413542151,
+        "samples": 720
+      },
+      "steady_elapsed_per_step_ms": 491.4660291591038,
+      "oom_micro_batches": 0,
+      "nonfinite_loss": 0,
+      "forest": "sklearn",
+      "position": 0
+    },
+    {
+      "wall_seconds": 510.57568779587746,
+      "exit_code": 0,
+      "dtype": "float32",
+      "gpus": 8,
+      "steps": 800,
+      "stage": 1,
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103/training/float32-1-native",
+      "skip": 80,
+      "prior_time": {
+        "mean_ms": 12.462269716585675,
+        "p95_ms": 21.539491787552826,
+        "max_ms": 49.156397581100464,
+        "samples": 720
+      },
+      "train_time": {
+        "mean_ms": 472.93549197105074,
+        "p95_ms": 551.115282997489,
+        "max_ms": 1166.2185937166214,
+        "samples": 720
+      },
+      "rank_timing/prior_max_s": {
+        "mean_ms": 18.277785844273037,
+        "p95_ms": 27.88597401231527,
+        "max_ms": 50.51282048225403,
+        "samples": 720
+      },
+      "rank_timing/train_max_s": {
+        "mean_ms": 487.3856974299997,
+        "p95_ms": 566.3375763222574,
+        "max_ms": 1297.3697930574417,
+        "samples": 720
+      },
+      "rank_timing/step_max_s": {
+        "mean_ms": 500.47311938574745,
+        "p95_ms": 583.8073670864105,
+        "samples": 720
+      },
+      "steady_elapsed_per_step_ms": 494.0473706099308,
+      "oom_micro_batches": 0,
+      "nonfinite_loss": 0,
+      "forest": "native",
+      "position": 1
+    },
+    {
+      "wall_seconds": 508.63677513971925,
+      "exit_code": 0,
+      "dtype": "float32",
+      "gpus": 8,
+      "steps": 800,
+      "stage": 1,
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103/training/float32-2-native",
+      "skip": 80,
+      "prior_time": {
+        "mean_ms": 12.761714180103606,
+        "p95_ms": 21.282595209777345,
+        "max_ms": 55.53486570715904,
+        "samples": 720
+      },
+      "train_time": {
+        "mean_ms": 473.5107716483374,
+        "p95_ms": 549.6247906237841,
+        "max_ms": 1032.3871187865734,
+        "samples": 720
+      },
+      "rank_timing/prior_max_s": {
+        "mean_ms": 17.56292591906256,
+        "p95_ms": 26.402447186410424,
+        "max_ms": 59.77797135710716,
+        "samples": 720
+      },
+      "rank_timing/train_max_s": {
+        "mean_ms": 483.2077709957957,
+        "p95_ms": 557.0409756153821,
+        "max_ms": 1296.4766435325146,
+        "samples": 720
+      },
+      "rank_timing/step_max_s": {
+        "mean_ms": 495.45061747647,
+        "p95_ms": 570.8708925172687,
+        "samples": 720
+      },
+      "steady_elapsed_per_step_ms": 491.4023728679038,
+      "oom_micro_batches": 0,
+      "nonfinite_loss": 0,
+      "forest": "native",
+      "position": 2
+    },
+    {
+      "wall_seconds": 512.7489763014019,
+      "exit_code": 0,
+      "dtype": "float32",
+      "gpus": 8,
+      "steps": 800,
+      "stage": 1,
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103/training/float32-3-sklearn",
+      "skip": 80,
+      "prior_time": {
+        "mean_ms": 13.656747139369449,
+        "p95_ms": 23.204106092452996,
+        "max_ms": 38.36413845419884,
+        "samples": 720
+      },
+      "train_time": {
+        "mean_ms": 473.5849985697617,
+        "p95_ms": 550.8495047688484,
+        "max_ms": 1055.0323650240898,
+        "samples": 720
+      },
+      "rank_timing/prior_max_s": {
+        "mean_ms": 18.823110829624866,
+        "p95_ms": 29.0818203240633,
+        "max_ms": 49.68905448913574,
+        "samples": 720
+      },
+      "rank_timing/train_max_s": {
+        "mean_ms": 484.4497006179558,
+        "p95_ms": 560.3266548365353,
+        "max_ms": 1262.9283405840397,
+        "samples": 720
+      },
+      "rank_timing/step_max_s": {
+        "mean_ms": 497.4391634989944,
+        "p95_ms": 576.3737499713898,
+        "samples": 720
+      },
+      "steady_elapsed_per_step_ms": 492.89052318781614,
+      "oom_micro_batches": 0,
+      "nonfinite_loss": 0,
+      "forest": "sklearn",
+      "position": 3
+    },
+    {
+      "wall_seconds": 378.1387802064419,
+      "exit_code": 0,
+      "dtype": "bfloat16",
+      "gpus": 8,
+      "steps": 800,
+      "stage": 1,
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103/training/bfloat16-0-sklearn",
+      "skip": 80,
+      "prior_time": {
+        "mean_ms": 33.6816782804413,
+        "p95_ms": 63.267271779477554,
+        "max_ms": 4681.07395991683,
+        "samples": 720
+      },
+      "train_time": {
+        "mean_ms": 286.3818388328784,
+        "p95_ms": 336.563016846776,
+        "max_ms": 1050.42127892375,
+        "samples": 720
+      },
+      "rank_timing/prior_max_s": {
+        "mean_ms": 39.78724015048808,
+        "p95_ms": 76.12011376768336,
+        "max_ms": 4684.677515178919,
+        "samples": 720
+      },
+      "rank_timing/train_max_s": {
+        "mean_ms": 302.06898313222655,
+        "p95_ms": 360.13665031641716,
+        "max_ms": 1199.7460462152958,
+        "samples": 720
+      },
+      "rank_timing/step_max_s": {
+        "mean_ms": 335.52280590972964,
+        "p95_ms": 392.2003088518974,
+        "samples": 720
+      },
+      "steady_elapsed_per_step_ms": 329.21187504608594,
+      "oom_micro_batches": 0,
+      "nonfinite_loss": 0,
+      "forest": "sklearn",
+      "position": 0
+    },
+    {
+      "wall_seconds": 364.98199332877994,
+      "exit_code": 0,
+      "dtype": "bfloat16",
+      "gpus": 8,
+      "steps": 800,
+      "stage": 1,
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103/training/bfloat16-1-native",
+      "skip": 80,
+      "prior_time": {
+        "mean_ms": 14.223776255837745,
+        "p95_ms": 20.209556631743904,
+        "max_ms": 1310.8387254178524,
+        "samples": 720
+      },
+      "train_time": {
+        "mean_ms": 289.3726693104125,
+        "p95_ms": 329.839782230556,
+        "max_ms": 753.3310912549496,
+        "samples": 720
+      },
+      "rank_timing/prior_max_s": {
+        "mean_ms": 20.277737267315388,
+        "p95_ms": 27.57830861955881,
+        "max_ms": 1319.61128115654,
+        "samples": 720
+      },
+      "rank_timing/train_max_s": {
+        "mean_ms": 303.8659870158881,
+        "p95_ms": 344.2944891750812,
+        "max_ms": 1490.5582405626774,
+        "samples": 720
+      },
+      "rank_timing/step_max_s": {
+        "mean_ms": 318.7337695413994,
+        "p95_ms": 360.04615090787405,
+        "samples": 720
+      },
+      "steady_elapsed_per_step_ms": 312.87053311761053,
+      "oom_micro_batches": 0,
+      "nonfinite_loss": 0,
+      "forest": "native",
+      "position": 1
+    },
+    {
+      "wall_seconds": 373.65891399234533,
+      "exit_code": 0,
+      "dtype": "bfloat16",
+      "gpus": 8,
+      "steps": 800,
+      "stage": 1,
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103/training/bfloat16-2-native",
+      "skip": 80,
+      "prior_time": {
+        "mean_ms": 18.90236290378703,
+        "p95_ms": 25.641776435077187,
+        "max_ms": 2995.3238554298878,
+        "samples": 720
+      },
+      "train_time": {
+        "mean_ms": 294.17701535340814,
+        "p95_ms": 352.2098202258348,
+        "max_ms": 929.6071119606495,
+        "samples": 720
+      },
+      "rank_timing/prior_max_s": {
+        "mean_ms": 24.938097880739303,
+        "p95_ms": 34.068494476377865,
+        "max_ms": 3005.8384276926517,
+        "samples": 720
+      },
+      "rank_timing/train_max_s": {
+        "mean_ms": 310.1891872524801,
+        "p95_ms": 367.99426171928644,
+        "max_ms": 1635.5179585516453,
+        "samples": 720
+      },
+      "rank_timing/step_max_s": {
+        "mean_ms": 329.4243873562664,
+        "p95_ms": 387.9022177308797,
+        "samples": 720
+      },
+      "steady_elapsed_per_step_ms": 323.35223518829383,
+      "oom_micro_batches": 0,
+      "nonfinite_loss": 0,
+      "forest": "native",
+      "position": 2
+    },
+    {
+      "wall_seconds": 362.53427329286933,
+      "exit_code": 0,
+      "dtype": "bfloat16",
+      "gpus": 8,
+      "steps": 800,
+      "stage": 1,
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-split-20261103/training/bfloat16-3-sklearn",
+      "skip": 80,
+      "prior_time": {
+        "mean_ms": 12.936611851263379,
+        "p95_ms": 20.641339384019375,
+        "max_ms": 689.935702830553,
+        "samples": 720
+      },
+      "train_time": {
+        "mean_ms": 288.92654016510477,
+        "p95_ms": 321.54812663793564,
+        "max_ms": 977.7449369430542,
+        "samples": 720
+      },
+      "rank_timing/prior_max_s": {
+        "mean_ms": 19.24473243351612,
+        "p95_ms": 27.77099031955003,
+        "max_ms": 700.6509266793728,
+        "samples": 720
+      },
+      "rank_timing/train_max_s": {
+        "mean_ms": 307.1626024786383,
+        "p95_ms": 334.25220008939505,
+        "max_ms": 1479.0798537433147,
+        "samples": 720
+      },
+      "rank_timing/step_max_s": {
+        "mean_ms": 320.62607091955016,
+        "p95_ms": 347.58891332894564,
+        "samples": 720
+      },
+      "steady_elapsed_per_step_ms": 312.7287641685042,
+      "oom_micro_batches": 0,
+      "nonfinite_loss": 0,
+      "forest": "sklearn",
+      "position": 3
+    }
+  ],
+  "training_aggregate": {
+    "float32": {
+      "sklearn_ms": 492.17827617345995,
+      "native_ms": 492.7248717389173,
+      "throughput_gain_fraction": -0.0011093321989781302,
+      "rank_max_prior_ms": {
+        "sklearn": 18.333446971761685,
+        "native": 17.9203558816678
+      },
+      "rank_max_train_ms": {
+        "sklearn": 484.54330197742416,
+        "native": 485.2967342128977
+      }
+    },
+    "bfloat16": {
+      "sklearn_ms": 320.9703196072951,
+      "native_ms": 318.11138415295216,
+      "throughput_gain_fraction": 0.008987215160361384,
+      "rank_max_prior_ms": {
+        "sklearn": 29.5159862920021,
+        "native": 22.607917574027347
+      },
+      "rank_max_train_ms": {
+        "sklearn": 304.6157928054324,
+        "native": 307.0275871341841
+      }
+    }
+  },
+  "trace": {
+    "tasks": 46080,
+    "completions": 46080,
+    "dispatched_steps": 720,
+    "skip_steps": 80,
+    "task_wall_s": {
+      "p50": 0.1788010634481907,
+      "p95": 0.8221598409116264,
+      "p99": 1.4321125271916382,
+      "max": 8.687432505190372
+    },
+    "task_cpu_s": {
+      "p50": 0.17712200799999778,
+      "p95": 0.8145842840500079,
+      "p99": 1.418238356959996,
+      "max": 8.629013720999993
+    },
+    "queue_s": {
+      "p50": 2.5933961179107428,
+      "p95": 3.5782921316102145,
+      "p99": 3.8842300533130762,
+      "max": 4.378022130578756
+    },
+    "transit_s": {
+      "p50": 0.0014831889420747757,
+      "p95": 0.009338379092514506,
+      "p99": 0.02125409368425606,
+      "max": 0.33565501123666763
+    },
+    "wait_union_s": {
+      "due_micro": 13.569322638213634,
+      "insufficient_ready": 1.4896214343607426
+    },
+    "due_wait_with_queued_blocker_union_s": 0,
+    "due_wait_with_running_blocker_union_s": 13.414923749864101,
+    "due_wait_with_transit_blocker_union_s": 0.017528347671031952,
+    "due_wait_with_known_blocker_union_s": 13.432452097535133,
+    "retry_results": {
+      "accepted": 46080,
+      "filter_rejected": 14280,
+      "class_sanity": 6802,
+      "no_features": 899
+    },
+    "attempt_stage_wall_s": {
+      "graph_s": 9328.20503764972,
+      "sanity_s": 108.14524789527059,
+      "filter_s": 3273.0006168931723
+    },
+    "rejected_attempt_stage_wall_s": {
+      "graph_s": 3094.735149808228,
+      "sanity_s": 41.735418014228344,
+      "filter_s": 845.9105871170759
+    },
+    "attempts_per_task": {
+      "p50": 1,
+      "p95": 3,
+      "p99": 5,
+      "max": 10
+    },
+    "component_exclusive_s": {
+      "nearest_center": 2442.2455234229565,
+      "RandomLinearFunction": 904.3740661554039,
+      "compact_em_probabilities": 778.3720553480089,
+      "RandomGPFunction": 758.4474550075829,
+      "RandomQuadraticFunction": 714.1978163644671,
+      "RandomTreeFunction": 593.4939538165927,
+      "CategoricalSoftmaxDiscretizer": 577.8006161078811,
+      "RandomNodeFunction": 537.6418223530054,
+      "Standardize": 394.25613471865654,
+      "RandomAggregationMultiFunction": 160.37067795172334,
+      "KumaraswamyWarping": 112.86870331689715,
+      "RandomFunction": 93.18355848640203,
+      "RandomDiscretizationFunction": 80.88294434919953,
+      "RandomRescale": 78.11969034001231,
+      "RandomTorchActivation": 75.35986300930381,
+      "CategoricalNeighborDiscretizer": 64.05258898809552,
+      "L2Normalize": 63.29820894822478,
+      "RandomEMAssignmentFunction": 62.037705179303885,
+      "RandomConcatMultiFunction": 45.8381859511137,
+      "NumericalConverter": 45.49422575905919,
+      "RandomPowerActivation": 40.54525860771537,
+      "RandomMLPFunction": 34.702902764081955,
+      "CheapRandomFunction": 28.952401630580425,
+      "RandomActivation": 28.80414805188775,
+      "RandomPowerReluActivation": 22.585251852869987,
+      "RandomProductFunction": 16.62976535409689,
+      "RandomMultiFunction": 13.828101646155119,
+      "RandomGraphFunction": 12.82422810792923,
+      "RandomActivationPlain": 12.126788690686226,
+      "CategoricalConverter": 10.88709258288145,
+      "RandomTensorSequential": 7.211195580661297,
+      "RandomNegPowerActivation": 1.9137270599603653,
+      "RandomIntPowerActivation": 1.7605095691978931
+    },
+    "due_blockers": [
+      {
+        "task_id": 21155,
+        "rank_wait_s": 26.998059637844563,
+        "task_wall_s": 8.687432505190372,
+        "attempts": [
+          {
+            "graph_s": 0.06649424135684967,
+            "sanity_s": 0.0015185438096523285,
+            "filter_s": 0.02862122282385826,
+            "result": "filter_rejected"
+          },
+          {
+            "graph_s": 8.528146043419838,
+            "sanity_s": 0.0007387511432170868,
+            "result": "no_features"
+          },
+          {
+            "graph_s": 0.025970373302698135,
+            "sanity_s": 0.0013896748423576355,
+            "filter_s": 0.03448013961315155,
+            "result": "accepted"
+          }
+        ],
+        "component_exclusive_s": {
+          "nearest_center": 7.731210559606552,
+          "RandomTreeFunction": 0.15348325297236443,
+          "RandomGPFunction": 0.12383570894598961,
+          "RandomLinearFunction": 0.1217440739274025
+        }
+      },
+      {
+        "task_id": 43461,
+        "rank_wait_s": 22.617221765220165,
+        "task_wall_s": 6.699771922081709,
+        "attempts": [
+          {
+            "graph_s": 0.6180870309472084,
+            "sanity_s": 0.0012924149632453918,
+            "result": "no_features"
+          },
+          {
+            "graph_s": 5.779286041855812,
+            "sanity_s": 0.0034027472138404846,
+            "filter_s": 0.1403079517185688,
+            "result": "filter_rejected"
+          },
+          {
+            "graph_s": 0.03954616189002991,
+            "sanity_s": 0.0030401423573493958,
+            "filter_s": 0.114625733345747,
+            "result": "accepted"
+          }
+        ],
+        "component_exclusive_s": {
+          "nearest_center": 4.566918607801199,
+          "compact_em_probabilities": 0.4529036842286587,
+          "RandomLinearFunction": 0.23817628994584084,
+          "RandomGPFunction": 0.23368431627750397
+        }
+      },
+      {
+        "task_id": 35276,
+        "rank_wait_s": 14.829051747918129,
+        "task_wall_s": 5.544362381100655,
+        "attempts": [
+          {
+            "graph_s": 0.1402025781571865,
+            "sanity_s": 0.0006940923631191254,
+            "filter_s": 0.02732892706990242,
+            "result": "filter_rejected"
+          },
+          {
+            "graph_s": 0.012920975685119629,
+            "sanity_s": 0.0007107779383659363,
+            "filter_s": 0.02690068632364273,
+            "result": "filter_rejected"
+          },
+          {
+            "graph_s": 4.631926819682121,
+            "sanity_s": 0.0003713183104991913,
+            "result": "no_features"
+          },
+          {
+            "graph_s": 0.569280743598938,
+            "sanity_s": 0.00037263333797454834,
+            "result": "no_features"
+          },
+          {
+            "graph_s": 0.10382923483848572,
+            "sanity_s": 0.0007185563445091248,
+            "filter_s": 0.028996646404266357,
+            "result": "accepted"
+          }
+        ],
+        "component_exclusive_s": {
+          "nearest_center": 4.194787345826626,
+          "RandomGPFunction": 0.2845911532640457,
+          "RandomLinearFunction": 0.2165381722152233,
+          "RandomQuadraticFunction": 0.19004543125629425
+        }
+      },
+      {
+        "task_id": 31212,
+        "rank_wait_s": 10.852603554725647,
+        "task_wall_s": 4.576374854892492,
+        "attempts": [
+          {
+            "graph_s": 1.3859486058354378,
+            "sanity_s": 0.002951856702566147,
+            "filter_s": 0.10819968208670616,
+            "result": "filter_rejected"
+          },
+          {
+            "graph_s": 0.38067150861024857,
+            "sanity_s": 0.002536732703447342,
+            "filter_s": 0.11646461486816406,
+            "result": "filter_rejected"
+          },
+          {
+            "graph_s": 2.4999971725046635,
+            "sanity_s": 0.0025921426713466644,
+            "filter_s": 0.0768594853579998,
+            "result": "accepted"
+          }
+        ],
+        "component_exclusive_s": {
+          "nearest_center": 2.748418413102627,
+          "compact_em_probabilities": 0.3042663298547268,
+          "RandomLinearFunction": 0.24350599944591522,
+          "RandomQuadraticFunction": 0.1695343665778637
+        }
+      }
+    ],
+    "note": "Queued/running/transit unions can overlap across different tasks; do not add them. Task/queue statistics select tasks by dispatched step when skip_steps>0. Component times are traced wall time, not process CPU.",
+    "coverage": {
+      "worker_files": 56,
+      "worker_min": 839,
+      "worker_max": 1082,
+      "service_events": 80008,
+      "worker_cap": 2048,
+      "service_cap": 500000
+    }
+  },
+  "tests": {
+    "full_suite": {
+      "passed": 1141,
+      "warnings": 7,
+      "seconds": 923.99,
+      "log": "/tmp/tabicl-final-prior-tests.log"
+    },
+    "focused": {
+      "passed": 148,
+      "seconds": 8.1,
+      "log": "/tmp/tabicl-final-focused-tests.log"
+    },
+    "trace_analyzer": {
+      "passed": 7,
+      "seconds": 0.83,
+      "log": "/tmp/tabicl-final-trace-tests.log"
+    },
+    "note": "Runs overlap in test cases; counts must not be summed as unique tests.",
+    "configuration": {
+      "passed": 94,
+      "deselected": 1,
+      "warnings": 1,
+      "seconds": 301.15,
+      "log": "/tmp/tabicl-final-config-tests.log",
+      "note": "Cold native build already passed in full suite; not repeated. Includes new default-selection tests and numerical compile contracts."
+    }
+  },
+  "default": {
+    "stage": 1,
+    "graph_execution": "optimized",
+    "filter_execution": "sufficient",
+    "filter_mode": "full",
+    "forest": "native",
+    "explicit_override": "TABICL_PRIOR_FOREST=sklearn",
+    "python_unset_default": "sklearn",
+    "stages_2_3_default": "sklearn",
+    "rationale": "Reduced CPU work and a modest complete-generation gain; no stable end-to-end training gain established."
+  },
+  "rejected_prototype": {
+    "algorithm": "four-coordinate projected upper bound for nearest center",
+    "removed": true,
+    "hotspot_throughput_change_fraction": {
+      "rows2048": 0.0666,
+      "rows4096": -0.0306
+    },
+    "scope": "Raw replay artifact includes this rejected prototype; final implementation contains neither its operator nor environment dispatch."
+  },
+  "default_smoke": {
+    "exit_code": 0,
+    "dtype": "bfloat16",
+    "gpus": 8,
+    "steps": 32,
+    "nonfinite_loss": 0,
+    "oom_micro_batches": 0,
+    "positive_learning_rate_steps": 31,
+    "warmup_ranks": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "warmup_rounds": [
+      3
+    ],
+    "warmup_optimizer_updates": 0,
+    "warmup_startup_max_s": 30.660811949521303,
+    "final_ce": 1.667107105255127,
+    "forest": "native",
+    "library": "/ossfs/workspace/tabicl-training-perf/.cache/prior-native/64c269d3831a8ba30ee5/tabicl_prior_exact_cpu.so",
+    "entry": "bash scripts/train_v2_clf_stage1_fast.sh",
+    "settings": {
+      "MAX_STEPS": 32,
+      "WARMUP_STEPS": 4,
+      "SAVE_TEMP_EVERY": 1000000,
+      "SAVE_PERM_EVERY": 1000000,
+      "OMP_NUM_THREADS": 2,
+      "MKL_NUM_THREADS": 2
+    },
+    "note": "Explicit library/forest/trace environment removed before launch. Fresh isolated checkpoint directory. Functional validation only; startup and short-run duration are not steady throughput measurements."
+  }
+}

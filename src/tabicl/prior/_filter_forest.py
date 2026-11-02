@@ -1,13 +1,15 @@
 """Execute the fixed full prior-filter forest without estimator scaffolding.
 
 Every tree is freshly fitted. Only bootstrap plans (independent of X and y)
-are cached. This intentionally supports audited sklearn calling conventions; callers
-use the ordinary estimator for other versions, missing values, or large plans.
+are cached. The sklearn path supports audited calling conventions; the native
+path has no sklearn private-ABI dependency. Unsupported input shapes use the
+ordinary estimator fallback in the caller.
 """
 from functools import lru_cache
 from typing import NamedTuple
 import re
 import warnings
+import os
 
 import numpy as np
 import sklearn
@@ -92,8 +94,11 @@ def planned_classification_oob_prediction(X, labels, n_classes, n_estimators=25)
 
 
 def _planned_prediction(X, Y, n_estimators, classes=None):
+    mode = os.environ.get('TABICL_PRIOR_FOREST', 'sklearn')
+    if mode not in ('sklearn', 'native'):
+        raise ValueError('TABICL_PRIOR_FOREST must be sklearn or native')
     api = sklearn_tree_api()
-    if (api is None or not isinstance(X, np.ndarray)
+    if ((api is None and mode == 'sklearn') or not isinstance(X, np.ndarray)
             or not isinstance(Y, np.ndarray) or X.ndim != 2 or Y.ndim not in (1, 2)
             or X.dtype.kind != 'f' or Y.dtype.kind not in 'fiu'
             or len(X) != len(Y) or min(X.shape) < 1 or len(X) < 2
@@ -101,15 +106,32 @@ def _planned_prediction(X, Y, n_estimators, classes=None):
             or (Y.ndim == 2 and Y.shape[1] < 1)
             or not np.isfinite(X).all() or not np.isfinite(Y).all()):
         return None
-    from sklearn.tree._criterion import MSE, Gini
-    from sklearn.tree._splitter import RandomSplitter
-    from sklearn.tree._tree import Tree, DepthFirstTreeBuilder
-
+    if mode == 'native' and (len(X) > 65536 or X.shape[1] > 4096
+            or (Y.ndim == 2 and Y.shape[1] > 256)
+            or (classes is not None and classes > 256) or n_estimators > 256):
+        # The public estimator remains the caller's fallback outside the
+        # bounded native contract. Check before allocating a bootstrap plan.
+        return None
     with np.errstate(over='ignore'):
         X = np.asarray(X, dtype=np.float32, order='C')
     if not np.isfinite(X).all():
         return None
     Y = np.ascontiguousarray(Y.reshape(len(X), -1), dtype=np.float64)
+    if mode == 'native':
+        from .graph_lib._distance import _native_available
+        import torch
+        if not _native_available() or not hasattr(torch.ops.tabicl_prior_exact, 'forest_oob_cpu'):
+            raise RuntimeError('native forest requires the current prior runtime; run scripts/prepare_prior_runtime.py')
+        weights, seeds = _native_bootstrap_plan(len(X), n_estimators)
+        prediction = torch.ops.tabicl_prior_exact.forest_oob_cpu(
+            torch.from_numpy(X), torch.from_numpy(Y), weights, seeds, classes or 0, 6).numpy()
+        if _bootstrap_plan(len(X), n_estimators)[2]:
+            warnings.warn('Some inputs do not have OOB scores. This probably means '
+                          'too few trees were used to compute any reliable OOB estimates.', UserWarning, stacklevel=2)
+        return prediction
+    from sklearn.tree._criterion import MSE, Gini
+    from sklearn.tree._splitter import RandomSplitter
+    from sklearn.tree._tree import Tree, DepthFirstTreeBuilder
     n, d = X.shape
     n_outputs = Y.shape[1] if classes is None else 1
     plans, votes, missing = _bootstrap_plan(n, n_estimators)
@@ -137,3 +159,14 @@ def _planned_prediction(X, Y, n_estimators, classes=None):
                       UserWarning, stacklevel=2)
     prediction /= votes[:, None]
     return prediction
+
+
+@lru_cache(maxsize=4)
+def _native_bootstrap_plan(n, n_estimators):
+    import torch
+    plans, _, _ = _bootstrap_plan(n, n_estimators)
+    # Copies own their data; never expose the readonly cached NumPy weights to
+    # a writable Tensor view. No data-dependent state enters this cache.
+    weights = torch.from_numpy(np.stack([p[1] for p in plans]))
+    seeds = torch.tensor([p[0].value for p in plans], dtype=torch.int64)
+    return weights, seeds

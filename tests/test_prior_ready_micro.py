@@ -92,6 +92,7 @@ def test_one_micro_per_rank_still_bypasses_cohort_straggler():
 def fake_service():
     """No processes/timers: test manager ownership with rank 0 ACK before rank 1 fetch."""
     s = _Service.__new__(_Service)
+    s.trace = None
     s.condition = threading.Condition()
     s.ready_micros = ReadyMicros(2, 2, 2, 1)
     register(s.ready_micros, 2)

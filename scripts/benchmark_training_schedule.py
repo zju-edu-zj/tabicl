@@ -13,6 +13,21 @@ import sys
 import time
 
 
+def recipe_forest_default(stage, tokens):
+    """DRY_RUN returns argv; reproduce Stage 1's shell-only environment default.
+
+    Explicit outer TABICL_PRIOR_FOREST takes precedence at the call site.
+    Stages 2/3 and compatibility recipes retain their existing sklearn default.
+    """
+    def option(name):
+        return tokens[tokens.index(name)+1] if name in tokens else None
+    if (stage == 1 and option('--graph_execution') == 'optimized'
+            and option('--filter_execution') == 'sufficient'
+            and option('--dataset_filter_mode') == 'full'):
+        return 'native'
+    return 'sklearn'
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpus", type=int, default=8)
@@ -34,7 +49,7 @@ def main():
                         help="Additional Trainer flags, appended after curriculum defaults")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    args.output.mkdir(parents=True, exist_ok=True)
+    args.output.mkdir(parents=True, exist_ok=False)
     env = dict(os.environ, NUM_GPUS=str(args.gpus), MAX_STEPS=str(args.steps), TRAIN_DTYPE=args.dtype,
                CKPT_DIR=str(args.output / "checkpoints"), LOG_DIR=str(args.output / "logs"),
                DRY_RUN="1", SAVE_TEMP_EVERY="1000000", SAVE_PERM_EVERY="1000000",
@@ -43,6 +58,7 @@ def main():
     text = subprocess.check_output(["bash", str(root / f"scripts/train_v2_clf_stage{args.stage}.sh")],
                                    env=env, cwd=root, text=True)
     tokens = shlex.split(text)
+    env.setdefault('TABICL_PRIOR_FOREST', recipe_forest_default(args.stage, tokens))
     command = [sys.executable, "-m", "torch.distributed.run", *tokens[tokens.index('--standalone'):],
                "--max_steps", str(args.steps),
                "--checkpoint_path", str(args.initial_checkpoint) if args.initial_checkpoint else "",
@@ -77,6 +93,7 @@ def main():
                   reference_centroid_topk=args.reference_centroid_topk)
     report['runtime_environment'] = {key: env.get(key) for key in (
         'TABICL_PRIOR_DISTANCE_LIBRARY', 'TABICL_PRIOR_COMPACT', 'TABICL_PRIOR_STATISTICS',
+        'TABICL_PRIOR_FOREST',
         'PYTHONHASHSEED', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS',
         'TORCHINDUCTOR_CACHE_DIR', 'TRITON_CACHE_DIR')}
     (args.output / "run.json").write_text(json.dumps(report, indent=2) + "\n")

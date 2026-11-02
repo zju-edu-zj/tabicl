@@ -935,7 +935,7 @@ class GraphPrior(Prior):
         self.device = device
 
     @torch.no_grad()
-    def generate_dataset(self, params: Dict[str, Any], *, compact: bool = False) -> Tuple[Tensor, Tensor, Tensor]:
+    def generate_dataset(self, params: Dict[str, Any], *, compact: bool = False, trace=None) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Generates a single valid dataset based on the provided parameters.
 
@@ -967,7 +967,11 @@ class GraphPrior(Prior):
         """
 
         while True:
+            if trace is not None:
+                trace.begin_attempt()
             X, y = GraphSCM(**params, defer_padding=compact)()
+            if trace is not None:
+                trace.mark('sanity')
 
             # Add batch dim for single dataset to be compatible with delete_unique_features and sanity_check
             X, y = X.unsqueeze(0), y.unsqueeze(0)
@@ -976,9 +980,13 @@ class GraphPrior(Prior):
             # Only keep valid datasets with sufficient features and balanced classes
             X, d = self.delete_unique_features(X, d)
             if not (d > 0).all():
+                if trace is not None:
+                    trace.end_attempt('no_features')
                 continue
 
             if not (self.regression or self.cls_sanity_check(X, y, params["train_size"])):
+                if trace is not None:
+                    trace.end_attempt('class_sanity')
                 continue
 
             # Padding columns affect ExtraTrees' random feature selection. Keep
@@ -986,8 +994,15 @@ class GraphPrior(Prior):
             filter_x = X[0]
             if compact and filter_x.shape[-1] < params["max_features"]:
                 filter_x = F.pad(filter_x, (0, params["max_features"] - filter_x.shape[-1]))
+            if trace is not None:
+                trace.mark('filter')
             if should_filter(filter_x, y[0], self.config, is_classif=not self.regression):
+                if trace is not None:
+                    trace.end_attempt('filter_rejected')
                 continue
+
+            if trace is not None:
+                trace.end_attempt('accepted')
 
             x = X.squeeze(0)
             if compact:

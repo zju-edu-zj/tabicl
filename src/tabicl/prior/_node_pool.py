@@ -38,18 +38,21 @@ from .graph_lib import _cpu_budget
 _worker_prior = None
 _worker_limits = None
 _worker_output_dir = None
+_worker_trace = None
 
 
 def _init_worker(prior, output_dir=None, cpu_permits=None, kernel_threads=1):
-    global _worker_prior, _worker_limits, _worker_output_dir
+    global _worker_prior, _worker_limits, _worker_output_dir, _worker_trace
     torch.set_num_threads(1)
     _worker_limits = threadpoolctl.threadpool_limits(limits=1)
     _worker_prior = prior
     _worker_output_dir = output_dir
     _cpu_budget.configure_worker_budget(cpu_permits, kernel_threads)
+    from ._generation_trace import worker_writer
+    _worker_trace = worker_writer()
 
 
-def _generate(params, seed):
+def _generate(params, seed, task_id=None):
     started = time.perf_counter()
     cpu_started = time.process_time()
     random.seed(seed)
@@ -57,7 +60,16 @@ def _generate(params, seed):
     torch.manual_seed(seed)
     with _cpu_budget.generation_slot():
         generation_started = time.perf_counter()
-        x, y, d = _worker_prior.generate_dataset(params, compact=True)
+        if _worker_trace is not None and _worker_trace.count < _worker_trace.limit:
+            from ._generation_trace import TaskTrace
+            classes = params.get('num_classes')
+            identity = dict(task_id=task_id, seed=int(seed), rows=int(params['seq_len']),
+                            requested_width=int(params['num_features']),
+                            classes=None if classes is None else int(classes))
+            with TaskTrace(_worker_trace, identity) as trace:
+                x, y, d = _worker_prior.generate_dataset(params, compact=True, trace=trace)
+        else:
+            x, y, d = _worker_prior.generate_dataset(params, compact=True)
         generated = time.perf_counter()
         cpu_seconds = time.process_time() - cpu_started
         x, y = encode_table(x.numpy(), y.numpy(), _worker_output_dir)
@@ -158,6 +170,10 @@ class _Service:
         self.released = set()
         self.closed = False
         self.error = None
+        self.trace = None
+        if os.environ.get('TABICL_PRIOR_TRACE_DIR'):
+            from ._generation_trace import Writer
+            self.trace = Writer(os.environ['TABICL_PRIOR_TRACE_DIR'], 'service', 500000)
         # These are inherited before spawned workers import NumPy/SciPy. Setting
         # thread limits only in the initializer is too late for import-time BLAS.
         for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -211,6 +227,7 @@ class _Service:
                         estimate = _output_bytes(params)
                         state = dict(params=params, results=[None] * len(params), left=len(params),
                                      bytes=estimate, delivered=set(), task_timings=[None] * len(params),
+                                     task_ids=planned.task_ids,
                                      submitted_monotonic_s=time.perf_counter())
                         if self.early_dispatch:
                             state["assignments"], state["schedule_stats"] = schedule_cohort(
@@ -228,7 +245,7 @@ class _Service:
                         for i in order:
                             p = params[i]
                             seed = int(np.random.SeedSequence([self.seed, planned.task_ids[i]]).generate_state(1)[0])
-                            future = self.executor.submit(_generate, p, seed)
+                            future = self.executor.submit(_generate, p, seed, planned.task_ids[i])
                             self.pending[future] = (batch_id, i)
                         batch_id += 1
                     if not self.pending:
@@ -246,6 +263,10 @@ class _Service:
                         self.result_transit_seconds.append(time.perf_counter() - finished)
                         state["results"][idx] = (x, y, d)
                         state["task_timings"][idx] = timing
+                        if self.trace is not None:
+                            self.trace.write(dict(event='complete', source=bid, index=idx,
+                                task_id=state['task_ids'][idx], submitted_s=state['submitted_monotonic_s'],
+                                received_s=time.perf_counter(), **timing))
                         self.generation_seconds.append(elapsed)
                         self.encoding_seconds.append(encoding)
                         self.worker_seconds += elapsed + encoding
@@ -342,7 +363,12 @@ class _Service:
                     raise RuntimeError('node prior pool is closed or rank released')
                 units = self.ready_micros.pop_step()
                 if units is None:
+                    waiting = time.perf_counter() if self.trace is not None else None
+                    reason = self.ready_micros.wait_state() if self.trace is not None else None
                     self.condition.wait(timeout=.1)
+                    if self.trace is not None:
+                        self.trace.write(dict(event='wait', step=sequence, rank=rank,
+                            started_s=waiting, finished_s=time.perf_counter(), **reason))
                     continue
                 # Balance actual GPU cost only among complete, intact micros.
                 # Materialization, seeds, parameter sampling and generation stay
@@ -357,6 +383,10 @@ class _Service:
                     acknowledged=set(), stats=stats,
                     dispatch_ready=max(self.batches[b]['task_timings'][i]['generated_monotonic_s']
                                        for b, i in refs))
+                if self.trace is not None:
+                    self.trace.write(dict(event='dispatch', step=step, at_s=time.perf_counter(),
+                        task_ids=[self.batches[b]['task_ids'][i] for b, i in refs],
+                        source_steps=[b for b, _ in refs], groups=groups))
                 self.condition.notify_all()
             state = self.micro_steps[sequence]
             if self.error:

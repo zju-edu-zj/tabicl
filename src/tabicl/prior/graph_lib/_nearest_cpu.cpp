@@ -380,7 +380,11 @@ at::Tensor em_probabilities_cpu(const at::Tensor& input, const at::Tensor& cente
   return result;
 }
 
+#include "_forest_cpu.h"
+
 TORCH_LIBRARY(tabicl_prior_exact, m) {
+  m.def("forest_oob_cpu(Tensor x, Tensor y, Tensor weights, Tensor seeds, int classes, int depth) -> Tensor");
+  m.def("forest_tree_cpu(Tensor x, Tensor y, Tensor weights, int seed, int classes, int depth) -> Tensor[]");
   m.def("compact_rows_cpu(Tensor x) -> Tensor[]");
   m.def("column_std_mean_cpu(Tensor x) -> Tensor");
   m.def("nearest_cpu(Tensor x, Tensor centers, float p) -> Tensor");
@@ -391,6 +395,8 @@ TORCH_LIBRARY(tabicl_prior_exact, m) {
   m.def("em_probabilities_cpu(Tensor x, Tensor centers, Tensor inverse_std_q, Tensor constants, float p, float q) -> Tensor");
 }
 TORCH_LIBRARY_IMPL(tabicl_prior_exact, CPU, m) {
+  m.impl("forest_oob_cpu", &forest_oob_cpu);
+  m.impl("forest_tree_cpu", &forest_tree_cpu);
   m.impl("compact_rows_cpu", &compact_rows_cpu);
   m.impl("column_std_mean_cpu", &column_std_mean_cpu);
   m.impl("nearest_cpu", &nearest_cpu);

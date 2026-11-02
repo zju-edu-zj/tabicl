@@ -85,6 +85,13 @@ if [[ "$PRIOR_BACKEND" == node_pool && "$PRIOR_SCHEDULE" == ready_micro && -z "$
     fi
 fi
 source "$REPO_ROOT/scripts/prior_recipe.sh"
+if [[ "$PRIOR_GRAPH_EXECUTION" == optimized && "$PRIOR_FILTER_EXECUTION" == sufficient && "$PRIOR_FILTER_MODE" == full ]]; then
+    # Full 25-tree native filter: less CPU work in complete-prior tests.
+    # Eight-rank ABBA is neutral in FP32 and within variation in BF16; this
+    # is a CPU-resource default, not a promised end-to-end training speedup.
+    # Other curriculum stages retain their independently measured defaults.
+    export TABICL_PRIOR_FOREST=${TABICL_PRIOR_FOREST:-native}
+fi
 mkdir -p "$LOG_DIR"
 
 # Reusing the same command after interruption resumes the new hybrid run,

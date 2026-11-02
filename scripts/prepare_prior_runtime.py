@@ -39,7 +39,11 @@ def compiler_output_to_stderr():
 
 
 def runtime_identity(source, torch):
-    return dict(source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+    digest = hashlib.sha256(source.read_bytes())
+    for header in sorted(source.parent.glob('_forest_cpu.h')):
+        digest.update(header.name.encode())
+        digest.update(header.read_bytes())
+    return dict(source_sha256=digest.hexdigest(),
         torch=torch.__version__, torch_git=torch.version.git_version,
         cxx11_abi=bool(torch._C._GLIBCXX_USE_CXX11_ABI),
         python=sysconfig.get_config_var('SOABI'), platform=platform.platform(),
@@ -49,7 +53,10 @@ def runtime_identity(source, torch):
 
 def validate_library(path, torch):
     torch.ops.load_library(str(path))
-    missing = [op for op in REQUIRED_OPS if not hasattr(torch.ops.tabicl_prior_exact, op)]
+    required = REQUIRED_OPS
+    if os.environ.get('TABICL_PRIOR_FOREST') == 'native':
+        required += ('forest_oob_cpu', 'forest_tree_cpu')
+    missing = [op for op in required if not hasattr(torch.ops.tabicl_prior_exact, op)]
     if missing:
         raise RuntimeError(f'{path}: missing operators {missing}; unset '
             'TABICL_PRIOR_DISTANCE_LIBRARY to build the current source')

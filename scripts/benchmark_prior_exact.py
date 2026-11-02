@@ -158,6 +158,8 @@ def main():
                         help='Also report generation time after every worker has initialized')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    if args.output.exists():
+        raise FileExistsError(args.output)
     if min(args.tasks, args.workers, args.rows) < 1:
         parser.error('tasks, workers and rows must be positive')
     os.environ.setdefault('PYTHONHASHSEED', '42')
@@ -202,6 +204,7 @@ def main():
                    native_library=os.environ.get('TABICL_PRIOR_DISTANCE_LIBRARY', ''),
                    compaction=os.environ.get('TABICL_PRIOR_COMPACT', 'hash'),
                    statistics=os.environ.get('TABICL_PRIOR_STATISTICS', 'native'),
+                   forest=os.environ.get('TABICL_PRIOR_FOREST', 'sklearn'),
                    python_hash_seed=os.environ['PYTHONHASHSEED'],
                    rejected_by_filter=sum(sum(r['filter_decisions']) for r in records),
                    filter_calls=sum(len(r['filter_decisions']) for r in records),
