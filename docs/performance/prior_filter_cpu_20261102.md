@@ -1,5 +1,7 @@
 # 完整 prior 过滤器：复用执行计划，保留所有树
 
+后续实现已扩展 sklearn 支持版本并将默认过滤执行器改为 `sufficient`，见[充分统计量与 EM 优化报告](prior_sufficient_cpu_20261102.md)。本文保留当时的配置和实验结论；下文的 1.7.2 版本限制、默认 reference 与未启用建议均属于该历史版本。
+
 ## 本轮范围
 
 基于 `05c11f80e4e4e6ae1cd146c4a0b9e3642eaead60` 已优化的图生成路径，新增 `filter_execution=reference|planned`。两组均使用 `graph_execution=optimized`、`categorical_sampling=marginal` 和 `dataset_filter_mode=full`；本轮收益是相对于上一轮优化后的增量，不能再次计入上一轮的图执行收益。

@@ -24,7 +24,7 @@ from tabicl.prior import _dataset
 from tabicl.prior.graph_lib._config import PriorConfig
 
 
-def initialize(prototype, seed, disable=()):
+def initialize(prototype, seed, disable=(), ready=None):
     global prior, limits, task_seed
     prior, task_seed = prototype, seed
     torch.set_num_threads(1)
@@ -32,6 +32,13 @@ def initialize(prototype, seed, disable=()):
     # Benchmark-only ablations; production has a single execution switch.
     from dataclasses import replace
     from tabicl.prior.graph_lib import _function, _converter
+    # Distance ablation must also bypass EM's fused distance/posterior kernel.
+    if 'em' in disable or 'distance' in disable:
+        def unfused_em(self, x):
+            distances = _function.compact_cdist(x, self.x_ind_, p=self.p_, vectorized=True)
+            probs = torch.softmax(self.consts - (distances / self.stds_[None, :]).clamp_min(0.) ** self.q_, -1)
+            return self.out_func_(probs)
+        _function.RandomEMAssignmentFunction._transform = unfused_em
     if 'distance' in disable:
         for module in (_function, _converter):
             for name in ('nearest_center', 'compact_cdist'):
@@ -54,6 +61,14 @@ def initialize(prototype, seed, disable=()):
                 kwargs['return_values'] = True
                 _original(self, *args, **kwargs)
             cls.__init__ = init_disc
+    if ready is not None:
+        from tabicl.prior.graph_lib._distance import _native_available
+        _native_available()  # load the configured library before steady timing
+        ready.wait(timeout=180)
+
+
+def worker_ready():
+    return os.getpid()
 
 
 def generate(item):
@@ -69,6 +84,13 @@ def generate(item):
     original_scm = _dataset.GraphSCM.__call__
     original_fit, forest_sizes = _dataset.ExtraTreesRegressor.fit, []
     original_planned = _dataset.planned_oob_prediction
+    original_classification = _dataset.planned_classification_oob_prediction
+
+    def audit_classification(x, labels, classes, n_estimators=25):
+        result = original_classification(x, labels, classes, n_estimators)
+        if result is not None:
+            forest_sizes.append(n_estimators)
+        return result
 
     def audit_planned(x, y, n_estimators=25):
         result = original_planned(x, y, n_estimators)
@@ -98,6 +120,7 @@ def generate(item):
     _dataset.GraphSCM.__call__ = audit_scm
     _dataset.ExtraTreesRegressor.fit = audit_fit
     _dataset.planned_oob_prediction = audit_planned
+    _dataset.planned_classification_oob_prediction = audit_classification
     started, cpu = time.perf_counter(), time.process_time()
     try:
         x, y, d = prior.generate_dataset(params, compact=True)
@@ -106,6 +129,7 @@ def generate(item):
         _dataset.GraphSCM.__call__ = original_scm
         _dataset.ExtraTreesRegressor.fit = original_fit
         _dataset.planned_oob_prediction = original_planned
+        _dataset.planned_classification_oob_prediction = original_classification
     elapsed, cpu = time.perf_counter()-started, time.process_time()-cpu
     _, counts = torch.unique(y, return_counts=True)
     probs = counts.double()/len(y)
@@ -128,8 +152,10 @@ def main():
     parser.add_argument('--filter-mode', choices=['full', 'progressive'], default='full')
     parser.add_argument('--categorical-sampling', choices=['legacy', 'marginal'], default='legacy')
     parser.add_argument('--graph-execution', choices=['reference', 'optimized'], default='reference')
-    parser.add_argument('--filter-execution', choices=['reference', 'planned'], default='reference')
-    parser.add_argument('--disable', nargs='*', choices=['distance', 'quadratic', 'embedding'], default=[])
+    parser.add_argument('--filter-execution', choices=['reference', 'planned', 'sufficient'], default='reference')
+    parser.add_argument('--disable', nargs='*', choices=['distance', 'quadratic', 'embedding', 'em'], default=[])
+    parser.add_argument('--warm-workers', action='store_true',
+                        help='Also report generation time after every worker has initialized')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if min(args.tasks, args.workers, args.rows) < 1:
@@ -148,10 +174,19 @@ def main():
     params = []
     while len(params) < args.tasks:
         params.extend(p.sample_parameters())
+    context = mp.get_context('spawn')
+    ready = context.Barrier(args.workers + 1) if args.warm_workers else None
     started = time.perf_counter()
-    with ProcessPoolExecutor(args.workers, mp_context=mp.get_context('spawn'),
-                   initializer=initialize, initargs=(p, args.seed, args.disable)) as executor:
+    with ProcessPoolExecutor(args.workers, mp_context=context,
+                   initializer=initialize, initargs=(p, args.seed, args.disable, ready)) as executor:
+        if ready is not None:
+            futures = [executor.submit(worker_ready) for _ in range(args.workers)]
+            ready.wait(timeout=180)
+            for future in futures:
+                future.result()
+        generation_started = time.perf_counter()
         records = list(executor.map(generate, enumerate(params[:args.tasks])))
+        generation_s = time.perf_counter() - generation_started
     total = time.perf_counter()-started
     summary = dict(wall_s=total, cpu_s=sum(r['cpu_s'] for r in records), tasks=args.tasks,
                    workers=args.workers, rows=args.rows, seed=args.seed,
@@ -160,6 +195,8 @@ def main():
                    graph_execution=args.graph_execution,
                    filter_execution=args.filter_execution,
                    disabled=args.disable,
+                   warm_workers=args.warm_workers, generation_s=generation_s,
+                   generation_tables_per_s=args.tasks/generation_s,
                    tree=os.environ.get('TABICL_PRIOR_TREE', 'native'),
                    one_dimensional_mode=os.environ.get('TABICL_PRIOR_1D_MODE', 'legacy'),
                    native_library=os.environ.get('TABICL_PRIOR_DISTANCE_LIBRARY', ''),

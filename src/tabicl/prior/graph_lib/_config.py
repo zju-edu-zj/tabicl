@@ -28,7 +28,7 @@ class PriorConfig:
     # Cached/corrected meta sampling retains its original weighted draws.
     categorical_sampling: Literal['legacy', 'marginal'] = 'legacy'
     graph_execution: Literal['reference', 'optimized'] = 'reference'
-    filter_execution: Literal['reference', 'planned'] = 'reference'
+    filter_execution: Literal['reference', 'planned', 'sufficient'] = 'sufficient'
     filter_unpredictable_graphs: bool = False
     min_n_nodes: int = 2
     max_n_nodes: int = 32
@@ -59,7 +59,7 @@ class PriorConfig:
                            dataset_filter_mode=getattr(args, 'dataset_filter_mode', 'full'),
                            categorical_sampling=getattr(args, 'categorical_sampling', 'legacy'),
                            graph_execution=getattr(args, 'graph_execution', 'reference'),
-                           filter_execution=getattr(args, 'filter_execution', 'reference'),
+                           filter_execution=getattr(args, 'filter_execution', 'sufficient'),
                            filter_unpredictable_graphs=args.filter_unpredictable_graphs,
                            min_n_nodes=args.min_n_nodes,
                            max_n_nodes=args.max_n_nodes,
@@ -83,8 +83,8 @@ class PriorConfig:
 
     @staticmethod
     def add_args_to_parser(parser: argparse.ArgumentParser):
-        parser.add_argument('--filter_execution', choices=['reference', 'planned'], default='reference',
-                            help='Full forest with cached bootstrap plans; unsupported inputs use sklearn')
+        parser.add_argument('--filter_execution', choices=['reference', 'planned', 'sufficient'], default='sufficient',
+                            help='Full forest: public sklearn, cached MSE plans, or multiclass counts; unsupported inputs use sklearn')
         parser.add_argument('--dataset_filter_mode', choices=['full', 'progressive'], default='full',
                             help='Full 25-tree filter, or full-table 4-to-25-tree progressive filtering')
         parser.add_argument('--categorical_sampling', choices=['legacy', 'marginal'], default='legacy',

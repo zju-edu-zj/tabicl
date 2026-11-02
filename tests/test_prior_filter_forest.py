@@ -12,7 +12,7 @@ from tabicl.prior.graph_lib._config import PriorConfig
 
 
 requires_abi = pytest.mark.skipif(
-    _filter_forest.sklearn.__version__ != _filter_forest.SUPPORTED_SKLEARN,
+    _filter_forest.sklearn_tree_api() is None,
     reason='low-level full-forest executor is gated to its audited sklearn ABI')
 
 
@@ -79,7 +79,8 @@ def test_all_trees_rebuilt_for_new_data():
 def test_filter_decisions_equal(classes, remove_trivial):
     rng = np.random.RandomState(12)
     x = torch.from_numpy(rng.normal(size=(2048, 20)).astype(np.float32))
-    cfg = PriorConfig(filter_unpredictable_datasets=True, remove_trivial_datasets=remove_trivial)
+    cfg = PriorConfig(filter_unpredictable_datasets=True, remove_trivial_datasets=remove_trivial,
+                      filter_execution='reference')
     for signal in [False, True]:
         for _ in range(3):
             y = x[:, 0] if signal else torch.from_numpy(rng.normal(size=2048).astype(np.float32))
@@ -105,7 +106,7 @@ def test_version_and_nonfinite_fallback(monkeypatch):
     x, y = np.ones((32, 4), np.float32), np.ones((32, 1))
     monkeypatch.setattr(_filter_forest.sklearn, '__version__', 'unsupported')
     assert _filter_forest.planned_oob_prediction(x, y) is None
-    monkeypatch.setattr(_filter_forest.sklearn, '__version__', _filter_forest.SUPPORTED_SKLEARN)
+    monkeypatch.setattr(_filter_forest.sklearn, '__version__', '1.7.2')
     for val in [np.nan, np.inf, -np.inf]:
         bad = x.copy()
         bad[0, 0] = val

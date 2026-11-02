@@ -83,6 +83,41 @@ def compact_cdist(x, centers, p, *, vectorized=False):
     return distances if inverse is None else distances[inverse]
 
 
+def compact_em_probabilities(x, centers, stds, constants, p, q, inverse_std_q):
+    """Complete EM posterior on distinct rows; restore AFTER the linear map.
+
+    p=2 retains the historical size-dependent GEMM dispatch. Unsupported native
+    libraries retain the existing distance/softmax calculation on compact rows.
+    Return inverse separately so downstream output work is compacted as well.
+    """
+    eligible = (x.ndim == 2 and centers.ndim == 2 and x.device.type == 'cpu'
+        and x.dtype in (torch.float32, torch.float64) and p != 2 and .5 <= p <= 4
+        and torch.isfinite(x).all() and torch.isfinite(centers).all()
+        and torch.isfinite(inverse_std_q).all() and torch.isfinite(constants).all())
+    compact, inverse = _compact_rows(x, len(centers)) if eligible else (x, None)
+    available = eligible and _native_available()
+    # The existing kernel vectors over centers, the fused one over rows.
+    # Wide, nonrepeated inputs with no scalar center tail favor the former.
+    # Both evaluate the same complete metric; this gate changes execution only.
+    lanes = 8 if x.dtype == torch.float32 else 4
+    prefer_distances = (inverse is None and x.shape[1] >= 32
+                        and len(centers) % lanes == 0 and p != q)
+    matching_parameters = all(t.dtype == x.dtype and t.device == x.device
+                              for t in (stds, inverse_std_q, constants))
+    if (available and matching_parameters and not prefer_distances
+            and hasattr(torch.ops.tabicl_prior_exact, 'em_probabilities_cpu')):
+        with parallel_distance(compact, centers, p):
+            result = torch.ops.tabicl_prior_exact.em_probabilities_cpu(compact, centers, inverse_std_q, constants, p, q)
+    else:
+        with parallel_distance(compact, centers, p):
+            if available and hasattr(torch.ops.tabicl_prior_exact, 'cdist_vector_cpu'):
+                dists = torch.ops.tabicl_prior_exact.cdist_vector_cpu(compact, centers, p)
+            else:
+                dists = torch.cdist(compact, centers, p=p)
+        result = torch.softmax(constants - torch.clamp(dists / stds[None, :], min=0.) ** q, dim=-1)
+    return result, inverse
+
+
 def nearest_center(x, centers, p, *, vectorized=False):
     """Accelerate distances while making 1-D compatibility explicit.
 

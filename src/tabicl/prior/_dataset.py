@@ -40,7 +40,7 @@ from .graph_lib._config import PriorConfig
 from ._mlp_scm import MLPSCM
 from ._tree_scm import TreeSCM
 from ._graph_scm import GraphSCM
-from ._filter_forest import planned_oob_prediction
+from ._filter_forest import planned_oob_prediction, planned_classification_oob_prediction
 
 from ._hp_sampling import HpSamplerList
 from ._reg2cls import Reg2Cls
@@ -1598,6 +1598,30 @@ def _bootstrap_pvalue(imp, n_boot=200):
     return float(nonpositive / n_boot)
 
 
+def _classification_filter_statistics(labels, prediction):
+    """Brier improvement and errors, without constructing one-hot targets.
+
+    Keep the original full-table baseline, even when invalid OOB rows are
+    masked. Zero-vote rows remain zeros, as in sklearn and the MSE executor.
+    """
+    classes = prediction.shape[1]
+    baseline = np.bincount(labels, minlength=classes).astype(np.float64) / len(labels)
+    mask = ~np.isnan(prediction).any(axis=1)
+    labels, prediction = labels[mask], prediction[mask]
+    baseline_error = 1 - 2 * baseline[labels] + baseline @ baseline
+    model_error = 1 - 2 * prediction[np.arange(len(labels)), labels] + np.einsum('ij,ij->i', prediction, prediction)
+    return baseline_error - model_error, baseline_error.mean(), model_error.mean()
+
+
+def _filter_from_statistics(imp, baseline_mse, extratrees_mse, config, n_boot):
+    pval = _bootstrap_pvalue(imp, n_boot)
+    if config.remove_trivial_datasets and np.sqrt(extratrees_mse) <= config.trivial_dataset_threshold * np.sqrt(baseline_mse):
+        return True
+    if config.filter_unpredictable_datasets and pval >= 0.05:
+        return True
+    return False
+
+
 def should_filter(
         X: torch.Tensor,
         y: torch.Tensor,
@@ -1609,10 +1633,20 @@ def should_filter(
 ) -> bool:
     if not (config.remove_trivial_datasets or config.filter_unpredictable_datasets):
         return False
+    if config.dataset_filter_mode not in ('full', 'progressive'):
+        raise ValueError('dataset_filter_mode must be full or progressive')
+    if config.filter_execution not in ('reference', 'planned', 'sufficient'):
+        raise ValueError('filter_execution must be reference, planned or sufficient')
 
     if is_classif:
         y_int = y.to(torch.long)
         C = int(y_int.max().item() + 1)
+        if C > 2 and config.filter_execution == 'sufficient' and config.dataset_filter_mode == 'full':
+            labels = y_int.detach().cpu().numpy()
+            prediction = planned_classification_oob_prediction(
+                X.detach().cpu().numpy(), labels, C, n_estimators)
+            if prediction is not None:
+                return _filter_from_statistics(*_classification_filter_statistics(labels, prediction), config, n_boot)
         Y = F.one_hot(y_int, num_classes=C).to(torch.float32)  # (n, C)
         if C == 2:
             # drop one dimension to make it faster
@@ -1624,9 +1658,6 @@ def should_filter(
     X_np = X.detach().cpu().numpy()
     Y_np = Y.detach().cpu().numpy()
 
-    # do the squeeze to avoid a sklearn warning
-    if config.dataset_filter_mode not in ('full', 'progressive'):
-        raise ValueError('dataset_filter_mode must be full or progressive')
     # Binary targets use one column; class count, rather than target width,
     # determines eligibility. Other shapes use the established full filter.
     progressive = (config.dataset_filter_mode == 'progressive' and is_classif
@@ -1643,6 +1674,7 @@ def should_filter(
         max_depth=6,  # make it faster
         warm_start=progressive,
     )
+    # Squeeze the single target dimension to avoid sklearn's column warning.
     fit_target = np.squeeze(Y_np, axis=-1) if Y_np.shape[-1] == 1 else Y_np
     if progressive:
         with warnings.catch_warnings():
@@ -1660,9 +1692,7 @@ def should_filter(
             return False
         et.set_params(n_estimators=n_estimators)
     Yhat = None
-    if config.filter_execution not in ('reference', 'planned'):
-        raise ValueError('filter_execution must be reference or planned')
-    if config.filter_execution == 'planned' and not progressive:
+    if config.filter_execution in ('planned', 'sufficient') and not progressive:
         Yhat = planned_oob_prediction(X_np, Y_np, n_estimators)
     if Yhat is None:
         et.fit(X_np, fit_target)
@@ -1678,14 +1708,7 @@ def should_filter(
     baseline_mse = ((Yv - baseline) ** 2).sum(axis=1).mean()
     extratrees_mse = ((Yv - Yhatv) ** 2).sum(axis=1).mean()
 
-    # Vectorized bootstrap (no retraining)
-    pval = _bootstrap_pvalue(imp, n_boot)
-
-    if config.remove_trivial_datasets and np.sqrt(extratrees_mse) <= config.trivial_dataset_threshold * np.sqrt(baseline_mse):
-        return True
-    if config.filter_unpredictable_datasets and pval >= 0.05:
-        return True
-    return False
+    return _filter_from_statistics(imp, baseline_mse, extratrees_mse, config, n_boot)
 
 
 def compute_predictability_pvalue(

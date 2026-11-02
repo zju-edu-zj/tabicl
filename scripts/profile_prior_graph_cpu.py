@@ -20,7 +20,7 @@ def main():
     p.add_argument('--rows', type=int, default=2048)
     p.add_argument('--seed', type=int, default=83)
     p.add_argument('--graph-execution', choices=['reference', 'optimized'], default='reference')
-    p.add_argument('--filter-execution', choices=['reference', 'planned'], default='reference')
+    p.add_argument('--filter-execution', choices=['reference', 'planned', 'sufficient'], default='reference')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     torch.set_num_threads(1)

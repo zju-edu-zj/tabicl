@@ -2,6 +2,7 @@
 // final root, and abandon only when a nonnegative partial sum cannot win.
 // No fast-math, changed p, dimension cap, or nearest-center approximation.
 #include <ATen/ATen.h>
+#include <vector>
 #include <ATen/Parallel.h>
 #include <ATen/cpu/vec/vec.h>
 #include <torch/library.h>
@@ -229,12 +230,69 @@ at::Tensor quadratic_features_cpu(const at::Tensor& input) {
   return result;
 }
 
+// Full EM posterior, vectorized over independent rows (including K < SIMD width).
+// ||x-c||_p^q / sigma^q = (sum |x-c|^p)^(q/p) * sigma^(-q).
+// No N*K distance/logit intermediates, no discarded centers or dimensions.
+at::Tensor em_probabilities_cpu(const at::Tensor& input, const at::Tensor& centers,
+                               const at::Tensor& inverse_std_q, const at::Tensor& constants,
+                               double exponent, double outer_exponent) {
+  TORCH_CHECK(input.device().is_cpu() && centers.device().is_cpu() &&
+              inverse_std_q.device().is_cpu() && constants.device().is_cpu());
+  TORCH_CHECK(input.dim() == 2 && centers.dim() == 2 && input.size(1) == centers.size(1));
+  TORCH_CHECK(input.scalar_type() == centers.scalar_type() &&
+              input.scalar_type() == inverse_std_q.scalar_type() && input.scalar_type() == constants.scalar_type());
+  const auto rows = input.size(0), count = centers.size(0), width = input.size(1);
+  TORCH_CHECK(count > 0 && inverse_std_q.numel() == count && constants.numel() == count);
+  TORCH_CHECK(exponent >= .5 && exponent <= 4. && outer_exponent > 0.);
+  const auto xt = input.t().contiguous(), c = centers.contiguous();
+  const auto scale = inverse_std_q.contiguous(), bias = constants.contiguous();
+  auto result = at::empty({rows, count}, input.options());
+  AT_DISPATCH_FLOATING_TYPES(input.scalar_type(), "tabicl_em_probabilities_cpu", [&] {
+    using Vec = at::vec::Vectorized<scalar_t>;
+    const auto* xp = xt.const_data_ptr<scalar_t>();
+    const auto* cp = c.const_data_ptr<scalar_t>();
+    const auto* sp = scale.const_data_ptr<scalar_t>();
+    const auto* bp = bias.const_data_ptr<scalar_t>();
+    auto* output = result.data_ptr<scalar_t>();
+    const scalar_t p = scalar_t(exponent), ratio = scalar_t(outer_exponent / exponent);
+    at::parallel_for(0, (rows+Vec::size()-1)/Vec::size(), 1, [&](int64_t begin, int64_t end) {
+      std::vector<Vec> logits(count);
+      for (auto block = begin; block < end; ++block) {
+        const auto row = block*Vec::size(), n = std::min(int64_t(Vec::size()), rows-row);
+        Vec maximum(-std::numeric_limits<scalar_t>::infinity());
+        for (int64_t center = 0; center < count; ++center) {
+          Vec sum(scalar_t(0));
+          for (int64_t dim = 0; dim < width; ++dim) {
+            const auto diff = (Vec::loadu(xp+dim*rows+row, n) - Vec(cp[center*width+dim])).abs();
+            sum = sum + (p == scalar_t(1) ? diff : p == scalar_t(2) ? diff*diff : (diff.log()*Vec(p)).exp());
+          }
+          const auto power = ratio == scalar_t(1) ? sum : (sum.log()*Vec(ratio)).exp();
+          logits[center] = Vec(bp[center]) - power*Vec(sp[center]);
+          maximum = at::vec::maximum(maximum, logits[center]);
+        }
+        Vec total(scalar_t(0));
+        for (auto& logit : logits) {
+          logit = (logit-maximum).exp();
+          total = total+logit;
+        }
+        for (int64_t center = 0; center < count; ++center) {
+          alignas(64) scalar_t values[Vec::size()];
+          (logits[center]/total).store(values);
+          for (int64_t j = 0; j < n; ++j) output[(row+j)*count+center] = values[j];
+        }
+      }
+    });
+  });
+  return result;
+}
+
 TORCH_LIBRARY(tabicl_prior_exact, m) {
   m.def("nearest_cpu(Tensor x, Tensor centers, float p) -> Tensor");
   m.def("tree_cpu(Tensor x, Tensor dimensions, Tensor thresholds, Tensor leaves) -> Tensor");
   m.def("nearest_vector_cpu(Tensor x, Tensor centers, float p) -> Tensor");
   m.def("cdist_vector_cpu(Tensor x, Tensor centers, float p) -> Tensor");
   m.def("quadratic_features_cpu(Tensor x) -> Tensor");
+  m.def("em_probabilities_cpu(Tensor x, Tensor centers, Tensor inverse_std_q, Tensor constants, float p, float q) -> Tensor");
 }
 TORCH_LIBRARY_IMPL(tabicl_prior_exact, CPU, m) {
   m.impl("nearest_cpu", &nearest_cpu);
@@ -242,4 +300,5 @@ TORCH_LIBRARY_IMPL(tabicl_prior_exact, CPU, m) {
   m.impl("nearest_vector_cpu", &nearest_rows_cpu);
   m.impl("cdist_vector_cpu", &cdist_vector_cpu);
   m.impl("quadratic_features_cpu", &quadratic_features_cpu);
+  m.impl("em_probabilities_cpu", &em_probabilities_cpu);
 }

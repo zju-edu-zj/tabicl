@@ -8,7 +8,7 @@ from tabicl.prior.graph_lib._base import RandomTensorTransformer, Context
 from tabicl.prior.graph_lib._activation import RandomActivation
 from tabicl.prior.graph_lib._matrix import RandomMatrix, RandomGaussianMatrix
 from tabicl.prior.graph_lib._weights import RandomWeights
-from tabicl.prior.graph_lib._distance import nearest_center, compact_cdist, _native_available
+from tabicl.prior.graph_lib._distance import nearest_center, compact_cdist, compact_em_probabilities, _native_available
 
 
 class RandomFunction(RandomTensorTransformer):
@@ -320,10 +320,17 @@ class RandomEMAssignmentFunction(RandomFunction):
         self.out_func_ = RandomLinearFunction(self.context, in_features=n_ind, out_features=self.out_features)
         self.p_ = self.sampler.numerical("gen_em_assignment_p_inv", 1.0, 4.0, use_log=True)
         self.q_ = self.sampler.numerical("gen_em_assignment_q", 1.0, 2.0)
+        if self.config.graph_execution == 'optimized':
+            self.inverse_std_q_ = self.stds_.pow(-self.q_)
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
         if self.config.graph_execution == 'optimized':
-            dists = compact_cdist(x, self.x_ind_, p=self.p_, vectorized=True)
+            result, inverse = compact_em_probabilities(x, self.x_ind_, self.stds_, self.consts,
+                self.p_, self.q_, self.inverse_std_q_)
+            # RandomLinearFunction._fit only samples a matrix: it is independent
+            # of the row count and values. Sample once at the original lazy call.
+            output = self.out_func_(result)
+            return output if inverse is None else output[inverse]
         else:
             dists = compact_cdist(x, self.x_ind_, p=self.p_)
         logits = self.consts - torch.clamp(dists / self.stds_[None, :], min=0.0) ** self.q_

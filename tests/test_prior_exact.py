@@ -190,3 +190,38 @@ def test_benchmark_rejects_worker_task_configuration_mismatch():
             benchmark.generate((0, {"config": PriorConfig()}))
     finally:
         benchmark.limits.restore_original_limits()
+
+
+@pytest.mark.parametrize('disabled,vectorized', [('em', True), ('distance', False)])
+def test_benchmark_ablation_bypasses_fused_em(monkeypatch, disabled, vectorized):
+    from types import SimpleNamespace
+    from tabicl.prior import _dataset
+    from tabicl.prior.graph_lib import _function, _converter
+    benchmark = load_benchmark()
+    # initialize() mutates worker-local functions; register their restoration
+    # because this test runs in the pytest process rather than a spawned worker.
+    for module in (_function, _converter):
+        for name in ('nearest_center', 'compact_cdist'):
+            if hasattr(module, name):
+                monkeypatch.setattr(module, name, getattr(module, name))
+    monkeypatch.setattr(_function.RandomEMAssignmentFunction, '_transform',
+                        _function.RandomEMAssignmentFunction._transform)
+    calls = []
+    def distances(x, centers, p, *, vectorized):
+        calls.append(vectorized)
+        return torch.cdist(x, centers, p=p)
+    monkeypatch.setattr(_function, 'compact_cdist', distances)
+    def forbidden(*args, **kwargs):
+        raise AssertionError('ablation must not execute the fused EM path')
+    monkeypatch.setattr(_function, 'compact_em_probabilities', forbidden)
+    benchmark.initialize(_dataset.GraphPrior(n_jobs=1), 42, disable=[disabled])
+    try:
+        x = torch.arange(8.).reshape(4, 2)
+        centers = torch.arange(6.).reshape(3, 2)
+        obj = SimpleNamespace(x_ind_=centers, p_=1.3, q_=1.7, stds_=torch.ones(3),
+                              consts=torch.zeros(1, 3), out_func_=lambda t: t)
+        got = _function.RandomEMAssignmentFunction._transform(obj, x)
+        assert calls == [vectorized]
+        torch.testing.assert_close(got, torch.softmax(-torch.cdist(x, centers, p=1.3)**1.7, -1))
+    finally:
+        benchmark.limits.restore_original_limits()

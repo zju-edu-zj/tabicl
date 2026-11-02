@@ -54,7 +54,7 @@ def test_unvalidated_modes_use_complete_filter(monkeypatch, option):
     x = torch.randn(rows, 101 if option == 'width' else 8, generator=g)
     y = torch.randint(12 if option == 'classes' else 2, (rows,), generator=g)
     cfg = PriorConfig(filter_unpredictable_datasets=True, dataset_filter_mode='progressive',
-                      remove_trivial_datasets=option == 'trivial')
+                      remove_trivial_datasets=option == 'trivial', filter_execution='reference')
     calls = fit_calls(monkeypatch)
     trees = 8 if option == 'trees' else 25
     _dataset.should_filter(x, y, cfg, is_classif=option != 'regression', n_estimators=trees,
