@@ -27,6 +27,7 @@ class PriorConfig:
     # Analytically integrate fresh exchangeable, single-use categorical weights.
     # Cached/corrected meta sampling retains its original weighted draws.
     categorical_sampling: Literal['legacy', 'marginal'] = 'legacy'
+    graph_execution: Literal['reference', 'optimized'] = 'reference'
     filter_unpredictable_graphs: bool = False
     min_n_nodes: int = 2
     max_n_nodes: int = 32
@@ -56,6 +57,7 @@ class PriorConfig:
                            filter_unpredictable_datasets=args.filter_unpredictable_datasets,
                            dataset_filter_mode=getattr(args, 'dataset_filter_mode', 'full'),
                            categorical_sampling=getattr(args, 'categorical_sampling', 'legacy'),
+                           graph_execution=getattr(args, 'graph_execution', 'reference'),
                            filter_unpredictable_graphs=args.filter_unpredictable_graphs,
                            min_n_nodes=args.min_n_nodes,
                            max_n_nodes=args.max_n_nodes,
@@ -83,6 +85,8 @@ class PriorConfig:
                             help='Full 25-tree filter, or full-table 4-to-25-tree progressive filtering')
         parser.add_argument('--categorical_sampling', choices=['legacy', 'marginal'], default='legacy',
                             help='Integrate fresh exchangeable single-use meta categorical weights; retain cached weights')
+        parser.add_argument('--graph_execution', choices=['reference', 'optimized'], default='reference',
+                            help='Full-complexity graph execution with vector distances, quadratic features and dead-value removal')
         parser.add_argument(
             "--graph_noise",
             default=False,

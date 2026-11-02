@@ -24,11 +24,36 @@ from tabicl.prior import _dataset
 from tabicl.prior.graph_lib._config import PriorConfig
 
 
-def initialize(prototype, seed):
+def initialize(prototype, seed, disable=()):
     global prior, limits, task_seed
     prior, task_seed = prototype, seed
     torch.set_num_threads(1)
     limits = threadpoolctl.threadpool_limits(1)
+    # Benchmark-only ablations; production has a single execution switch.
+    from dataclasses import replace
+    from tabicl.prior.graph_lib import _function, _converter
+    if 'distance' in disable:
+        for module in (_function, _converter):
+            for name in ('nearest_center', 'compact_cdist'):
+                if hasattr(module, name):
+                    original = getattr(module, name)
+                    def reference(*args, _original=original, **kwargs):
+                        kwargs['vectorized'] = False
+                        return _original(*args, **kwargs)
+                    setattr(module, name, reference)
+    if 'quadratic' in disable:
+        original_init = _function.RandomQuadraticFunction.__init__
+        def init_quadratic(self, *args, _original=original_init, **kwargs):
+            _original(self, *args, **kwargs)
+            self.config = replace(self.config, graph_execution='reference')
+        _function.RandomQuadraticFunction.__init__ = init_quadratic
+    if 'embedding' in disable:
+        for cls in (_converter.CategoricalSoftmaxDiscretizer, _converter.CategoricalNeighborDiscretizer):
+            original_init = cls.__init__
+            def init_disc(self, *args, _original=original_init, **kwargs):
+                kwargs['return_values'] = True
+                _original(self, *args, **kwargs)
+            cls.__init__ = init_disc
 
 
 def generate(item):
@@ -93,6 +118,8 @@ def main():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--filter-mode', choices=['full', 'progressive'], default='full')
     parser.add_argument('--categorical-sampling', choices=['legacy', 'marginal'], default='legacy')
+    parser.add_argument('--graph-execution', choices=['reference', 'optimized'], default='reference')
+    parser.add_argument('--disable', nargs='*', choices=['distance', 'quadratic', 'embedding'], default=[])
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if min(args.tasks, args.workers, args.rows) < 1:
@@ -106,19 +133,22 @@ def main():
          min_features=1, max_features=100, max_classes=10, max_seq_len=args.rows,
          seq_len_per_gp=True, min_train_size=.3, max_train_size=.9,
          config=PriorConfig(filter_unpredictable_graphs=True, filter_unpredictable_datasets=True,
-                            dataset_filter_mode=args.filter_mode, categorical_sampling=args.categorical_sampling))
+                            dataset_filter_mode=args.filter_mode, categorical_sampling=args.categorical_sampling,
+                            graph_execution=args.graph_execution))
     params = []
     while len(params) < args.tasks:
         params.extend(p.sample_parameters())
     started = time.perf_counter()
     with ProcessPoolExecutor(args.workers, mp_context=mp.get_context('spawn'),
-                   initializer=initialize, initargs=(p, args.seed)) as executor:
+                   initializer=initialize, initargs=(p, args.seed, args.disable)) as executor:
         records = list(executor.map(generate, enumerate(params[:args.tasks])))
     total = time.perf_counter()-started
     summary = dict(wall_s=total, cpu_s=sum(r['cpu_s'] for r in records), tasks=args.tasks,
                    workers=args.workers, rows=args.rows, seed=args.seed,
                    filter_mode=args.filter_mode,
                    categorical_sampling=args.categorical_sampling,
+                   graph_execution=args.graph_execution,
+                   disabled=args.disable,
                    tree=os.environ.get('TABICL_PRIOR_TREE', 'native'),
                    one_dimensional_mode=os.environ.get('TABICL_PRIOR_1D_MODE', 'legacy'),
                    native_library=os.environ.get('TABICL_PRIOR_DISTANCE_LIBRARY', ''),

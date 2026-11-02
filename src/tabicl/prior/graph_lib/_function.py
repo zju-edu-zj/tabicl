@@ -211,7 +211,10 @@ class RandomDiscretizationFunction(RandomFunction):
         self.targets_ = RandomLinearFunction(self.context, self.in_features, self.out_features)(self.centers_)
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
-        closest_idx = nearest_center(x, self.centers_, self.p_)
+        if self.config.graph_execution == 'optimized':
+            closest_idx = nearest_center(x, self.centers_, self.p_, vectorized=True)
+        else:
+            closest_idx = nearest_center(x, self.centers_, self.p_)
         return self.targets_[closest_idx]
 
 
@@ -280,10 +283,24 @@ class RandomQuadraticFunction(RandomFunction):
             self.idxs_ = torch.arange(x.shape[1])
         self.n_feat_ = len(self.idxs_) + 1  # +1 for constant term
         self.tensor_3d_ = RandomMatrix(self.context).sample(self.out_features, self.n_feat_, self.n_feat_)
+        if self.config.graph_execution == 'optimized':
+            self.triu_ = torch.triu_indices(self.n_feat_, self.n_feat_, device=x.device)
+            i, j = self.triu_
+            # x_i*x_j equals x_j*x_i: retain every original coefficient, but
+            # form the common polynomial basis only once for all outputs.
+            self.coefficients_ = (self.tensor_3d_[:, i, j] +
+                self.tensor_3d_[:, j, i] * (i != j)).t().contiguous()
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
         # append ones to get the affine + linear part
         x = torch.cat([x[:, self.idxs_], torch.ones(x.shape[0], 1)], dim=-1)
+        if self.config.graph_execution == 'optimized':
+            if (x.device.type == 'cpu' and x.dtype in (torch.float32, torch.float64)
+                    and _native_available() and hasattr(torch.ops.tabicl_prior_exact, 'quadratic_features_cpu')):
+                phi = torch.ops.tabicl_prior_exact.quadratic_features_cpu(x)
+            else:
+                phi = x[:, self.triu_[0]] * x[:, self.triu_[1]]
+            return phi @ self.coefficients_
         return torch.einsum("oij,bi,bj->bo", self.tensor_3d_, x, x)
 
 
@@ -305,7 +322,10 @@ class RandomEMAssignmentFunction(RandomFunction):
         self.q_ = self.sampler.numerical("gen_em_assignment_q", 1.0, 2.0)
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
-        dists = compact_cdist(x, self.x_ind_, p=self.p_)
+        if self.config.graph_execution == 'optimized':
+            dists = compact_cdist(x, self.x_ind_, p=self.p_, vectorized=True)
+        else:
+            dists = compact_cdist(x, self.x_ind_, p=self.p_)
         logits = self.consts - torch.clamp(dists / self.stds_[None, :], min=0.0) ** self.q_
         result = torch.softmax(logits, dim=-1)
         return self.out_func_(result)

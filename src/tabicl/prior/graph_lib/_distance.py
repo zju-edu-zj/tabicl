@@ -67,7 +67,7 @@ def _compact_rows(x, comparisons):
     return unique, inverse
 
 
-def compact_cdist(x, centers, p):
+def compact_cdist(x, centers, p, *, vectorized=False):
     """Full cdist matrix, preserving EM's distances and subsequent shapes."""
     if (x.ndim != 2 or centers.ndim != 2 or x.device.type != "cpu"
             or x.dtype not in (torch.float32, torch.float64) or p == 2
@@ -76,11 +76,14 @@ def compact_cdist(x, centers, p):
         return torch.cdist(x, centers, p=p)
     compact, inverse = _compact_rows(x, len(centers))
     with parallel_distance(compact, centers, p):
-        distances = torch.cdist(compact, centers, p=p)
+        if vectorized and _native_available() and hasattr(torch.ops.tabicl_prior_exact, 'cdist_vector_cpu'):
+            distances = torch.ops.tabicl_prior_exact.cdist_vector_cpu(compact, centers, p)
+        else:
+            distances = torch.cdist(compact, centers, p=p)
     return distances if inverse is None else distances[inverse]
 
 
-def nearest_center(x, centers, p):
+def nearest_center(x, centers, p, *, vectorized=False):
     """Accelerate distances while making 1-D compatibility explicit.
 
     Default ``TABICL_PRIOR_1D_MODE=legacy`` retains the current prior's
@@ -110,7 +113,9 @@ def nearest_center(x, centers, p):
     # not merely duplicate-center ties, would need special handling.
     rows = max(1, (4 * 1024**2) // (len(centers) * x.element_size()))
     with parallel_distance(compact, centers, p):
-        if _native_available():
+        if vectorized and _native_available() and hasattr(torch.ops.tabicl_prior_exact, 'nearest_vector_cpu'):
+            result = torch.ops.tabicl_prior_exact.nearest_vector_cpu(compact, centers, p)
+        elif _native_available():
             result = torch.ops.tabicl_prior_exact.nearest_cpu(compact, centers, p)
         else:
             result = torch.cat([torch.cdist(chunk, centers, p=p).argmin(dim=-1)
