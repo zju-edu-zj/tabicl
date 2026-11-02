@@ -200,6 +200,8 @@ def main():
                    tree=os.environ.get('TABICL_PRIOR_TREE', 'native'),
                    one_dimensional_mode=os.environ.get('TABICL_PRIOR_1D_MODE', 'legacy'),
                    native_library=os.environ.get('TABICL_PRIOR_DISTANCE_LIBRARY', ''),
+                   compaction=os.environ.get('TABICL_PRIOR_COMPACT', 'hash'),
+                   statistics=os.environ.get('TABICL_PRIOR_STATISTICS', 'native'),
                    python_hash_seed=os.environ['PYTHONHASHSEED'],
                    rejected_by_filter=sum(sum(r['filter_decisions']) for r in records),
                    filter_calls=sum(len(r['filter_decisions']) for r in records),

@@ -175,8 +175,20 @@ class RandomIntPowerActivation(RandomActivation):
 
 class Standardize(RandomActivation):
     def _fit(self, x: torch.Tensor):
-        self.mean_ = x.mean(dim=0, keepdim=True)
-        self.inv_std_ = 1.0 / (x.std(dim=0, keepdim=True, correction=0) + 1e-4)
+        from ._distance import _native_available
+        import os
+        if (self.config.graph_execution == 'optimized' and x.device.type == 'cpu'
+                and x.dtype == torch.float32 and x.ndim == 2 and min(x.shape) > 0
+                # Scalar columns already use an efficient contiguous Torch reduction.
+                and x.shape[1] >= 2 and not x.requires_grad
+                and os.environ.get('TABICL_PRIOR_STATISTICS', 'native') == 'native'
+                and _native_available() and hasattr(torch.ops.tabicl_prior_exact, 'column_std_mean_cpu')):
+            stats = torch.ops.tabicl_prior_exact.column_std_mean_cpu(x)
+            self.mean_, std = stats[:1], stats[1:]
+        else:
+            self.mean_ = x.mean(dim=0, keepdim=True)
+            std = x.std(dim=0, keepdim=True, correction=0)
+        self.inv_std_ = 1.0 / (std + 1e-4)
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
         return (x - self.mean_) * self.inv_std_

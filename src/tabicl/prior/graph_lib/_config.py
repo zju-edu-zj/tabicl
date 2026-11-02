@@ -26,8 +26,8 @@ class PriorConfig:
     dataset_filter_mode: Literal['full', 'progressive'] = 'full'
     # Analytically integrate fresh exchangeable, single-use categorical weights.
     # Cached/corrected meta sampling retains its original weighted draws.
-    categorical_sampling: Literal['legacy', 'marginal'] = 'legacy'
-    graph_execution: Literal['reference', 'optimized'] = 'reference'
+    categorical_sampling: Literal['legacy', 'marginal'] = 'marginal'
+    graph_execution: Literal['reference', 'optimized'] = 'optimized'
     filter_execution: Literal['reference', 'planned', 'sufficient'] = 'sufficient'
     filter_unpredictable_graphs: bool = False
     min_n_nodes: int = 2
@@ -57,8 +57,8 @@ class PriorConfig:
                            allow_act_warping=args.allow_act_warping,
                            filter_unpredictable_datasets=args.filter_unpredictable_datasets,
                            dataset_filter_mode=getattr(args, 'dataset_filter_mode', 'full'),
-                           categorical_sampling=getattr(args, 'categorical_sampling', 'legacy'),
-                           graph_execution=getattr(args, 'graph_execution', 'reference'),
+                           categorical_sampling=getattr(args, 'categorical_sampling', 'marginal'),
+                           graph_execution=getattr(args, 'graph_execution', 'optimized'),
                            filter_execution=getattr(args, 'filter_execution', 'sufficient'),
                            filter_unpredictable_graphs=args.filter_unpredictable_graphs,
                            min_n_nodes=args.min_n_nodes,
@@ -87,9 +87,9 @@ class PriorConfig:
                             help='Full forest: public sklearn, cached MSE plans, or multiclass counts; unsupported inputs use sklearn')
         parser.add_argument('--dataset_filter_mode', choices=['full', 'progressive'], default='full',
                             help='Full 25-tree filter, or full-table 4-to-25-tree progressive filtering')
-        parser.add_argument('--categorical_sampling', choices=['legacy', 'marginal'], default='legacy',
+        parser.add_argument('--categorical_sampling', choices=['legacy', 'marginal'], default='marginal',
                             help='Integrate fresh exchangeable single-use meta categorical weights; retain cached weights')
-        parser.add_argument('--graph_execution', choices=['reference', 'optimized'], default='reference',
+        parser.add_argument('--graph_execution', choices=['reference', 'optimized'], default='optimized',
                             help='Full-complexity graph execution with vector distances, quadratic features and dead-value removal')
         parser.add_argument(
             "--graph_noise",

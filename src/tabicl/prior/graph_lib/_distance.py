@@ -52,6 +52,12 @@ def _compact_rows(x, comparisons):
     """Evaluate repeated rows once; use a deterministic, RNG-free cost gate."""
     if len(x) < 128 or comparisons < 8 or x.shape[1] == 0:
         return x, None
+    # Scalar torch.unique is cheaper than hash-map allocation; native hashing
+    # wins for full multidimensional rows, including the continuous-row probe.
+    if (x.shape[1] > 1 and os.environ.get('TABICL_PRIOR_COMPACT', 'hash') == 'hash'
+            and _native_available() and hasattr(torch.ops.tabicl_prior_exact, 'compact_rows_cpu')):
+        unique, inverse = torch.ops.tabicl_prior_exact.compact_rows_cpu(x)
+        return unique, inverse if inverse.numel() else None
     if x.shape[1] == 1:
         unique, inverse = torch.unique(x[:, 0], sorted=True, return_inverse=True)
         unique = unique[:, None]

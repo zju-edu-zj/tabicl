@@ -41,7 +41,7 @@ def test_bypass_straggler_then_force_its_deadline_without_discard():
 
 
 @pytest.mark.parametrize('seed', range(30))
-@pytest.mark.parametrize('delay', [0, 1, 2, 5])
+@pytest.mark.parametrize('delay', [0, 1, 2, 5, 8])
 def test_random_completion_preserves_every_task_and_micro(seed, delay):
     p = ReadyMicros(8, 8, 4, delay)
     register(p, 15)
@@ -71,6 +71,22 @@ def test_duplicate_completion_and_invalid_registration():
         p.complete(0, 0)
     with pytest.raises(ValueError):
         ReadyMicros(3, 2, 2, 1)
+
+
+def test_one_micro_per_rank_still_bypasses_cohort_straggler():
+    p = ReadyMicros(4, 16, 4, 2)
+    register(p, 4)
+    for batch in range(4):
+        for task in range(64):
+            if (batch, task) != (0, 0):
+                p.complete(batch, task)
+    steps = [p.pop_step(), p.pop_step()]
+    assert all(len(step) == 16 for step in steps)
+    assert p.pop_step() is None
+    p.complete(0, 0)
+    steps += [p.pop_step(), p.pop_step()]
+    assert sorted(t for step in steps for u in step for t in u.task_ids) == list(range(256))
+    assert p.stats()['ready_micro_max_late_steps'] <= 2
 
 
 def fake_service():

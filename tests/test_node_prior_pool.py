@@ -255,7 +255,8 @@ def test_complete_graph_generation_matches_original_distance(monkeypatch):
     import tabicl.prior.graph_lib._function as function
     import tabicl.prior.graph_lib._converter as converter
     torch.set_num_threads(1)
-    prior = small_prior()
+    prior = small_prior(config=PriorConfig(min_n_nodes=2, max_n_nodes=4,
+                                          graph_execution='reference'))
     for value in range(10):
         seed(value)
         params = prior.sample_parameters()[0]

@@ -50,6 +50,9 @@ run_pretrain() {
         printf '%q ' "$@"
         printf '\n'
     else
+        if declare -F prepare_prior_runtime >/dev/null; then
+            prepare_prior_runtime || return
+        fi
         "$@"
     fi
 }

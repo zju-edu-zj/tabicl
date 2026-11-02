@@ -20,8 +20,8 @@ PRIOR_PREFETCH_FACTOR=${PRIOR_PREFETCH_FACTOR:-8}
 PRIOR_IN_ORDER=${PRIOR_IN_ORDER:-False}
 PRIOR_FILTER_MODE=${PRIOR_FILTER_MODE:-full}
 PRIOR_READY_MAX_DELAY=${PRIOR_READY_MAX_DELAY:-2}
-PRIOR_CATEGORICAL_SAMPLING=${PRIOR_CATEGORICAL_SAMPLING:-legacy}
-PRIOR_GRAPH_EXECUTION=${PRIOR_GRAPH_EXECUTION:-reference}
+PRIOR_CATEGORICAL_SAMPLING=${PRIOR_CATEGORICAL_SAMPLING:-marginal}
+PRIOR_GRAPH_EXECUTION=${PRIOR_GRAPH_EXECUTION:-optimized}
 PRIOR_FILTER_EXECUTION=${PRIOR_FILTER_EXECUTION:-sufficient}
 PRIOR_ARGS=(
     --prior_backend "$PRIOR_BACKEND"
@@ -43,3 +43,15 @@ PRIOR_ARGS=(
     --graph_execution "$PRIOR_GRAPH_EXECUTION"
     --filter_execution "$PRIOR_FILTER_EXECUTION"
 )
+
+prepare_prior_runtime() {
+    if [[ "$PRIOR_GRAPH_EXECUTION" == optimized ]]; then
+        local runtime_args=(--check-training)
+        if [[ -n "${TABICL_PRIOR_DISTANCE_LIBRARY:-}" ]]; then
+            runtime_args+=(--library "$TABICL_PRIOR_DISTANCE_LIBRARY")
+        fi
+        TABICL_PRIOR_DISTANCE_LIBRARY=$("${PYTHON:-python}" \
+            "$REPO_ROOT/scripts/prepare_prior_runtime.py" "${runtime_args[@]}") || return
+        export TABICL_PRIOR_DISTANCE_LIBRARY
+    fi
+}

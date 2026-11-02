@@ -43,7 +43,7 @@ def main():
     text = subprocess.check_output(["bash", str(root / f"scripts/train_v2_clf_stage{args.stage}.sh")],
                                    env=env, cwd=root, text=True)
     tokens = shlex.split(text)
-    command = [sys.executable, "-m", "torch.distributed.run", *tokens[1:],
+    command = [sys.executable, "-m", "torch.distributed.run", *tokens[tokens.index('--standalone'):],
                "--max_steps", str(args.steps),
                "--checkpoint_path", str(args.initial_checkpoint) if args.initial_checkpoint else "",
                "--save_temp_every", "1000000", "--save_perm_every", "1000000", *args.train_args]
@@ -75,6 +75,10 @@ def main():
     report.update(profile_pipeline=args.profile_pipeline, trace_step=args.trace_step,
                   trace_steps=args.trace_steps, trace_all_ranks=args.trace_all_ranks,
                   reference_centroid_topk=args.reference_centroid_topk)
+    report['runtime_environment'] = {key: env.get(key) for key in (
+        'TABICL_PRIOR_DISTANCE_LIBRARY', 'TABICL_PRIOR_COMPACT', 'TABICL_PRIOR_STATISTICS',
+        'PYTHONHASHSEED', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS',
+        'TORCHINDUCTOR_CACHE_DIR', 'TRITON_CACHE_DIR')}
     (args.output / "run.json").write_text(json.dumps(report, indent=2) + "\n")
     raise SystemExit(result.returncode)
 

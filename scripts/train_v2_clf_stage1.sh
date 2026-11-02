@@ -57,24 +57,31 @@ PRIOR_WORKERS=${PRIOR_WORKERS:-8}             # per-rank workers for the DataLoa
 PRIOR_PREFETCH_FACTOR=${PRIOR_PREFETCH_FACTOR:-8}
 PRIOR_IN_ORDER=${PRIOR_IN_ORDER:-False}       # DataLoader completion-order override
 source "$REPO_ROOT/scripts/icl_recipe.sh"
-# The default is the measured fastest CPU-generation path for the long stages.
-# Stage 1 remains dtype-aware because its short, fixed-length BF16 workload was
-# faster through the DataLoader in the controlled comparison.
-if [[ -z "${PRIOR_BACKEND:-}" ]]; then
-    if [[ "$TRAIN_DTYPE" == float32 ]]; then
-        PRIOR_BACKEND=node_pool
+# Full-micro readiness removes fixed-cohort tails. It is fastest in BF16 on
+# the measured node and within run variation of balanced in compute-bound FP32.
+PRIOR_BACKEND=${PRIOR_BACKEND:-node_pool}
+if [[ "$PRIOR_BACKEND" == node_pool ]]; then
+    # Ready units must be full micros in both each rank's batch and the
+    # four-table prior group. Preserve partial-micro support via FIFO otherwise.
+    if (( BATCH_SIZE % (NUM_GPUS * MICRO_BATCH_SIZE) == 0 && 4 % MICRO_BATCH_SIZE == 0 )); then
+        PRIOR_SCHEDULE=${PRIOR_SCHEDULE:-ready_micro}
     else
-        PRIOR_BACKEND=dataloader
+        PRIOR_SCHEDULE=${PRIOR_SCHEDULE:-none}
     fi
+else
+    PRIOR_SCHEDULE=${PRIOR_SCHEDULE:-none}
 fi
-# BF16 is supply-bound here: fixed cohorts can cost more than balancing saves.
-# With one indivisible micro-batch per rank, reassignment cannot lower the max.
-# Keep an explicit override for controlled same-task comparisons.
-if [[ -z "${PRIOR_SCHEDULE:-}" && "$PRIOR_BACKEND" == node_pool ]]; then
-    if [[ "$TRAIN_DTYPE" != float32 ]] || (( BATCH_SIZE <= NUM_GPUS * MICRO_BATCH_SIZE )); then
-        PRIOR_SCHEDULE=none
-    else
-        PRIOR_SCHEDULE=balanced
+if [[ "$PRIOR_BACKEND" == node_pool && "$PRIOR_SCHEDULE" == ready_micro && -z "${PRIOR_READY_MAX_DELAY:-}" ]]; then
+    # Two 800-step BF16 repeats favor a wider bounded fairness window. No
+    # task is dropped: its source step still defines a mandatory deadline.
+    # Reserve a cohort beyond that deadline so small windows / 16 ranks work.
+    PRIOR_READY_MAX_DELAY=2
+    if [[ "$TRAIN_DTYPE" == bfloat16 ]]; then
+        PRIOR_READY_MAX_DELAY=8
+    fi
+    PRIOR_READY_COHORTS=$(( ${PRIOR_POOL_WINDOW:-128} / NUM_GPUS ))
+    if (( PRIOR_READY_MAX_DELAY >= PRIOR_READY_COHORTS )); then
+        PRIOR_READY_MAX_DELAY=$(( PRIOR_READY_COHORTS > 0 ? PRIOR_READY_COHORTS - 1 : 0 ))
     fi
 fi
 source "$REPO_ROOT/scripts/prior_recipe.sh"
@@ -89,7 +96,7 @@ elif [[ -n "$INIT_CKPT" ]]; then
     RESUME_ARGS=(--checkpoint_path "$INIT_CKPT" --only_load_model True)
 fi
 
-run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
+run_pretrain "${PYTHON:-python}" -m torch.distributed.run --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --wandb_log "$WANDB_LOG" \
             --wandb_project TabICLv2 \
             --wandb_name "${WANDB_NAME:-tabiclv2_clf_stage1_hybrid}" \

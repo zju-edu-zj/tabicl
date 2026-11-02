@@ -9,6 +9,100 @@
 #include <cmath>
 #include <limits>
 #include <numeric>
+#include <unordered_map>
+#include <cstring>
+
+// Exact full-row compaction. Hash collisions are always resolved by comparing
+// every coordinate; signed zero compares equal. First occurrence order avoids
+// sorting rows that are used only for independent pairwise evaluations.
+std::vector<at::Tensor> compact_rows_cpu(const at::Tensor& input) {
+  TORCH_CHECK(input.device().is_cpu() && input.dim() == 2);
+  TORCH_CHECK(input.scalar_type() == at::kFloat || input.scalar_type() == at::kDouble);
+  const auto n = input.size(0), d = input.size(1);
+  auto empty = at::empty({0}, input.options().dtype(at::kLong));
+  if (n < 128 || d == 0) return {input, empty};
+  auto x = input.contiguous();
+  auto inverse = at::empty({n}, input.options().dtype(at::kLong));
+  std::vector<int64_t> representatives;
+  representatives.reserve(n);
+  AT_DISPATCH_FLOATING_TYPES(x.scalar_type(), "tabicl_compact_rows_cpu", [&] {
+    const auto* xp = x.const_data_ptr<scalar_t>();
+    auto hash_row = [&](int64_t row, int64_t width) {
+      uint64_t hash = 1469598103934665603ULL;
+      for (int64_t j = 0; j < width; ++j) {
+        const auto value = xp[row*d+j];
+        uint64_t bits = 0;
+        if (value != scalar_t(0)) std::memcpy(&bits, &value, sizeof(scalar_t));
+        hash ^= bits;
+        hash *= 1099511628211ULL;
+        hash ^= hash >> 32;
+      }
+      return hash;
+    };
+    // Continuous inputs usually fail this inexpensive probe. Hash collisions
+    // can only trigger unnecessary full work, never merge unequal full rows.
+    if (d > 1) {
+      std::unordered_map<uint64_t, bool> probe;
+      for (int64_t i = 0; i < 64; ++i) probe[hash_row(i, std::min(d, int64_t(4)))] = true;
+      if (probe.size() > 56) return;
+    }
+    std::unordered_map<uint64_t, std::vector<int64_t>> buckets;
+    buckets.reserve(n);
+    auto* ip = inverse.data_ptr<int64_t>();
+    for (int64_t i = 0; i < n; ++i) {
+      auto& bucket = buckets[hash_row(i, d)];
+      int64_t found = -1;
+      for (auto unique : bucket) {
+        const auto row = representatives[unique];
+        bool equal = true;
+        for (int64_t j = 0; j < d; ++j) {
+          if (xp[row*d+j] != xp[i*d+j]) { equal = false; break; }
+        }
+        if (equal) { found = unique; break; }
+      }
+      if (found < 0) {
+        found = representatives.size();
+        representatives.push_back(i);
+        bucket.push_back(found);
+      }
+      ip[i] = found;
+      if (representatives.size()*8 > n*7) { representatives.clear(); return; }
+    }
+  });
+  if (representatives.empty()) return {input, empty};
+  auto indices = at::empty({int64_t(representatives.size())}, input.options().dtype(at::kLong));
+  std::copy(representatives.begin(), representatives.end(), indices.data_ptr<int64_t>());
+  return {x.index_select(0, indices), inverse};
+}
+
+// Two stable passes with double accumulators for float32 prior activations.
+// Vectorize independent columns, rather than a strided Welford reduction per
+// column. No E[x^2]-E[x]^2 cancellation, sampled rows or changed correction.
+at::Tensor column_std_mean_cpu(const at::Tensor& input) {
+  TORCH_CHECK(input.device().is_cpu() && input.dim() == 2 && input.scalar_type() == at::kFloat);
+  const auto n = input.size(0), d = input.size(1);
+  TORCH_CHECK(n > 0 && d > 0);
+  const auto x = input.contiguous();
+  const auto* xp = x.const_data_ptr<float>();
+  auto result = at::empty({2, d}, x.options());
+  auto* output = result.data_ptr<float>();
+  std::vector<double> mean(d, 0.), variance(d, 0.);
+  for (int64_t i = 0; i < n; ++i) {
+    for (int64_t j = 0; j < d; ++j) mean[j] += double(xp[i*d+j]);
+  }
+  for (int64_t j = 0; j < d; ++j) mean[j] /= double(n);
+  for (int64_t i = 0; i < n; ++i) {
+    for (int64_t j = 0; j < d; ++j) {
+      const double delta = double(xp[i*d+j])-mean[j];
+      variance[j] += delta*delta;
+    }
+  }
+  for (int64_t j = 0; j < d; ++j) {
+    output[j] = float(mean[j]);
+    output[d+j] = float(std::sqrt(variance[j]/double(n)));
+  }
+  return result;
+}
 
 at::Tensor nearest_cpu(const at::Tensor& input, const at::Tensor& centers,
                        double exponent) {
@@ -287,6 +381,8 @@ at::Tensor em_probabilities_cpu(const at::Tensor& input, const at::Tensor& cente
 }
 
 TORCH_LIBRARY(tabicl_prior_exact, m) {
+  m.def("compact_rows_cpu(Tensor x) -> Tensor[]");
+  m.def("column_std_mean_cpu(Tensor x) -> Tensor");
   m.def("nearest_cpu(Tensor x, Tensor centers, float p) -> Tensor");
   m.def("tree_cpu(Tensor x, Tensor dimensions, Tensor thresholds, Tensor leaves) -> Tensor");
   m.def("nearest_vector_cpu(Tensor x, Tensor centers, float p) -> Tensor");
@@ -295,6 +391,8 @@ TORCH_LIBRARY(tabicl_prior_exact, m) {
   m.def("em_probabilities_cpu(Tensor x, Tensor centers, Tensor inverse_std_q, Tensor constants, float p, float q) -> Tensor");
 }
 TORCH_LIBRARY_IMPL(tabicl_prior_exact, CPU, m) {
+  m.impl("compact_rows_cpu", &compact_rows_cpu);
+  m.impl("column_std_mean_cpu", &column_std_mean_cpu);
   m.impl("nearest_cpu", &nearest_cpu);
   m.impl("tree_cpu", &tree_cpu);
   m.impl("nearest_vector_cpu", &nearest_rows_cpu);

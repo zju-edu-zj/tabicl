@@ -123,7 +123,10 @@ def test_full_filtered_prior_and_rng_equal_reference(seed, monkeypatch):
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
-        config = PriorConfig(filter_unpredictable_graphs=True, filter_unpredictable_datasets=True)
+        # This test audits the exact distance path, independently of the
+        # numerically approximate optimized graph execution default.
+        config = PriorConfig(filter_unpredictable_graphs=True, filter_unpredictable_datasets=True,
+                             graph_execution='reference')
         prior = _dataset.GraphPrior(config=config, n_jobs=1)
         params = dict(regression=False, seq_len=256, train_size=180, num_features=12,
                       max_features=100, num_classes=3, config=config, device="cpu")

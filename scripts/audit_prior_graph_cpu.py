@@ -38,6 +38,13 @@ def initialize():
 
 def audit(item):
     task, seed_base, rows, execution = item
+    # Runtime comparison holds all graph/component distributions fixed. Both
+    # sides execute the optimized graph; only statistics/compaction differ.
+    graph_execution = execution
+    if execution in ('runtime_old', 'runtime_new'):
+        graph_execution = 'optimized'
+        os.environ['TABICL_PRIOR_STATISTICS'] = 'torch' if execution == 'runtime_old' else 'native'
+        os.environ['TABICL_PRIOR_COMPACT'] = 'sort' if execution == 'runtime_old' else 'hash'
     mode = 'marginal'
     seed = int(np.random.SeedSequence([seed_base, task]).generate_state(1)[0])
     random.seed(seed)
@@ -46,7 +53,7 @@ def audit(item):
     prior = GraphPrior(batch_size=1, n_jobs=1, min_features=1, max_features=100,
         max_classes=10, max_seq_len=rows, seq_len_per_gp=True, min_train_size=.3, max_train_size=.9,
         config=PriorConfig(filter_unpredictable_graphs=True, filter_unpredictable_datasets=True,
-                           categorical_sampling=mode, graph_execution=execution))
+                           categorical_sampling=mode, graph_execution=graph_execution))
     params = prior.sample_parameters(1)[0]
     choice_original, graph_original = GlobalSampler.choice, RandomGraphFunction._transform
     counts, graphs = Counter(), []
@@ -132,6 +139,7 @@ def main():
     p.add_argument('--workers', type=int, default=8)
     p.add_argument('--rows', type=int, default=2048)
     p.add_argument('--seeds', type=int, nargs='+', default=[83, 84])
+    p.add_argument('--comparison', choices=['graph', 'runtime'], default='graph')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     if min(a.tasks, a.workers, a.rows, *a.seeds) < 1:
@@ -140,7 +148,8 @@ def main():
     records = []
     with ProcessPoolExecutor(a.workers, mp_context=mp.get_context('spawn'), initializer=initialize) as ex:
         for seed in a.seeds:
-            for mode in ('reference', 'optimized'):
+            for mode in (('reference', 'optimized') if a.comparison == 'graph'
+                         else ('runtime_old', 'runtime_new')):
                 group = list(ex.map(audit, [(i, seed, a.rows, mode) for i in range(a.tasks)]))
                 records.extend(group)
                 print(json.dumps(dict(seed=seed, mode=mode, tasks=len(group))), flush=True)
