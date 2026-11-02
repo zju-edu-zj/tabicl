@@ -40,6 +40,7 @@ from .graph_lib._config import PriorConfig
 from ._mlp_scm import MLPSCM
 from ._tree_scm import TreeSCM
 from ._graph_scm import GraphSCM
+from ._filter_forest import planned_oob_prediction
 
 from ._hp_sampling import HpSamplerList
 from ._reg2cls import Reg2Cls
@@ -1658,9 +1659,14 @@ def should_filter(
         if np.isfinite(z) and z >= 2.0:
             return False
         et.set_params(n_estimators=n_estimators)
-    et.fit(X_np, fit_target)
-
-    Yhat = et.oob_prediction_  # (n, d)
+    Yhat = None
+    if config.filter_execution not in ('reference', 'planned'):
+        raise ValueError('filter_execution must be reference or planned')
+    if config.filter_execution == 'planned' and not progressive:
+        Yhat = planned_oob_prediction(X_np, Y_np, n_estimators)
+    if Yhat is None:
+        et.fit(X_np, fit_target)
+        Yhat = et.oob_prediction_  # (n, d)
     if len(Yhat.shape) == 1:
         Yhat = Yhat[:, None]
     mask = ~np.isnan(Yhat).any(axis=1)  # keep valid OOB rows

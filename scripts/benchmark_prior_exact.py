@@ -68,6 +68,13 @@ def generate(item):
     original_filter = _dataset.should_filter
     original_scm = _dataset.GraphSCM.__call__
     original_fit, forest_sizes = _dataset.ExtraTreesRegressor.fit, []
+    original_planned = _dataset.planned_oob_prediction
+
+    def audit_planned(x, y, n_estimators=25):
+        result = original_planned(x, y, n_estimators)
+        if result is not None:
+            forest_sizes.append(n_estimators)
+        return result
 
     def audit_fit(model, *args, **kwargs):
         forest_sizes.append(model.n_estimators)
@@ -90,6 +97,7 @@ def generate(item):
     _dataset.should_filter = audit_filter
     _dataset.GraphSCM.__call__ = audit_scm
     _dataset.ExtraTreesRegressor.fit = audit_fit
+    _dataset.planned_oob_prediction = audit_planned
     started, cpu = time.perf_counter(), time.process_time()
     try:
         x, y, d = prior.generate_dataset(params, compact=True)
@@ -97,6 +105,7 @@ def generate(item):
         _dataset.should_filter = original_filter
         _dataset.GraphSCM.__call__ = original_scm
         _dataset.ExtraTreesRegressor.fit = original_fit
+        _dataset.planned_oob_prediction = original_planned
     elapsed, cpu = time.perf_counter()-started, time.process_time()-cpu
     _, counts = torch.unique(y, return_counts=True)
     probs = counts.double()/len(y)
@@ -119,6 +128,7 @@ def main():
     parser.add_argument('--filter-mode', choices=['full', 'progressive'], default='full')
     parser.add_argument('--categorical-sampling', choices=['legacy', 'marginal'], default='legacy')
     parser.add_argument('--graph-execution', choices=['reference', 'optimized'], default='reference')
+    parser.add_argument('--filter-execution', choices=['reference', 'planned'], default='reference')
     parser.add_argument('--disable', nargs='*', choices=['distance', 'quadratic', 'embedding'], default=[])
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
@@ -134,7 +144,7 @@ def main():
          seq_len_per_gp=True, min_train_size=.3, max_train_size=.9,
          config=PriorConfig(filter_unpredictable_graphs=True, filter_unpredictable_datasets=True,
                             dataset_filter_mode=args.filter_mode, categorical_sampling=args.categorical_sampling,
-                            graph_execution=args.graph_execution))
+                            graph_execution=args.graph_execution, filter_execution=args.filter_execution))
     params = []
     while len(params) < args.tasks:
         params.extend(p.sample_parameters())
@@ -148,6 +158,7 @@ def main():
                    filter_mode=args.filter_mode,
                    categorical_sampling=args.categorical_sampling,
                    graph_execution=args.graph_execution,
+                   filter_execution=args.filter_execution,
                    disabled=args.disable,
                    tree=os.environ.get('TABICL_PRIOR_TREE', 'native'),
                    one_dimensional_mode=os.environ.get('TABICL_PRIOR_1D_MODE', 'legacy'),
