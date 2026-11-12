@@ -1,0 +1,65 @@
+docs/experiments/global_sparse_roleqo_stage1_20261112.md
+  s_09f9ec7d3c10d2::t_f189a4ffc500fe 1-55
+scripts/benchmark_training_schedule.py
+  s_09f9ec7d3c10d2::t_8a7f193150bad8 16-19,26-28,64-70,75-76
+scripts/icl_recipe.sh
+  s_8244512d946449::t_a966da49c8a6e3 15,43
+scripts/run_role_qo_perf_experiments.py
+  s_09f9ec7d3c10d2::t_2bf4f73c9d1b9a 1-178
+scripts/train_global_sparse_roleqo_stage1.sh
+  s_09f9ec7d3c10d2::t_74ff0327c340fa 1-23
+scripts/train_v2_clf_stage1.sh
+  s_09f9ec7d3c10d2::t_3287fe15d28625 44-46,124-126,130
+scripts/train_v2_clf_stage2.sh
+  s_8244512d946449::t_1a0ed543507c80 73
+scripts/train_v2_clf_stage3.sh
+  s_8244512d946449::t_159e355932af16 75
+src/tabicl/_model/encoders.py
+  s_8244512d946449::t_bd6f504f7b6e2e 101,121-122,156
+src/tabicl/_model/icl_attention.py
+  s_09f9ec7d3c10d2::t_988bff72376aa3 301,334,346
+src/tabicl/_model/layers.py
+  s_09f9ec7d3c10d2::t_6d2313196549e5 304,313,317-319,335-378,380-387,390-413,435,443,465-476,484-486,612-614,621,687,699,701-702,712,723,735-737,818,825-826,843,857-858,862-863,889,891,901
+src/tabicl/_model/learning.py
+  s_8244512d946449::t_1c499a08e22052 97,127
+src/tabicl/_model/tabicl.py
+  s_8244512d946449::t_12489be3c2a99b 245,282,368
+src/tabicl/train/_optimizer.py
+  s_8244512d946449::t_2d39bc48445e66 33-46
+src/tabicl/train/_performance.py
+  s_09f9ec7d3c10d2::t_ac73ff87f6a384 62-65,84-93
+src/tabicl/train/_run.py
+  s_09f9ec7d3c10d2::t_0a7f072659b494 335,389-401,644-645
+src/tabicl/train/_train_config.py
+  s_09f9ec7d3c10d2::t_d3632316d7297f 149-154,258-263,426-431
+tests/test_hybrid_optimizer.py
+  s_8244512d946449::t_3ba51bdb3423ee 18,25,63-74
+tests/test_icl_training_diagnostics.py
+  s_8244512d946449::t_2bc590893061b9 158
+tests/test_role_qo_attention.py
+  s_09f9ec7d3c10d2::t_6d12ceb05017c1 1-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1acd39ba52afc4fb2439c871f84fee31c3d3bcab",
+  "prompts": {},
+  "sessions": {
+    "s_09f9ec7d3c10d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cdd1-3c74-7e13-9f49-d02ef1c83113",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    },
+    "s_8244512d946449": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cc21-5533-7cc3-934b-f13f909972fc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
