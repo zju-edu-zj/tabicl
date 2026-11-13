@@ -1,0 +1,25 @@
+docs/experiments/global_sparse_roleqo_stage1_20261112.md
+  s_f4001d5abaca29::t_9ba73e0de7b105 33-34,39-42,57-89
+scripts/train_global_sparse_roleqo_stage1.sh
+  s_f4001d5abaca29::t_5709cfbfb1296c 14-18
+scripts/train_v2_clf_stage1.sh
+  s_f4001d5abaca29::t_8ffff2ccf63932 54,101,103-110,112-115,117-118
+tests/test_training_recipe.py
+  s_f4001d5abaca29::t_90cbe786b287cd 51-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7b54491d968625b5974064392311bb273239210c",
+  "prompts": {},
+  "sessions": {
+    "s_f4001d5abaca29": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d3f3-ad1b-7583-9d3b-47018fb50748",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
