@@ -438,7 +438,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
                 if q.is_cuda and q.ndim == 4 and q.shape[-1] <= 128:
                     from ._fusion_triton import fused_gate
 
-                    shared_heads = fused_gate(
+                    shared_flat = fused_gate(
                         q, sparse_heads, global_heads,
                         self.fusion_gate_weight, self.fusion_gate_bias,
                     )
@@ -447,18 +447,21 @@ class SetRetrievalAttention(GlobalLinearAttention):
                         global_heads.float()
                         + base_gate * (sparse_heads.float() - global_heads.float())
                     ).to(q.dtype)
+                    shared_flat = shared_heads.transpose(-3, -2).contiguous().view(
+                        *q.shape[:-3], q.shape[-2], self.embed_dim
+                    )
                 with torch.autocast(device_type=q.device.type, enabled=False):
                     # The base is the exact legacy execution path. Independent
                     # gates only add corrections relative to that function.
-                    shared_heads = (
-                        shared_heads.float()
-                        + (global_gate - (1 - base_gate)) * global_heads.float()
+                    correction = (
+                        (global_gate - (1 - base_gate)) * global_heads.float()
                         + (local_gate - base_gate) * sparse_heads.float()
                     ).to(q.dtype)
                     local_scaled = (sparse_heads.float() * local_gate).to(q.dtype)
-                shared_flat = shared_heads.transpose(-3, -2).contiguous().view(
+                correction_flat = correction.transpose(-3, -2).contiguous().view(
                     *q.shape[:-3], q.shape[-2], self.embed_dim
                 )
+                shared_flat = shared_flat + correction_flat
                 local_flat = local_scaled.transpose(-3, -2).contiguous().view_as(shared_flat)
                 output = F.linear(shared_flat, self.out_proj.weight, self.out_proj.bias)
                 output = output + F.linear(local_flat, self.local_out_delta.weight)
