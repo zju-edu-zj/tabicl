@@ -21,4 +21,4 @@ export CKPT_DIR=${CKPT_DIR:-/ossfs/workspace/tabicl-stage2-fusion-v1-20261117/ch
 export LOG_DIR=${LOG_DIR:-/ossfs/workspace/tabicl-stage2-fusion-v1-20261117/logs}
 export WANDB_NAME=${WANDB_NAME:-tabicl_sparse_fusion_v1_stage2}
 
-exec "$REPO_ROOT/scripts/train_v2_clf_stage2.sh"
+exec bash "$REPO_ROOT/scripts/train_v2_clf_stage2.sh"
