@@ -1,0 +1,19 @@
+src/tabicl/_model/icl_attention.py
+  s_1b3169379f960a::t_e15c40e252d3bd 441,450-452,456-457,461,464
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f45c1a40076338503a30c8714d0ee71c0179d04e",
+  "prompts": {},
+  "sessions": {
+    "s_1b3169379f960a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e5de-ef51-7e10-9d98-ea6fd203f0bf",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
