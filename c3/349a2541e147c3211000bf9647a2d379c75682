@@ -1,0 +1,19 @@
+src/tabicl/_model/learning.py
+  s_1b3169379f960a::t_ed5287c727d7fd 96,126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c3349a2541e147c3211000bf9647a2d379c75682",
+  "prompts": {},
+  "sessions": {
+    "s_1b3169379f960a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e5de-ef51-7e10-9d98-ea6fd203f0bf",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
