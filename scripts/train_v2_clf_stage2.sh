@@ -44,6 +44,8 @@ LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
 STAGE1_CKPT=${STAGE1_CKPT:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1/step-500000.ckpt}
 WANDB_LOG=${WANDB_LOG:-False}
 TENSORBOARD_LOG=${TENSORBOARD_LOG:-False}
+MAX_STEPS=${MAX_STEPS:-40000}
+WANDB_NAME=${WANDB_NAME:-tabiclv2_clf_stage2}
 
 # Load the Stage 1 weights only on the very first launch. On later launches (e.g.
 # restarts after a cluster time limit), CKPT_DIR already contains Stage 2
@@ -58,18 +60,19 @@ fi
 run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --wandb_log "$WANDB_LOG" \
             --wandb_project TabICLv2 \
-            --wandb_name tabiclv2_clf_stage2 \
+            --wandb_name "$WANDB_NAME" \
             --log_dir "$LOG_DIR" \
             --tensorboard_log "$TENSORBOARD_LOG" \
             --device cuda \
             --dtype "$TRAIN_DTYPE" \
             --np_seed 42 \
             --torch_seed 42 \
-            --max_steps 40000 \
+            --max_steps "$MAX_STEPS" \
             --batch_size 64 \
             --micro_batch_size 1 \
             --lr 1e-4 \
             --muon True \
+            --muon_route_mode "${MUON_ROUTE_MODE:-attention}" \
             --beta1 0.9 \
             --weight_decay 0.01 \
             --use_cautious_wd False \
@@ -113,9 +116,12 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --row_num_cls 4 \
             --row_rope_base 100000 \
             --row_rope_interleaved False \
+            --freeze_col "${FREEZE_COL:-False}" \
+            --freeze_row "${FREEZE_ROW:-False}" \
             --icl_num_blocks 12 \
             --icl_nhead 8 \
             "${ICL_ARGS[@]}" \
+            --freeze_icl "${FREEZE_ICL:-False}" \
             --ff_factor 2 \
             --norm_first True \
             --zero_init False \

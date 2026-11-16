@@ -146,6 +146,12 @@ def build_parser():
         "parameters use AdamW (norms and biases have no weight decay). False uses all-AdamW. "
         "Legacy all-Muon checkpoints require only_load_model=True and a new checkpoint directory.",
     )
+    parser.add_argument(
+        "--muon_route_mode",
+        choices=("attention", "all_matrix"),
+        default="attention",
+        help="Route transformer projections only, or every trainable rank-2+ tensor, to Muon.",
+    )
     parser.add_argument("--beta1", type=float, default=0.9, help="First moment decay (AdamW beta1 / Muon momentum)")
     parser.add_argument("--beta2", type=float, default=0.999, help="Second moment decay for AdamW, including hybrid groups")
     parser.add_argument(
@@ -385,6 +391,12 @@ def build_parser():
     parser.add_argument("--icl_router", choices=("centroid", "hierarchical"), default="centroid")
     parser.add_argument("--icl_partition", choices=("projection", "content_tree"), default="projection",
                         help="Support-only leaf construction, independently of centroid/beam search.")
+    parser.add_argument(
+        "--icl_fusion",
+        choices=("legacy", "independent_v1"),
+        default="legacy",
+        help="Global/local fusion geometry for hybrid ICL retrieval layers.",
+    )
     parser.add_argument("--icl_global_type", choices=("elu", "induced"), default="elu",
                         help="Global support memory used alone and inside hybrid retrieval layers.")
     parser.add_argument("--icl_num_induced_slots", type=int, default=128,

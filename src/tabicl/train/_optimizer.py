@@ -30,14 +30,23 @@ def build_optimizer(model, config):
     adamw_lr = config.lr / 4 if adamw_lr is None else adamw_lr
     if not math.isfinite(adamw_lr) or adamw_lr <= 0:
         raise ValueError("adamw_lr must be finite and positive")
-    muon_ids = set()
-    for module in model.modules():
-        if isinstance(module, MultiheadAttentionBlock):
-            for p in (module.attn.in_proj_weight, module.attn.out_proj.weight,
-                      module.linear1.weight, module.linear2.weight):
-                if p.ndim != 2:
-                    raise ValueError("Muon transformer projections must be 2D")
-                muon_ids.add(id(p))
+    route_mode = getattr(config, "muon_route_mode", "attention")
+    if route_mode == "all_matrix":
+        muon_ids = {id(p) for _, p in trainable if p.ndim >= 2}
+    elif route_mode == "attention":
+        muon_ids = set()
+        for module in model.modules():
+            if isinstance(module, MultiheadAttentionBlock):
+                projections = [module.attn.in_proj_weight, module.attn.out_proj.weight,
+                               module.linear1.weight, module.linear2.weight]
+                if hasattr(module.attn, "local_out_delta"):
+                    projections.append(module.attn.local_out_delta.weight)
+                for p in projections:
+                    if p.ndim != 2:
+                        raise ValueError("Muon transformer projections must be 2D")
+                    muon_ids.add(id(p))
+    else:
+        raise ValueError(f"Unknown Muon route mode: {route_mode!r}")
 
     groups = {
         "muon": dict(params=[], param_names=[], use_muon=True,

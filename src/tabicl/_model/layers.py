@@ -595,6 +595,7 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         router: str = "centroid",
         router_beam: int = 16,
         partition: str = "projection",
+        fusion: str = "legacy",
         qk_norm: bool = False,
         global_type: str = "elu",
         num_induced_slots: int = 128,
@@ -626,7 +627,7 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
                 d_model, nhead, dropout, False, mode=attention_type, qk_norm=qk_norm,
                 block_size=block_size, num_selected_blocks=num_selected_blocks,
                 query_chunk_size=query_chunk_size, router=router, router_beam=router_beam,
-                partition=partition, global_type=global_type,
+                partition=partition, fusion=fusion, global_type=global_type,
                 num_induced_slots=num_induced_slots,
             )
         else:

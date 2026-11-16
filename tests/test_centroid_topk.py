@@ -103,3 +103,50 @@ def test_checkpoint_context_replays_instead_of_reselecting(monkeypatch):
     with replay:
         actual = op.route(q, k)
     assert all(a is b for a, b in zip(actual, expected))
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+@pytest.mark.parametrize("leaves,budget,support", [(1, 1, 17), (13, 4, 401), (64, 8, 2041), (80, 4, 2537)])
+def test_fused_route_quality_matches_portable_reference(dtype, leaves, budget, support):
+    from tabicl._model._routing_triton import centroid_topk_quality
+
+    torch.manual_seed(183)
+    q = torch.randn(2, 3, 137, 32, device="cuda", dtype=dtype)
+    centers = torch.randn(2, 3, leaves, 32, device="cuda")
+    lengths = torch.full((leaves,), 32, device="cuda", dtype=torch.long)
+    lengths[-1] = support - 32 * (leaves - 1)
+    actual_ids, actual_quality = centroid_topk_quality(
+        q, centers, lengths, budget, support, 8192
+    )
+    module = SetRetrievalAttention(64, 2, block_size=32, num_selected_blocks=budget)
+    module.use_triton = False
+    expected_ids, expected_quality = module._centroid_route_quality(
+        q, centers, lengths, budget, support
+    )
+    assert torch.equal(actual_ids, expected_ids)
+    torch.testing.assert_close(actual_quality, expected_quality, atol=2e-5, rtol=2e-5)
+    assert torch.isfinite(actual_quality).all()
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_independent_v1_cuda_migration_preserves_initial_output(dtype):
+    torch.manual_seed(184)
+    legacy = SetRetrievalAttention(
+        64, 2, block_size=32, num_selected_blocks=2, partition="content_tree",
+        fusion="legacy",
+    ).cuda().to(dtype).eval()
+    v1 = SetRetrievalAttention(
+        64, 2, block_size=32, num_selected_blocks=2, partition="content_tree",
+        fusion="independent_v1",
+    ).cuda().to(dtype).eval()
+    v1.load_state_dict(legacy.state_dict(), strict=False)
+    with torch.no_grad():
+        v1.local_out_delta.weight.zero_()
+        v1.fusion_route_weight.zero_()
+        v1.fusion_route_bias.zero_()
+    query = torch.randn(1, 137, 64, device="cuda", dtype=dtype)
+    support = torch.randn(1, 291, 64, device="cuda", dtype=dtype)
+    expected = legacy(query, support, support)
+    actual = v1(query, support, support)
+    tolerance = 2e-3 if dtype == torch.bfloat16 else 2e-6
+    torch.testing.assert_close(actual, expected, atol=tolerance, rtol=tolerance)

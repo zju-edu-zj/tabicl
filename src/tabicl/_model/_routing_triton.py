@@ -1,5 +1,7 @@
 """CUDA routing primitives. Routing is discrete and has no autograd state."""
 
+import math
+
 import torch
 import triton
 import triton.language as tl
@@ -145,6 +147,123 @@ def centroid_topk(q, centroids, budget, chunk_elements=8 * 1024**2):
         _write_topk[(triton.cdiv(rows*budget, 256),)](
             indices, sort, out, rows, count, n, start, budget, 256)
     return out
+
+
+@triton.jit(do_not_specialize=["ROWS", "CHUNK_N", "FULL_N", "START", "NK", "SUPPORT"])
+def _route_quality(SCORES, INDICES, LENGTHS, QUALITY, ROWS, CHUNK_N, FULL_N, START,
+                   NK, SUPPORT, LOG_N, SCALE,
+                   K: tl.constexpr, WIDTH: tl.constexpr, SELECT: tl.constexpr,
+                   TILE: tl.constexpr):
+    row = tl.program_id(0) * TILE + tl.arange(0, TILE)
+    leaf = tl.arange(0, WIDTH)
+    live_row = row < ROWS
+    alive = leaf[None, :] < NK
+    raw = tl.load(SCORES + row[:, None] * NK + leaf[None, :],
+                  live_row[:, None] & alive, other=0.0).to(tl.float32)
+    # Quality features must never turn a zero-initialized adapter into NaNs.
+    raw = tl.where(raw == raw, tl.maximum(-1.0e4, tl.minimum(raw, 1.0e4)), 0.0)
+
+    count = NK.to(tl.float32)
+    mean = tl.sum(tl.where(alive, raw, 0.0), axis=1) / count
+    centered = raw - mean[:, None]
+    variance = tl.sum(tl.where(alive, centered * centered, 0.0), axis=1) / count
+    std = tl.maximum(tl.sqrt(variance), 1.0e-6)
+
+    remaining = alive
+    top = tl.zeros((TILE,), tl.float32)
+    boundary = tl.zeros((TILE,), tl.float32)
+    outside = tl.zeros((TILE,), tl.float32)
+    for i in tl.static_range(K + 1):
+        best = tl.max(tl.where(remaining, raw, -float("inf")), axis=1)
+        equal = remaining & (raw == best[:, None])
+        index = tl.min(tl.where(equal, leaf[None, :], 2147483647), axis=1)
+        if i == 0:
+            top = best
+        if i == K - 1:
+            boundary = best
+        if i == K:
+            outside = best
+        remaining = remaining & (leaf[None, :] != index[:, None])
+
+    slot = tl.arange(0, SELECT)
+    chosen = tl.load(INDICES + row[:, None] * K + slot[None, :],
+                     live_row[:, None] & (slot[None, :] < K), other=-1)
+    selected_leaf = tl.sum(
+        ((leaf[None, :, None] == chosen[:, None, :]) &
+         (slot[None, None, :] < K)).to(tl.int32), axis=2
+    ) > 0
+    length = tl.load(LENGTHS + leaf, leaf < NK, other=1).to(tl.float32)
+    candidate = tl.sum(tl.where(selected_leaf, length[None, :], 0.0), axis=1) / SUPPORT
+
+    # log(length) is a block-size prior: this is a routing-mass proxy, not
+    # token-level dense attention mass.
+    logits = raw * SCALE + tl.log(length[None, :])
+    maximum = tl.max(tl.where(alive, logits, -float("inf")), axis=1)
+    weights = tl.exp(tl.where(alive, logits - maximum[:, None], -float("inf")))
+    normalizer = tl.maximum(tl.sum(weights, axis=1), 1.0e-20)
+    selected_mass = tl.sum(tl.where(selected_leaf, weights, 0.0), axis=1) / normalizer
+    expected_logit = tl.sum(weights * logits, axis=1) / normalizer
+    entropy = maximum + tl.log(normalizer) - expected_logit
+    entropy = tl.where(NK > 1, entropy / tl.log(count), 0.0)
+    entropy = tl.maximum(0.0, tl.minimum(entropy, 1.0))
+    top_z = tl.maximum(-8.0, tl.minimum((top - mean) / std, 8.0))
+    margin = tl.where(NK > K, (boundary - outside) / std, 0.0)
+    margin = tl.maximum(0.0, tl.minimum(margin, 8.0))
+
+    output_row = row // CHUNK_N * FULL_N + START + row % CHUNK_N
+    mask = live_row
+    tl.store(QUALITY + output_row * 6 + 0, LOG_N, mask)
+    tl.store(QUALITY + output_row * 6 + 1, candidate, mask)
+    tl.store(QUALITY + output_row * 6 + 2, selected_mass, mask)
+    tl.store(QUALITY + output_row * 6 + 3, top_z, mask)
+    tl.store(QUALITY + output_row * 6 + 4, margin, mask)
+    tl.store(QUALITY + output_row * 6 + 5, entropy, mask)
+
+
+def centroid_topk_quality(q, centroids, lengths, budget, support_size,
+                          chunk_elements=8 * 1024**2):
+    """Exact centroid top-k plus six route statistics from the same score tile."""
+    b, h, n, d = q.shape
+    nk = centroids.shape[-2]
+    if not 1 <= budget <= min(8, nk) or nk > 1024 or chunk_elements < 1:
+        raise ValueError(
+            "centroid_topk_quality requires 1 <= budget <= min(8, leaves), "
+            "leaves <= 1024, positive tile"
+        )
+    out = torch.empty((b, h, n, budget), device=q.device, dtype=torch.int32)
+    quality = torch.empty((b, h, n, 6), device=q.device, dtype=torch.float32)
+    chunk = max(1, chunk_elements // (b * h * (nk + 5 * budget)))
+    max_rows = b * h * min(n, chunk)
+    workspace = torch.empty((max_rows * nk,), device=q.device, dtype=torch.float32)
+    values_workspace = torch.empty((max_rows * budget,), device=q.device, dtype=torch.float32)
+    indices_workspace = torch.empty((max_rows * budget,), device=q.device, dtype=torch.int32)
+    sorted_workspace = torch.empty_like(values_workspace)
+    sort_workspace = torch.empty((max_rows * budget,), device=q.device, dtype=torch.int64)
+    for start in range(0, n, chunk):
+        count = min(chunk, n - start)
+        rows = b * h * count
+        scores = workspace[: rows * nk].view(b, h, count, nk)
+        centroid_scores(q[:, :, start : start + count], centroids, out=scores)
+        values = values_workspace[: rows * budget].view(b, h, count, budget)
+        indices = indices_workspace[: rows * budget].view(b, h, count, budget)
+        sorted_values = sorted_workspace[: rows * budget].view_as(values)
+        sort = sort_workspace[: rows * budget].view_as(indices)
+        _score_topk[(triton.cdiv(rows, 16),)](
+            scores, values, indices, rows, count, n, start, nk, budget,
+            triton.next_power_of_2(nk), triton.next_power_of_2(budget), 16,
+            num_warps=4,
+        )
+        torch.sort(values, dim=-1, descending=True, out=(sorted_values, sort))
+        _write_topk[(triton.cdiv(rows * budget, 256),)](
+            indices, sort, out, rows, count, n, start, budget, 256
+        )
+        _route_quality[(triton.cdiv(rows, 16),)](
+            scores, indices, lengths, quality, rows, count, n, start, nk,
+            support_size, math.log1p(support_size) / math.log(65537), d**-0.5,
+            budget, triton.next_power_of_2(nk), triton.next_power_of_2(budget), 16,
+            num_warps=4,
+        )
+    return out, quality
 
 
 @triton.jit(do_not_specialize=["S", "KB", "KH", "KS"])

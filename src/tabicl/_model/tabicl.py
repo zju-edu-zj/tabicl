@@ -168,6 +168,10 @@ class TabICL(nn.Module):
         Fixed random-projection ordering or recursively rebuilt balanced content_tree.
         Each layer/head partitions only its current support keys.
 
+    icl_fusion : {"legacy", "independent_v1"}, default="legacy"
+        Hybrid global/local fusion. ``independent_v1`` keeps separate output
+        projections and independently gated additive channels with route-quality inputs.
+
     icl_qk_norm : bool, default=False
         Apply head-wise Q/K RMS normalization and bounded per-head length scaling
         in ICL attention. Experimental long-context recipes enable this instead
@@ -241,6 +245,7 @@ class TabICL(nn.Module):
         icl_router: str = "centroid",
         icl_router_beam: int = 16,
         icl_partition: str = "projection",
+        icl_fusion: str = "legacy",
         icl_qk_norm: bool = False,
         icl_global_type: str = "elu",
         icl_num_induced_slots: int = 128,
@@ -302,6 +307,9 @@ class TabICL(nn.Module):
         if icl_partition not in ("projection", "content_tree"):
             raise ValueError("icl_partition must be projection or content_tree")
         self.icl_partition = icl_partition
+        if icl_fusion not in ("legacy", "independent_v1"):
+            raise ValueError("icl_fusion must be legacy or independent_v1")
+        self.icl_fusion = icl_fusion
 
         self.col_embedder = ColEmbedding(
             embed_dim=embed_dim,
@@ -362,6 +370,7 @@ class TabICL(nn.Module):
             router=icl_router,
             router_beam=icl_router_beam,
             partition=icl_partition,
+            fusion=icl_fusion,
             qk_norm=icl_qk_norm,
             global_type=icl_global_type,
             num_induced_slots=icl_num_induced_slots,

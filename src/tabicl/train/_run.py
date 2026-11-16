@@ -328,6 +328,7 @@ class Trainer:
             "icl_router": self.config.icl_router,
             "icl_router_beam": self.config.icl_router_beam,
             "icl_partition": self.config.icl_partition,
+            "icl_fusion": self.config.icl_fusion,
             "icl_global_type": self.config.icl_global_type,
             "icl_num_induced_slots": self.config.icl_num_induced_slots,
             "icl_ssmax": self.config.icl_ssmax_type if self.config.icl_ssmax else False,
@@ -627,6 +628,7 @@ class Trainer:
                     "icl_block_size": 128, "icl_num_selected_blocks": 4,
                     "icl_router": "centroid", "icl_router_beam": 16,
                     "icl_partition": "projection",
+                    "icl_fusion": "legacy",
                     "icl_global_type": "elu", "icl_num_induced_slots": 128,
                     "icl_ssmax": False, "icl_qk_norm": False}
         keys = ["icl_attention", "icl_ssmax", "icl_qk_norm"]
@@ -636,6 +638,8 @@ class Trainer:
                 keys.append("icl_num_induced_slots")
         if mode in ("global_full", "global_sparse", "global_sparse_alternating"):
             keys.append("icl_sparse_every")
+        if mode in ("global_full", "global_sparse"):
+            keys.append("icl_fusion")
         if mode in ("sparse", "global_sparse", "global_sparse_alternating"):
             keys.extend(("icl_block_size", "icl_num_selected_blocks", "icl_router", "icl_partition"))
             if self.model_config.get("icl_router") == "hierarchical":
@@ -644,6 +648,13 @@ class Trainer:
             previous = stored.get(key, defaults[key])
             requested = self.model_config.get(key, defaults[key])
             if previous != requested:
+                if (
+                    key == "icl_fusion"
+                    and previous == "legacy"
+                    and requested == "independent_v1"
+                    and self.config.only_load_model
+                ):
+                    continue
                 raise ValueError(f"Checkpoint {key}={previous!r}, requested {requested!r}; "
                                  "resume with the same architecture or use a new checkpoint directory")
         state_dict = checkpoint["state_dict"]
@@ -654,6 +665,29 @@ class Trainer:
                 name.removeprefix("_orig_mod."): value
                 for name, value in state_dict.items()
             }
+        if (
+            stored.get("icl_fusion", "legacy") == "legacy"
+            and self.model_config.get("icl_fusion", "legacy") == "independent_v1"
+        ):
+            target = self.raw_model.state_dict()
+            migrated = dict(state_dict)
+            for name, module in self.raw_model.named_modules():
+                if (
+                    getattr(module, "fusion", None) != "independent_v1"
+                    or not hasattr(module, "local_out_delta")
+                ):
+                    continue
+                prefix = f"{name}." if name else ""
+                source = prefix + "out_proj.weight"
+                local = prefix + "local_out_delta.weight"
+                if source not in migrated:
+                    raise ValueError(f"Legacy fusion checkpoint is missing {source}")
+                migrated[local] = torch.zeros_like(target[local])
+                for suffix in ("fusion_route_weight", "fusion_route_bias"):
+                    key = prefix + suffix
+                    migrated[key] = torch.zeros_like(target[key])
+            state_dict = migrated
+            print("Migrated legacy convex fusion to function-equivalent independent_v1 channels")
         self.raw_model.load_state_dict(state_dict)
 
         # Optionally load optimizer and scheduler state

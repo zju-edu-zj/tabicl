@@ -188,3 +188,34 @@ def test_dense_default_preserves_official_parameter_layout():
 
     m = Encoder(1, 32, 2, 64)
     assert set(m.blocks[0].attn.state_dict()) == {"in_proj_weight", "in_proj_bias", "out_proj.weight", "out_proj.bias"}
+
+
+def test_legacy_checkpoint_migrates_to_function_equivalent_independent_fusion(tmp_path):
+    common = dict(
+        max_classes=3, embed_dim=16, col_num_blocks=1, col_nhead=2, col_num_inds=4,
+        row_num_blocks=1, row_nhead=2, row_num_cls=2, icl_num_blocks=2,
+        icl_nhead=2, icl_ssmax=False, zero_init=False, icl_attention="global_sparse",
+        icl_sparse_every=1, icl_block_size=16, icl_num_selected_blocks=1,
+        icl_partition="content_tree",
+    )
+    torch.manual_seed(25)
+    legacy = TabICL(**common, icl_fusion="legacy").train()
+    checkpoint = tmp_path / "legacy.ckpt"
+    stored_config = dict(common, icl_attention_impl_version=4, icl_fusion="legacy")
+    torch.save({"config": stored_config, "state_dict": legacy.state_dict()}, checkpoint)
+
+    trainer = Trainer.__new__(Trainer)
+    trainer.config = build_parser().parse_args([
+        "--device", "cpu", "--only_load_model", "True", "--icl_fusion", "independent_v1"
+    ])
+    trainer.config.checkpoint_path = str(checkpoint)
+    trainer.raw_model = TabICL(**common, icl_fusion="independent_v1").train()
+    trainer.model_config = dict(stored_config, icl_fusion="independent_v1")
+    trainer.load_checkpoint()
+
+    x = torch.randn(1, 49, 5)
+    y = torch.randint(0, 3, (1, 37))
+    with torch.no_grad():
+        expected = legacy(x, y)
+        actual = trainer.raw_model(x, y)
+    torch.testing.assert_close(actual, expected, atol=3e-6, rtol=3e-6)

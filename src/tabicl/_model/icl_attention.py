@@ -5,6 +5,7 @@ The hard router has no trainable parameters. Q/K still learn through attention.
 """
 
 from contextlib import contextmanager
+import math
 
 import torch
 from torch import nn
@@ -36,6 +37,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
         router="centroid",
         router_beam=16,
         partition="projection",
+        fusion="legacy",
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -49,6 +51,8 @@ class SetRetrievalAttention(GlobalLinearAttention):
             raise ValueError("router must be centroid or hierarchical")
         if partition not in ("projection", "content_tree"):
             raise ValueError("partition must be projection or content_tree")
+        if fusion not in ("legacy", "independent_v1"):
+            raise ValueError("fusion must be legacy or independent_v1")
         if router_beam < 1 or (router == "hierarchical" and router_beam < num_selected_blocks):
             raise ValueError("router_beam must be >= num_selected_blocks")
         # The reference and fused kernels use zero attention dropout alike.
@@ -61,6 +65,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
         self.router = router
         self.router_beam = router_beam
         self.partition = partition
+        self.fusion = fusion
         # A 32 MiB route tile amortizes GEMM/top-k dispatch at long contexts.
         # Fast selection includes candidates/sort buffers in this bound.
         # This is a workspace bound, not an attention or candidate budget.
@@ -75,6 +80,14 @@ class SetRetrievalAttention(GlobalLinearAttention):
         if mode != "sparse":
             self.fusion_gate_weight = nn.Parameter(torch.zeros(self.num_heads, self.head_dim))
             self.fusion_gate_bias = nn.Parameter(torch.zeros(self.num_heads))
+            if fusion == "independent_v1":
+                # Effective projections are O_global=O and O_local=O+Delta.
+                # Zero Delta preserves the legacy fused projection at step zero
+                # while retaining the full independent two-matrix function class.
+                self.local_out_delta = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
+                nn.init.zeros_(self.local_out_delta.weight)
+                self.fusion_route_weight = nn.Parameter(torch.zeros(self.num_heads, 2, 6))
+                self.fusion_route_bias = nn.Parameter(torch.zeros(self.num_heads, 2))
 
     @torch.no_grad()
     def _prepare_route(self, k):
@@ -113,7 +126,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
         return prepared
 
     @torch.no_grad()
-    def route(self, q, k, prepared=None):
+    def route(self, q, k, prepared=None, return_quality=False):
         """Return head-specific support ordering and selected leaf IDs."""
         if self._route_replay is not None:
             return next(self._route_replay)
@@ -121,8 +134,30 @@ class SetRetrievalAttention(GlobalLinearAttention):
         nk = centroids.shape[-2]
         budget = min(self.num_selected_blocks, nk)
         with torch.autocast(device_type=q.device.type, enabled=False):
+            quality = None
             if self.router == "hierarchical":
                 selected = self._route_tree(q, centroids, lengths, budget)
+                if return_quality:
+                    _, quality = self._centroid_route_quality(
+                        q, centroids, lengths, budget, k.shape[-2], selected
+                    )
+            elif (
+                return_quality
+                and q.is_cuda
+                and self.use_triton
+                and self.use_fast_centroid_topk
+                and budget <= 8
+                and nk <= 1024
+            ):
+                from ._routing_triton import centroid_topk_quality
+
+                selected, quality = centroid_topk_quality(
+                    q, centroids, lengths, budget, k.shape[-2], self.route_score_chunk_elements
+                )
+            elif return_quality:
+                selected, quality = self._centroid_route_quality(
+                    q, centroids, lengths, budget, k.shape[-2]
+                )
             elif (q.is_cuda and self.use_triton and self.use_fast_centroid_topk
                   and budget <= 8 and nk <= 1024):
                 from ._routing_triton import centroid_topk
@@ -143,10 +178,64 @@ class SetRetrievalAttention(GlobalLinearAttention):
                         scores = queries.float() @ centroids.transpose(-1, -2)
                     pieces.append(scores.topk(budget, -1).indices)
                 selected = torch.cat(pieces, dim=2)
-        result = order.to(torch.int32), selected.to(torch.int32)
+        result = (order.to(torch.int32), selected.to(torch.int32), quality) if return_quality else (
+            order.to(torch.int32), selected.to(torch.int32)
+        )
         if self._route_record is not None:
             self._route_record.append(result)
         return result
+
+    @torch.no_grad()
+    def _centroid_route_quality(self, q, centroids, lengths, budget, support_size, selected=None):
+        """Select leaves and expose calibrated, bounded-cost router statistics."""
+        nk = centroids.shape[-2]
+        chunk = max(1, self.route_score_chunk_elements // (q.shape[0] * q.shape[1] * nk))
+        selected_parts, feature_parts = [], []
+        for start in range(0, q.shape[-2], chunk):
+            queries = q[:, :, start : start + chunk]
+            if q.is_cuda and self.use_triton:
+                from ._routing_triton import centroid_scores
+
+                raw_scores = centroid_scores(queries, centroids)
+            else:
+                raw_scores = queries.float() @ centroids.transpose(-1, -2)
+            raw_scores = torch.nan_to_num(raw_scores.float(), nan=0.0, posinf=1e4, neginf=-1e4)
+            chosen = (
+                raw_scores.topk(budget, -1).indices
+                if selected is None
+                else selected[:, :, start : start + chunk].long()
+            )
+            route_logits = raw_scores / math.sqrt(q.shape[-1]) + lengths.float().log()
+            log_prob = route_logits.log_softmax(-1)
+            prob = log_prob.exp()
+            selected_mass = prob.gather(-1, chosen).sum(-1)
+            candidate_fraction = lengths[chosen].sum(-1).float() / support_size
+            mean = raw_scores.mean(-1)
+            std = raw_scores.std(-1, unbiased=False).clamp_min(1e-6)
+            boundary = raw_scores.topk(min(budget + 1, nk), -1).values
+            top_score = ((boundary[..., 0] - mean) / std).clamp(-8, 8)
+            if nk > budget:
+                margin = ((boundary[..., budget - 1] - boundary[..., budget]) / std).clamp(0, 8)
+            else:
+                margin = torch.zeros_like(top_score)
+            if nk > 1:
+                entropy = (-(prob * log_prob).sum(-1) / math.log(nk)).clamp(0, 1)
+            else:
+                entropy = torch.zeros_like(top_score)
+            log_n = torch.full_like(selected_mass, math.log1p(support_size) / math.log(65537))
+            feature_parts.append(torch.stack(
+                (log_n, candidate_fraction, selected_mass, top_score, margin, entropy), -1
+            ))
+            selected_parts.append(chosen.to(torch.int32))
+        return torch.cat(selected_parts, 2), torch.cat(feature_parts, 2)
+
+    @staticmethod
+    def _full_route_quality(q, support_size):
+        shape = (*q.shape[:-1], 6)
+        quality = torch.zeros(shape, device=q.device, dtype=torch.float32)
+        quality[..., 0] = math.log1p(support_size) / math.log(65537)
+        quality[..., 1:3] = 1
+        return quality
 
     def checkpoint_contexts(self):
         """Record discrete routing once and replay it during block checkpointing."""
@@ -230,9 +319,16 @@ class SetRetrievalAttention(GlobalLinearAttention):
             attn_mask=valid.reshape(b * h * n, 1, -1),
         ).reshape(b, h, n, d)
 
-    def _sparse_attention(self, q, k, v, prepared=None):
-        order, selected = (self.route(q, k) if prepared is None or "route" not in prepared
-                           else self.route(q, k, prepared["route"]))
+    def _sparse_attention(self, q, k, v, prepared=None, return_quality=False):
+        routed = (
+            self.route(q, k, return_quality=return_quality)
+            if prepared is None or "route" not in prepared
+            else self.route(q, k, prepared["route"], return_quality=return_quality)
+        )
+        if return_quality:
+            order, selected, route_quality = routed
+        else:
+            order, selected = routed
         visible = min(k.shape[-2], self.num_selected_blocks * self.block_size)
         attention_q = self.qk_norm.scale_query(q, visible) if self.qk_norm is not None else q
         if (
@@ -264,7 +360,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
             index = order.long()[..., None].expand_as(k)
             ks, vs = k.gather(2, index), v.gather(2, index)
             self._diagnose(attention_q, ks, vs, selected)
-        return out
+        return (out, route_quality) if return_quality else out
 
     @torch.no_grad()
     def _diagnose(self, q, k, v, selected=None):
@@ -314,10 +410,57 @@ class SetRetrievalAttention(GlobalLinearAttention):
             sparse_heads = F.scaled_dot_product_attention(attention_q, k, v)
             if diagnose:
                 self._diagnose(attention_q, k, v)
+            route_quality = self._full_route_quality(q, k.shape[-2])
         else:
-            sparse_heads = self._sparse_attention(q, k, v, prepared)
+            if self.fusion == "independent_v1" and global_heads is not None:
+                sparse_heads, route_quality = self._sparse_attention(
+                    q, k, v, prepared, return_quality=True
+                )
+            else:
+                sparse_heads = self._sparse_attention(q, k, v, prepared)
         heads = sparse_heads
         if global_heads is not None:
+            if self.fusion == "independent_v1":
+                with torch.autocast(device_type=q.device.type, enabled=False):
+                    base_logit = (
+                        torch.einsum("bhtd,hd->bht", q.float(), self.fusion_gate_weight.float())
+                        + self.fusion_gate_bias.float()[None, :, None]
+                    )
+                    route_delta = (
+                        torch.einsum(
+                            "bhtf,hcf->bhtc", route_quality, self.fusion_route_weight.float()
+                        )
+                        + self.fusion_route_bias.float()[None, :, None]
+                    )
+                    local_gate = torch.sigmoid(base_logit + route_delta[..., 1])[..., None]
+                    global_gate = 1 - torch.sigmoid(base_logit - route_delta[..., 0])[..., None]
+                    # Written around the old interpolation so zero route deltas
+                    # take the exact legacy arithmetic path before the dtype cast.
+                    shared_heads = global_heads.float() + local_gate * (
+                        sparse_heads.float() - global_heads.float()
+                    )
+                    shared_heads = shared_heads + (
+                        global_gate + local_gate - 1
+                    ) * global_heads.float()
+                    shared_heads = shared_heads.to(q.dtype)
+                    local_scaled = (sparse_heads.float() * local_gate).to(q.dtype)
+                shared_flat = shared_heads.transpose(-3, -2).contiguous().view(
+                    *q.shape[:-3], q.shape[-2], self.embed_dim
+                )
+                local_flat = local_scaled.transpose(-3, -2).contiguous().view_as(shared_flat)
+                output = F.linear(shared_flat, self.out_proj.weight, self.out_proj.bias)
+                output = output + F.linear(local_flat, self.local_out_delta.weight)
+                if diagnose:
+                    self.last_diagnostics.update({
+                        "fusion_global_gate_mean": global_gate.detach().mean(),
+                        "fusion_sparse_gate_mean": local_gate.detach().mean(),
+                        "route_candidate_fraction": route_quality[..., 1].mean(),
+                        "route_selected_mass_proxy": route_quality[..., 2].mean(),
+                        "route_top_score_z": route_quality[..., 3].mean(),
+                        "route_boundary_margin": route_quality[..., 4].mean(),
+                        "route_entropy": route_quality[..., 5].mean(),
+                    })
+                return output
             if q.is_cuda and q.ndim == 4 and q.shape[-1] <= 128:
                 from ._fusion_triton import fused_gate
 

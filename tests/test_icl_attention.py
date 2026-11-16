@@ -258,6 +258,46 @@ def test_full_budget_fast_path_skips_routing(mode):
     torch.testing.assert_close(result, m.out_proj(heads.transpose(1, 2).reshape_as(q)))
 
 
+@pytest.mark.parametrize("support", [65, 193])
+def test_independent_v1_initialization_is_function_equivalent_to_legacy(support):
+    torch.manual_seed(95)
+    legacy = SetRetrievalAttention(
+        32, 2, mode="fused_sparse", block_size=32, num_selected_blocks=2,
+        partition="content_tree", fusion="legacy",
+    ).eval()
+    independent = SetRetrievalAttention(
+        32, 2, mode="fused_sparse", block_size=32, num_selected_blocks=2,
+        partition="content_tree", fusion="independent_v1",
+    ).eval()
+    independent.load_state_dict(legacy.state_dict(), strict=False)
+    with torch.no_grad():
+        independent.local_out_delta.weight.zero_()
+        independent.fusion_route_weight.zero_()
+        independent.fusion_route_bias.zero_()
+    legacy.use_triton = independent.use_triton = False
+    query, keys = torch.randn(2, 17, 32), torch.randn(2, support, 32)
+    expected = legacy(query, keys, keys)
+    actual = independent(query, keys, keys)
+    torch.testing.assert_close(actual, expected, atol=2e-6, rtol=2e-6)
+
+
+def test_independent_v1_route_quality_is_finite_and_calibrated():
+    torch.manual_seed(96)
+    module = SetRetrievalAttention(
+        32, 2, mode="fused_sparse", block_size=32, num_selected_blocks=2,
+        partition="content_tree", fusion="independent_v1",
+    )
+    module.use_triton = False
+    q, k = torch.randn(2, 2, 19, 16), torch.randn(2, 2, 193, 16)
+    order, selected, quality = module.route(q, k, return_quality=True)
+    assert order.shape == (2, 2, 193)
+    assert selected.shape == (2, 2, 19, 2)
+    assert quality.shape == (2, 2, 19, 6)
+    assert torch.isfinite(quality).all()
+    assert ((quality[..., :3] >= 0) & (quality[..., :3] <= 1)).all()
+    assert ((quality[..., 4:] >= 0) & (quality[..., 4:] <= 8)).all()
+
+
 @pytest.mark.parametrize("mode", ["global", "global_sparse"])
 def test_induced_global_support_isolation_cache_and_gradients(mode):
     torch.manual_seed(95)
