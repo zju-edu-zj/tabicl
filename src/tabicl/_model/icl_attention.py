@@ -432,17 +432,29 @@ class SetRetrievalAttention(GlobalLinearAttention):
                         )
                         + self.fusion_route_bias.float()[None, :, None]
                     )
+                    base_gate = torch.sigmoid(base_logit)[..., None]
                     local_gate = torch.sigmoid(base_logit + route_delta[..., 1])[..., None]
                     global_gate = 1 - torch.sigmoid(base_logit - route_delta[..., 0])[..., None]
-                    # Written around the old interpolation so zero route deltas
-                    # take the exact legacy arithmetic path before the dtype cast.
-                    shared_heads = global_heads.float() + local_gate * (
-                        sparse_heads.float() - global_heads.float()
+                if q.is_cuda and q.ndim == 4 and q.shape[-1] <= 128:
+                    from ._fusion_triton import fused_gate
+
+                    shared_heads = fused_gate(
+                        q, sparse_heads, global_heads,
+                        self.fusion_gate_weight, self.fusion_gate_bias,
                     )
-                    shared_heads = shared_heads + (
-                        global_gate + local_gate - 1
-                    ) * global_heads.float()
-                    shared_heads = shared_heads.to(q.dtype)
+                else:
+                    shared_heads = (
+                        global_heads.float()
+                        + base_gate * (sparse_heads.float() - global_heads.float())
+                    ).to(q.dtype)
+                with torch.autocast(device_type=q.device.type, enabled=False):
+                    # The base is the exact legacy execution path. Independent
+                    # gates only add corrections relative to that function.
+                    shared_heads = (
+                        shared_heads.float()
+                        + (global_gate - (1 - base_gate)) * global_heads.float()
+                        + (local_gate - base_gate) * sparse_heads.float()
+                    ).to(q.dtype)
                     local_scaled = (sparse_heads.float() * local_gate).to(q.dtype)
                 shared_flat = shared_heads.transpose(-3, -2).contiguous().view(
                     *q.shape[:-3], q.shape[-2], self.embed_dim
