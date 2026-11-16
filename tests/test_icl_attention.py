@@ -272,6 +272,7 @@ def test_independent_v1_initialization_is_function_equivalent_to_legacy(support)
     independent.load_state_dict(legacy.state_dict(), strict=False)
     with torch.no_grad():
         independent.local_out_delta.weight.zero_()
+        independent.fusion_gate_query_weight.zero_()
         independent.fusion_route_weight.zero_()
         independent.fusion_route_bias.zero_()
     legacy.use_triton = independent.use_triton = False

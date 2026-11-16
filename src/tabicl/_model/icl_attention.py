@@ -86,6 +86,9 @@ class SetRetrievalAttention(GlobalLinearAttention):
                 # while retaining the full independent two-matrix function class.
                 self.local_out_delta = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
                 nn.init.zeros_(self.local_out_delta.weight)
+                self.fusion_gate_query_weight = nn.Parameter(
+                    torch.zeros(self.num_heads, 2, self.head_dim)
+                )
                 self.fusion_route_weight = nn.Parameter(torch.zeros(self.num_heads, 2, 6))
                 self.fusion_route_bias = nn.Parameter(torch.zeros(self.num_heads, 2))
 
@@ -426,6 +429,9 @@ class SetRetrievalAttention(GlobalLinearAttention):
                         torch.einsum("bhtd,hd->bht", q.float(), self.fusion_gate_weight.float())
                         + self.fusion_gate_bias.float()[None, :, None]
                     )
+                    query_delta = torch.einsum(
+                        "bhtd,hcd->bhtc", q.float(), self.fusion_gate_query_weight.float()
+                    )
                     route_delta = (
                         torch.einsum(
                             "bhtf,hcf->bhtc", route_quality, self.fusion_route_weight.float()
@@ -433,8 +439,12 @@ class SetRetrievalAttention(GlobalLinearAttention):
                         + self.fusion_route_bias.float()[None, :, None]
                     )
                     base_gate = torch.sigmoid(base_logit)[..., None]
-                    local_gate = torch.sigmoid(base_logit + route_delta[..., 1])[..., None]
-                    global_gate = 1 - torch.sigmoid(base_logit - route_delta[..., 0])[..., None]
+                    local_gate = torch.sigmoid(
+                        base_logit + query_delta[..., 1] + route_delta[..., 1]
+                    )[..., None]
+                    global_gate = 1 - torch.sigmoid(
+                        base_logit - query_delta[..., 0] - route_delta[..., 0]
+                    )[..., None]
                 if q.is_cuda and q.ndim == 4 and q.shape[-1] <= 128:
                     from ._fusion_triton import fused_gate
 

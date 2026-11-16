@@ -683,7 +683,9 @@ class Trainer:
                 if source not in migrated:
                     raise ValueError(f"Legacy fusion checkpoint is missing {source}")
                 migrated[local] = torch.zeros_like(target[local])
-                for suffix in ("fusion_route_weight", "fusion_route_bias"):
+                for suffix in (
+                    "fusion_gate_query_weight", "fusion_route_weight", "fusion_route_bias"
+                ):
                     key = prefix + suffix
                     migrated[key] = torch.zeros_like(target[key])
             state_dict = migrated

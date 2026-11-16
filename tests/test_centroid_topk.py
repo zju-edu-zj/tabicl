@@ -142,6 +142,7 @@ def test_independent_v1_cuda_migration_preserves_initial_output(dtype):
     v1.load_state_dict(legacy.state_dict(), strict=False)
     with torch.no_grad():
         v1.local_out_delta.weight.zero_()
+        v1.fusion_gate_query_weight.zero_()
         v1.fusion_route_weight.zero_()
         v1.fusion_route_bias.zero_()
     query = torch.randn(1, 137, 64, device="cuda", dtype=dtype)
