@@ -1,0 +1,19 @@
+scripts/train_v2_clf_stage2_sparse_fusion_v1.sh
+  s_1b3169379f960a::t_02e5a0661ad092 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6a4df937e03d92f30811ae947e407293beaa2c72",
+  "prompts": {},
+  "sessions": {
+    "s_1b3169379f960a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e5de-ef51-7e10-9d98-ea6fd203f0bf",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
