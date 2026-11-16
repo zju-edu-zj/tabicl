@@ -1,0 +1,25 @@
+src/tabicl/_model/icl_attention.py
+  s_1b3169379f960a::t_f2e4e43fa9a274 89-91,432-434,442-447
+src/tabicl/train/_run.py
+  s_1b3169379f960a::t_fb83f558030390 686-688
+tests/test_centroid_topk.py
+  s_1b3169379f960a::t_6ce8bb9718df08 145
+tests/test_icl_attention.py
+  s_1b3169379f960a::t_e64c339dc46308 275
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "32c637809c49ff424a612adeb2d45e1c7d373fc1",
+  "prompts": {},
+  "sessions": {
+    "s_1b3169379f960a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e5de-ef51-7e10-9d98-ea6fd203f0bf",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
