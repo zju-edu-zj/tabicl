@@ -1,0 +1,31 @@
+src/tabicl/_model/_hierarchical_frontier.py
+  s_9acb7393662811::t_5825ddbd500e36 64,68-72,92-100,167-169
+  s_9acb7393662811::t_ba37428ffcf49a 14-16,63,67,75-76,87,90-91,101-103,117,121,124-127,175-178,201-207,221-224
+  s_9acb7393662811::t_2a0857d103496a 73,128,157,170,173,225
+src/tabicl/_model/_adaptive_frontier.py
+  s_9acb7393662811::t_ba37428ffcf49a 44
+src/tabicl/_model/_hierarchical_frontier_triton.py
+  s_9acb7393662811::t_0feaebfe4795ab 13
+  s_9acb7393662811::t_ba37428ffcf49a 43-44,53,87-88,90-92,96-97,122-127
+  s_9acb7393662811::t_5825ddbd500e36 114-117
+tests/test_hierarchical_frontier.py
+  s_9acb7393662811::t_5825ddbd500e36 104-105,152-197
+  s_9acb7393662811::t_0feaebfe4795ab 5,128-151
+  s_9acb7393662811::t_ba37428ffcf49a 28,79,83,90-103,106-107,116-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "74b3abfccd1890b80289916d83fb2b4cd042f1b3",
+  "prompts": {},
+  "sessions": {
+    "s_9acb7393662811": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ea73-f531-7a92-875d-ff6c0c5c945a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
