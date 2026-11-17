@@ -1,0 +1,19 @@
+scripts/train_v2_clf_stage1_token_sparse.sh
+  s_c464e329ae3a5a::t_3927b3fdf9b070 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "01aa6735660deff1b289f5b1255c9c0e6c0ba933",
+  "prompts": {},
+  "sessions": {
+    "s_c464e329ae3a5a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ea5c-eb77-7e20-b923-c783f9c08926",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
