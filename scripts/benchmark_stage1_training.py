@@ -17,6 +17,7 @@ import time
 import torch
 from torch._dynamo.utils import counters
 
+from tabicl._model.attention import set_flash_attn3_enabled
 from tabicl._model.tabicl import TabICL
 from tabicl.train._run import Trainer
 from tabicl.train._train_config import build_parser
@@ -47,6 +48,7 @@ def main():
     torch.set_num_threads(4)
     torch.manual_seed(123)
     torch.backends.cuda.matmul.allow_tf32 = not args.strict_fp32
+    set_flash_attn3_enabled(False)
     trainer = Trainer.__new__(Trainer)
     trainer.config = build_parser().parse_args([
         "--device", "cuda", "--dtype", args.dtype, "--batch_size", str(args.batch),
