@@ -1,0 +1,28 @@
+src/tabicl/train/_run.py
+  s_3d6845861c5da5::t_8df1d7dedecadd 508-511,513-529
+scripts/benchmark_stage1_training.py
+  s_3d6845861c5da5::t_8df1d7dedecadd 30-35,58-60,71-73
+src/tabicl/train/_train_config.py
+  s_3d6845861c5da5::t_8df1d7dedecadd 82-85
+  s_3d6845861c5da5::t_ee7bbb22ddc8a2 81
+tests/test_icl_training_diagnostics.py
+  s_3d6845861c5da5::t_8df1d7dedecadd 186-195
+scripts/icl_recipe.sh
+  s_3d6845861c5da5::t_8df1d7dedecadd 32,36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6e3562a42075ed50da81105a689e4c124da36e68",
+  "prompts": {},
+  "sessions": {
+    "s_3d6845861c5da5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1eade-2f1f-7c33-92f0-cd3ae0f38a45",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

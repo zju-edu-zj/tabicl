@@ -1,0 +1,19 @@
+scripts/benchmark_stage1_training.py
+  s_3d6845861c5da5::t_2b060bdc9c5b70 20,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6243dedc1c8ab3c9a4073a539144b83d9d43d101",
+  "prompts": {},
+  "sessions": {
+    "s_3d6845861c5da5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1eade-2f1f-7c33-92f0-cd3ae0f38a45",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
