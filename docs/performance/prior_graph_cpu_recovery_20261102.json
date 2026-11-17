@@ -1,0 +1,1837 @@
+{
+  "validation": {
+    "date": "2026-11-02",
+    "source_base": "2ccc09d3687027013df0e131a19f6a925844020b",
+    "artifact_directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102",
+    "regression": {"passed": 628, "failed": 0, "prior_suite": {"passed": 613, "warnings": 5, "elapsed_s": 247.51}, "training_recipe_suite": {"passed": 15, "elapsed_s": 27.84, "run_from_production_directory": true}},
+    "new_test_file": {"passed": 131, "included_in_regression": true},
+    "training": {"ranks": 8, "steps_per_run": 160, "skip_steps": 20, "runs": 8, "oom": 0, "nonfinite_cross_entropy": 0},
+    "cpu": {"accepted_tasks_per_run": 512, "workers": 8, "ordering": ["reference", "optimized", "optimized", "reference"], "concurrent_with_other_experiments": false},
+    "profile": {
+      "accepted_tasks_per_length": 128,
+      "filter_calls_per_length": 167,
+      "cumulative_percentages_overlap": true,
+      "2048": {"total_self_s": 38.997844973, "filter_cumulative_percent": 40.91, "tree_fit_self_percent": 23.78, "make_estimator_cumulative_percent": 5.56, "nearest_cumulative_percent": 15.16, "full_distance_cumulative_percent": 4.88, "compaction_cumulative_percent": 3.34, "standardize_cumulative_percent": 5.07, "random_weights_cumulative_percent": 6.03, "bootstrap_pvalue_cumulative_percent": 0.85, "dag_sampling_cumulative_percent": 0.18},
+      "4096": {"total_self_s": 62.214513971, "filter_cumulative_percent": 41.72, "tree_fit_self_percent": 28.72, "make_estimator_cumulative_percent": 3.53, "nearest_cumulative_percent": 16.51, "full_distance_cumulative_percent": 6.01, "compaction_cumulative_percent": 3.65, "standardize_cumulative_percent": 6.13, "random_weights_cumulative_percent": 4.03, "bootstrap_pvalue_cumulative_percent": 1.08, "dag_sampling_cumulative_percent": 0.12}
+    },
+    "quality_audit": "See archived prior_graph_cpu_20261102.json for 4096 accepted tables over two lengths and two seeds; not rerun after container recreation. No quality equivalence or downstream generalization guarantee is inferred from non-significant audit deltas.",
+    "long_training_resumed": false,
+    "limitations": ["First reference runs incurred cold compilation; launch wall differences are uncontrolled.", "160-step windows do not establish long-term throughput or tail stability.", "BF16 reference a2 train timing differs materially; input and runtime effects are not isolated.", "Prior/train maxima can come from different ranks and must not be added.", "No attempt was made to preserve RNG streams or bitwise floating-point output."]
+  },
+  "cpu": {
+    "2048": {
+      "runs": {
+        "n2048_w8_a1": {
+          "wall_s": 28.363546937704086,
+          "cpu_s": 188.46637069199997,
+          "tasks": 512,
+          "workers": 8,
+          "rows": 2048,
+          "seed": 83,
+          "filter_mode": "full",
+          "categorical_sampling": "marginal",
+          "graph_execution": "reference",
+          "disabled": [],
+          "tree": "native",
+          "one_dimensional_mode": "legacy",
+          "native_library": "/tmp/tabicl-cpu-graph-final-build-20261102/tabicl_prior_exact_cpu.so",
+          "python_hash_seed": "42",
+          "rejected_by_filter": 156,
+          "filter_calls": 668,
+          "forest_fit_sizes": {
+            "25": 668
+          },
+          "graph_calls": 747,
+          "graph_s": 136.5116154961288,
+          "filter_s": 51.893149483948946,
+          "p50_s": 0.23937720991671085,
+          "p95_s": 1.1361329482868312,
+          "p99_s": 1.881489714458584,
+          "tables_per_s": 18.051338964217862
+        },
+        "n2048_w8_a2": {
+          "wall_s": 28.316506557166576,
+          "cpu_s": 188.762277879,
+          "tasks": 512,
+          "workers": 8,
+          "rows": 2048,
+          "seed": 83,
+          "filter_mode": "full",
+          "categorical_sampling": "marginal",
+          "graph_execution": "reference",
+          "disabled": [],
+          "tree": "native",
+          "one_dimensional_mode": "legacy",
+          "native_library": "/tmp/tabicl-cpu-graph-final-build-20261102/tabicl_prior_exact_cpu.so",
+          "python_hash_seed": "42",
+          "rejected_by_filter": 156,
+          "filter_calls": 668,
+          "forest_fit_sizes": {
+            "25": 668
+          },
+          "graph_calls": 747,
+          "graph_s": 136.740233335644,
+          "filter_s": 51.95716438814998,
+          "p50_s": 0.239088237285614,
+          "p95_s": 1.1300817079842087,
+          "p99_s": 1.8697366177663202,
+          "tables_per_s": 18.081326485890923
+        },
+        "n2048_w8_b1": {
+          "wall_s": 21.771854929625988,
+          "cpu_s": 142.850541771,
+          "tasks": 512,
+          "workers": 8,
+          "rows": 2048,
+          "seed": 83,
+          "filter_mode": "full",
+          "categorical_sampling": "marginal",
+          "graph_execution": "optimized",
+          "disabled": [],
+          "tree": "native",
+          "one_dimensional_mode": "legacy",
+          "native_library": "/tmp/tabicl-cpu-graph-final-build-20261102/tabicl_prior_exact_cpu.so",
+          "python_hash_seed": "42",
+          "rejected_by_filter": 156,
+          "filter_calls": 668,
+          "forest_fit_sizes": {
+            "25": 668
+          },
+          "graph_calls": 741,
+          "graph_s": 91.55674379691482,
+          "filter_s": 51.07902402058244,
+          "p50_s": 0.19796099327504635,
+          "p95_s": 0.7831849586218594,
+          "p99_s": 1.2738861799240109,
+          "tables_per_s": 23.516599832901584
+        },
+        "n2048_w8_b2": {
+          "wall_s": 21.87781321629882,
+          "cpu_s": 143.35552120600002,
+          "tasks": 512,
+          "workers": 8,
+          "rows": 2048,
+          "seed": 83,
+          "filter_mode": "full",
+          "categorical_sampling": "marginal",
+          "graph_execution": "optimized",
+          "disabled": [],
+          "tree": "native",
+          "one_dimensional_mode": "legacy",
+          "native_library": "/tmp/tabicl-cpu-graph-final-build-20261102/tabicl_prior_exact_cpu.so",
+          "python_hash_seed": "42",
+          "rejected_by_filter": 156,
+          "filter_calls": 668,
+          "forest_fit_sizes": {
+            "25": 668
+          },
+          "graph_calls": 741,
+          "graph_s": 91.93310311064124,
+          "filter_s": 51.178291369229555,
+          "p50_s": 0.20095842145383358,
+          "p95_s": 0.7917687892913818,
+          "p99_s": 1.2782266471162433,
+          "tables_per_s": 23.402704600227757
+        }
+      },
+      "throughput_gain": 0.29852197971778605,
+      "cpu_reduction": 0.24129287618744633
+    },
+    "4096": {
+      "runs": {
+        "n4096_w8_a1": {
+          "wall_s": 48.05051313713193,
+          "cpu_s": 329.486222319,
+          "tasks": 512,
+          "workers": 8,
+          "rows": 4096,
+          "seed": 83,
+          "filter_mode": "full",
+          "categorical_sampling": "marginal",
+          "graph_execution": "reference",
+          "disabled": [],
+          "tree": "native",
+          "one_dimensional_mode": "legacy",
+          "native_library": "/tmp/tabicl-cpu-graph-final-build-20261102/tabicl_prior_exact_cpu.so",
+          "python_hash_seed": "42",
+          "rejected_by_filter": 120,
+          "filter_calls": 632,
+          "forest_fit_sizes": {
+            "25": 632
+          },
+          "graph_calls": 716,
+          "graph_s": 243.84973874688148,
+          "filter_s": 85.53062161430717,
+          "p50_s": 0.3789159208536148,
+          "p95_s": 2.2727501962333916,
+          "p99_s": 4.109811800792812,
+          "tables_per_s": 10.655453325520106
+        },
+        "n4096_w8_a2": {
+          "wall_s": 47.849250588566065,
+          "cpu_s": 328.84243294,
+          "tasks": 512,
+          "workers": 8,
+          "rows": 4096,
+          "seed": 83,
+          "filter_mode": "full",
+          "categorical_sampling": "marginal",
+          "graph_execution": "reference",
+          "disabled": [],
+          "tree": "native",
+          "one_dimensional_mode": "legacy",
+          "native_library": "/tmp/tabicl-cpu-graph-final-build-20261102/tabicl_prior_exact_cpu.so",
+          "python_hash_seed": "42",
+          "rejected_by_filter": 120,
+          "filter_calls": 632,
+          "forest_fit_sizes": {
+            "25": 632
+          },
+          "graph_calls": 716,
+          "graph_s": 243.40774485841393,
+          "filter_s": 85.23078434541821,
+          "p50_s": 0.3723106235265732,
+          "p95_s": 2.293778170272707,
+          "p99_s": 4.109561761803925,
+          "tables_per_s": 10.700272077455404
+        },
+        "n4096_w8_b1": {
+          "wall_s": 37.08422877639532,
+          "cpu_s": 253.14685930300007,
+          "tasks": 512,
+          "workers": 8,
+          "rows": 4096,
+          "seed": 83,
+          "filter_mode": "full",
+          "categorical_sampling": "marginal",
+          "graph_execution": "optimized",
+          "disabled": [],
+          "tree": "native",
+          "one_dimensional_mode": "legacy",
+          "native_library": "/tmp/tabicl-cpu-graph-final-build-20261102/tabicl_prior_exact_cpu.so",
+          "python_hash_seed": "42",
+          "rejected_by_filter": 141,
+          "filter_calls": 653,
+          "forest_fit_sizes": {
+            "25": 653
+          },
+          "graph_calls": 726,
+          "graph_s": 164.92395654693246,
+          "filter_s": 87.64359511062503,
+          "p50_s": 0.32940923795104027,
+          "p95_s": 1.499388808198273,
+          "p99_s": 2.148355223536491,
+          "tables_per_s": 13.806408192743538
+        },
+        "n4096_w8_b2": {
+          "wall_s": 37.09916812926531,
+          "cpu_s": 251.91531123499996,
+          "tasks": 512,
+          "workers": 8,
+          "rows": 4096,
+          "seed": 83,
+          "filter_mode": "full",
+          "categorical_sampling": "marginal",
+          "graph_execution": "optimized",
+          "disabled": [],
+          "tree": "native",
+          "one_dimensional_mode": "legacy",
+          "native_library": "/tmp/tabicl-cpu-graph-final-build-20261102/tabicl_prior_exact_cpu.so",
+          "python_hash_seed": "42",
+          "rejected_by_filter": 141,
+          "filter_calls": 653,
+          "forest_fit_sizes": {
+            "25": 653
+          },
+          "graph_calls": 726,
+          "graph_s": 164.12701908499002,
+          "filter_s": 87.3007690384984,
+          "p50_s": 0.3288906216621399,
+          "p95_s": 1.5052411815151572,
+          "p99_s": 2.1357937730476255,
+          "tables_per_s": 13.800848531590495
+        }
+      },
+      "throughput_gain": 0.2927389109406,
+      "cpu_reduction": 0.23281150455269461
+    }
+  },
+  "ablation": {},
+  "audit": {},
+  "training": {
+    "bfloat16_a1": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/training/bfloat16_a1",
+      "exit_code": 0,
+      "wall_s": 378.4073369540274,
+      "configuration": {
+        "dtype": "bfloat16",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "reference"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 1,
+        "prior_pool/completed_datasets": 426.0,
+        "prior_pool/delivered_batches": 15.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 372834304.0,
+        "prior_pool/peak_reserved_bytes": 424443904.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 321.2296459823847,
+        "prior_pool/generation_p95_ms": 1124.818554148078,
+        "prior_pool/generation_p99_ms": 1798.6966837197542,
+        "prior_pool/encoding_mean_ms": 0.031522916796061916,
+        "prior_pool/result_transit_mean_ms": 3.140784284108681,
+        "prior_pool/worker_busy_seconds": 187.2551900818944,
+        "prior_pool/service_fetch_wait_seconds": 38.230773732066154,
+        "prior_pool/service_uptime_seconds": 7.906327210366726,
+        "prior_pool/active_leases": 0.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 16.0,
+        "prior_pool/sampled_tasks": 1024.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.541292130947113,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1625841205248.0,
+        "prior_pool/predicted_max_after": 1365525921792.0,
+        "prior_pool/predicted_gain": 1.190633717970278,
+        "prior_pool/ready_micro_units": 60.0,
+        "prior_pool/pending_micro_units": 224.0,
+        "prior_pool/ready_micro_steps": 2.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 4.88739525899291,
+        "prior_pool/decode_seconds": 9.693950414657593e-05,
+        "prior_pool/acknowledge_seconds": 0.0020035356283187866
+      },
+      "steps": 160,
+      "skip": 20,
+      "steady_step_ms": 530.7452570913093,
+      "steady_elapsed_step_ms": {
+        "mean": 530.7452570913093,
+        "p95": 1616.1661233752961,
+        "maximum": 3196.989979594946
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 533.8599194905588,
+        "p95": 1614.5580712705844,
+        "maximum": 3204.865623265505
+      },
+      "max_rank_prior_ms": {
+        "mean": 178.99017722478933,
+        "p95": 1245.0183138251293,
+        "maximum": 2411.3436490297318
+      },
+      "rank_mean_prior_ms": {
+        "mean": 172.5838878923761,
+        "p95": 1233.6667517665762,
+        "maximum": 2408.5885994136333
+      },
+      "max_rank_train_ms": {
+        "mean": 365.5847409207906,
+        "p95": 369.64891944080574,
+        "maximum": 1601.3673543930054
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 168.9760642658387,
+            "p95": 1225.729122199117,
+            "maximum": 2398.4665982425213
+          },
+          "train": {
+            "mean": 357.54434298723936,
+            "p95": 358.1877861171961,
+            "maximum": 1601.3673543930054
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 173.09451608785562,
+            "p95": 1232.074896804987,
+            "maximum": 2411.2693928182125
+          },
+          "train": {
+            "mean": 357.13259165308307,
+            "p95": 364.57416974008083,
+            "maximum": 1597.3187647759914
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 174.4478284514376,
+            "p95": 1233.3054544404138,
+            "maximum": 2406.988274306059
+          },
+          "train": {
+            "mean": 355.91055676341057,
+            "p95": 361.88402753323317,
+            "maximum": 1587.8934115171432
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 172.45090521339858,
+            "p95": 1231.8190231919277,
+            "maximum": 2409.599620848894
+          },
+          "train": {
+            "mean": 357.7999251229422,
+            "p95": 364.3188579007983,
+            "maximum": 1584.50049161911
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 175.17311413373267,
+            "p95": 1242.9002126678815,
+            "maximum": 2411.3436490297318
+          },
+          "train": {
+            "mean": 355.1362967118621,
+            "p95": 364.18104879558086,
+            "maximum": 1595.2474549412727
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 172.2375090899212,
+            "p95": 1235.2427855134,
+            "maximum": 2409.8150692880154
+          },
+          "train": {
+            "mean": 358.0084241660578,
+            "p95": 363.028916157782,
+            "maximum": 1597.4455997347832
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 171.99987119862013,
+            "p95": 1233.2646487280715,
+            "maximum": 2410.4281663894653
+          },
+          "train": {
+            "mean": 358.2410809450916,
+            "p95": 362.9968075081706,
+            "maximum": 1587.8734588623047
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 172.29129469820433,
+            "p95": 1244.8069777339686,
+            "maximum": 2410.7980243861675
+          },
+          "train": {
+            "mean": 357.9999441547053,
+            "p95": 365.6711187213659,
+            "maximum": 1592.2435373067856
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "bfloat16_a2": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/training/bfloat16_a2",
+      "exit_code": 0,
+      "wall_s": 142.28657142445445,
+      "configuration": {
+        "dtype": "bfloat16",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "reference"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 1,
+        "prior_pool/completed_datasets": 396.0,
+        "prior_pool/delivered_batches": 15.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 372834304.0,
+        "prior_pool/peak_reserved_bytes": 424443904.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 248.3311928808689,
+        "prior_pool/generation_p95_ms": 852.7912525460124,
+        "prior_pool/generation_p99_ms": 1296.4445900172009,
+        "prior_pool/encoding_mean_ms": 0.026789964223750913,
+        "prior_pool/result_transit_mean_ms": 2.4735389296153576,
+        "prior_pool/worker_busy_seconds": 132.3906605578959,
+        "prior_pool/service_fetch_wait_seconds": 36.32187905907631,
+        "prior_pool/service_uptime_seconds": 6.63398164883256,
+        "prior_pool/active_leases": 0.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 16.0,
+        "prior_pool/sampled_tasks": 1024.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.27290359139442444,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1610600153088.0,
+        "prior_pool/predicted_max_after": 1256886108160.0,
+        "prior_pool/predicted_gain": 1.2814209200273639,
+        "prior_pool/ready_micro_units": 52.0,
+        "prior_pool/pending_micro_units": 224.0,
+        "prior_pool/ready_micro_steps": 2.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 4.568568579852581,
+        "prior_pool/decode_seconds": 9.005144238471985e-05,
+        "prior_pool/acknowledge_seconds": 0.0037904977798461914
+      },
+      "steps": 160,
+      "skip": 20,
+      "steady_step_ms": 435.84076490785395,
+      "steady_elapsed_step_ms": {
+        "mean": 435.84076490785395,
+        "p95": 1255.5743798613519,
+        "maximum": 2565.848473459482
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 438.74073369162426,
+        "p95": 1256.217650324103,
+        "maximum": 2565.413948148489
+      },
+      "max_rank_prior_ms": {
+        "mean": 157.67618838165487,
+        "p95": 964.3371963873474,
+        "maximum": 2321.5055614709854
+      },
+      "rank_mean_prior_ms": {
+        "mean": 151.05780056744283,
+        "p95": 956.8974703550307,
+        "maximum": 2118.3292903006077
+      },
+      "max_rank_train_ms": {
+        "mean": 291.7241991630622,
+        "p95": 321.46660741418594,
+        "maximum": 519.6552239358425
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 148.72944022395782,
+            "p95": 954.4039895758001,
+            "maximum": 2054.287262260914
+          },
+          "train": {
+            "mean": 282.54505579492877,
+            "p95": 314.7450504824519,
+            "maximum": 504.49611991643906
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 151.5938811536346,
+            "p95": 964.0154864639013,
+            "maximum": 2039.3151193857193
+          },
+          "train": {
+            "mean": 283.91123435326983,
+            "p95": 313.8682287186384,
+            "maximum": 519.6552239358425
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 149.52904683138644,
+            "p95": 955.9581577777832,
+            "maximum": 2051.5680387616158
+          },
+          "train": {
+            "mean": 285.97290611692836,
+            "p95": 317.2815514728427,
+            "maximum": 507.38539174199104
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 154.15157742266143,
+            "p95": 955.9305556118454,
+            "maximum": 2321.5055614709854
+          },
+          "train": {
+            "mean": 281.31752607545684,
+            "p95": 313.3492793887853,
+            "maximum": 323.3466446399689
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 152.649179925876,
+            "p95": 954.8744162544575,
+            "maximum": 2320.369940251112
+          },
+          "train": {
+            "mean": 282.8519712335297,
+            "p95": 315.1544352993369,
+            "maximum": 335.21919697523117
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 150.3644151347024,
+            "p95": 953.8158660754531,
+            "maximum": 2051.6305416822433
+          },
+          "train": {
+            "mean": 285.1482165977359,
+            "p95": 316.3023052737117,
+            "maximum": 507.81766325235367
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 150.57726787137133,
+            "p95": 953.567252680656,
+            "maximum": 2051.6342744231224
+          },
+          "train": {
+            "mean": 284.93628608328953,
+            "p95": 316.0290975123644,
+            "maximum": 507.6642297208309
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 150.8675959759525,
+            "p95": 962.6140384003488,
+            "maximum": 2056.3235841691494
+          },
+          "train": {
+            "mean": 284.6473116693752,
+            "p95": 315.6830705702305,
+            "maximum": 503.46361473202705
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "bfloat16_b1": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/training/bfloat16_b1",
+      "exit_code": 0,
+      "wall_s": 159.7889294140041,
+      "configuration": {
+        "dtype": "bfloat16",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 1,
+        "prior_pool/completed_datasets": 508.0,
+        "prior_pool/delivered_batches": 15.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 372834304.0,
+        "prior_pool/peak_reserved_bytes": 424443904.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 246.4676909148693,
+        "prior_pool/generation_p95_ms": 871.8230072408908,
+        "prior_pool/generation_p99_ms": 1638.872862607241,
+        "prior_pool/encoding_mean_ms": 0.030066605334676155,
+        "prior_pool/result_transit_mean_ms": 2.4517964293050953,
+        "prior_pool/worker_busy_seconds": 176.98881095647812,
+        "prior_pool/service_fetch_wait_seconds": 36.04813623428345,
+        "prior_pool/service_uptime_seconds": 7.441487092524767,
+        "prior_pool/active_leases": 0.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 16.0,
+        "prior_pool/sampled_tasks": 1024.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.5065463483333588,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1425828478976.0,
+        "prior_pool/predicted_max_after": 1270587064320.0,
+        "prior_pool/predicted_gain": 1.122180855618173,
+        "prior_pool/ready_micro_units": 81.0,
+        "prior_pool/pending_micro_units": 224.0,
+        "prior_pool/ready_micro_steps": 2.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 4.595399871468544,
+        "prior_pool/decode_seconds": 0.00010965019464492798,
+        "prior_pool/acknowledge_seconds": 0.004733540117740631
+      },
+      "steps": 160,
+      "skip": 20,
+      "steady_step_ms": 392.6063070605908,
+      "steady_elapsed_step_ms": {
+        "mean": 392.60630706059084,
+        "p95": 448.58489129691964,
+        "maximum": 1689.3909126520157
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 396.574098936149,
+        "p95": 456.5862234681809,
+        "maximum": 1698.8759823143482
+      },
+      "max_rank_prior_ms": {
+        "mean": 49.11663739808968,
+        "p95": 73.7662652507417,
+        "maximum": 1335.9282426536083
+      },
+      "rank_mean_prior_ms": {
+        "mean": 42.77713779093964,
+        "p95": 62.25974936969505,
+        "maximum": 1329.6923162415624
+      },
+      "max_rank_train_ms": {
+        "mean": 356.57328931348667,
+        "p95": 374.14865903556347,
+        "maximum": 1258.816223591566
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 41.444605828395915,
+            "p95": 47.12493699043905,
+            "maximum": 1324.6825598180294
+          },
+          "train": {
+            "mean": 344.96351397995437,
+            "p95": 363.3277840912342,
+            "maximum": 1255.2293874323368
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 44.61603646299669,
+            "p95": 67.66757071018164,
+            "maximum": 1324.0971602499485
+          },
+          "train": {
+            "mean": 347.55200991140947,
+            "p95": 367.7961651235819,
+            "maximum": 1252.6872865855694
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 44.04273267303194,
+            "p95": 67.93265677988474,
+            "maximum": 1319.5397444069386
+          },
+          "train": {
+            "mean": 348.0754400204335,
+            "p95": 368.24471186846495,
+            "maximum": 1258.816223591566
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 41.936032686914714,
+            "p95": 55.1340425387024,
+            "maximum": 1330.1260359585285
+          },
+          "train": {
+            "mean": 350.25797885443484,
+            "p95": 371.8211781233549,
+            "maximum": 1251.4765784144402
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 42.76095660669463,
+            "p95": 53.564678691327245,
+            "maximum": 1335.2804705500603
+          },
+          "train": {
+            "mean": 349.40309543162584,
+            "p95": 369.70430817455053,
+            "maximum": 1248.067770153284
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 42.2168741268771,
+            "p95": 70.46706844121216,
+            "maximum": 1333.6382918059826
+          },
+          "train": {
+            "mean": 349.9550483056477,
+            "p95": 368.52686461061234,
+            "maximum": 1245.8164356648922
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 42.23287209336247,
+            "p95": 49.5173217728733,
+            "maximum": 1335.9282426536083
+          },
+          "train": {
+            "mean": 349.95718467980623,
+            "p95": 367.86758750677103,
+            "maximum": 1257.2330757975578
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 42.96699184924364,
+            "p95": 54.3746497482061,
+            "maximum": 1334.2460244894028
+          },
+          "train": {
+            "mean": 349.19540834214007,
+            "p95": 373.98685831576586,
+            "maximum": 1243.5738071799278
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "bfloat16_b2": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/training/bfloat16_b2",
+      "exit_code": 0,
+      "wall_s": 142.10287769138813,
+      "configuration": {
+        "dtype": "bfloat16",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 1,
+        "prior_pool/completed_datasets": 449.0,
+        "prior_pool/delivered_batches": 15.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 376438784.0,
+        "prior_pool/peak_reserved_bytes": 424443904.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 278.41372042894363,
+        "prior_pool/generation_p95_ms": 954.8270374536493,
+        "prior_pool/generation_p99_ms": 1617.6290586590762,
+        "prior_pool/encoding_mean_ms": 0.030748446561180406,
+        "prior_pool/result_transit_mean_ms": 3.22482208897648,
+        "prior_pool/worker_busy_seconds": 161.1835777424276,
+        "prior_pool/service_fetch_wait_seconds": 36.58235178142786,
+        "prior_pool/service_uptime_seconds": 7.242637973278761,
+        "prior_pool/active_leases": 1.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 16.0,
+        "prior_pool/sampled_tasks": 1024.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.4848390817642212,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1592210227200.0,
+        "prior_pool/predicted_max_after": 1270587064320.0,
+        "prior_pool/predicted_gain": 1.2531295744397715,
+        "prior_pool/ready_micro_units": 68.0,
+        "prior_pool/pending_micro_units": 224.0,
+        "prior_pool/ready_micro_steps": 2.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 4.644322033971548,
+        "prior_pool/decode_seconds": 9.023398160934448e-05,
+        "prior_pool/acknowledge_seconds": 0.009722881019115448
+      },
+      "steps": 160,
+      "skip": 20,
+      "steady_step_ms": 427.63403843023946,
+      "steady_elapsed_step_ms": {
+        "mean": 427.63403843023946,
+        "p95": 1035.514574684202,
+        "maximum": 1762.5498920679092
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 431.5896070695349,
+        "p95": 1041.940985620021,
+        "maximum": 1763.9799900352955
+      },
+      "max_rank_prior_ms": {
+        "mean": 87.03090511262417,
+        "p95": 713.8097118586296,
+        "maximum": 1431.020088493824
+      },
+      "rank_mean_prior_ms": {
+        "mean": 81.72096299074057,
+        "p95": 706.7916474072258,
+        "maximum": 1417.8941384889185
+      },
+      "max_rank_train_ms": {
+        "mean": 352.87217630871703,
+        "p95": 377.58316807448864,
+        "maximum": 398.17360416054726
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 79.01623113346952,
+            "p95": 700.9782860055561,
+            "maximum": 1415.064875036478
+          },
+          "train": {
+            "mean": 344.4044642416494,
+            "p95": 364.1831591725349,
+            "maximum": 383.64793360233307
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 82.73715140031916,
+            "p95": 711.5237552672619,
+            "maximum": 1421.3985837996006
+          },
+          "train": {
+            "mean": 344.3430560507945,
+            "p95": 366.1244282498956,
+            "maximum": 388.1761319935322
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 82.76580630668572,
+            "p95": 704.8252047970884,
+            "maximum": 1409.9856168031693
+          },
+          "train": {
+            "mean": 344.28988729736636,
+            "p95": 369.873528368771,
+            "maximum": 393.9250521361828
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 79.36004546603986,
+            "p95": 713.1248952820894,
+            "maximum": 1431.020088493824
+          },
+          "train": {
+            "mean": 347.9107848767723,
+            "p95": 370.6311831250786,
+            "maximum": 398.17360416054726
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 83.13979801854917,
+            "p95": 703.4101910889143,
+            "maximum": 1416.8009348213673
+          },
+          "train": {
+            "mean": 343.9824855487262,
+            "p95": 367.09672063589096,
+            "maximum": 391.4629779756069
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 83.14736615866423,
+            "p95": 710.651524737477,
+            "maximum": 1418.8723042607307
+          },
+          "train": {
+            "mean": 343.9390557951161,
+            "p95": 369.0272353589534,
+            "maximum": 382.68130645155907
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 81.5624762326479,
+            "p95": 706.391716562211,
+            "maximum": 1408.4769487380981
+          },
+          "train": {
+            "mean": 345.5473748168775,
+            "p95": 369.71991397440434,
+            "maximum": 396.48284018039703
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 82.03882920954909,
+            "p95": 703.4276055172081,
+            "maximum": 1421.5337559580803
+          },
+          "train": {
+            "mean": 345.00377843422547,
+            "p95": 369.6358434855938,
+            "maximum": 389.20314982533455
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "float32_a1": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/training/float32_a1",
+      "exit_code": 0,
+      "wall_s": 410.1658082790673,
+      "configuration": {
+        "dtype": "float32",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "reference"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 1,
+        "prior_pool/completed_datasets": 422.0,
+        "prior_pool/delivered_batches": 15.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 372834304.0,
+        "prior_pool/peak_reserved_bytes": 424443904.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 299.9326642602682,
+        "prior_pool/generation_p95_ms": 1069.9246436357491,
+        "prior_pool/generation_p99_ms": 1790.6530234217685,
+        "prior_pool/encoding_mean_ms": 0.031170474974465033,
+        "prior_pool/result_transit_mean_ms": 2.336718548106921,
+        "prior_pool/worker_busy_seconds": 168.21373477205634,
+        "prior_pool/service_fetch_wait_seconds": 37.844560481607914,
+        "prior_pool/service_uptime_seconds": 7.4679059609770775,
+        "prior_pool/active_leases": 0.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 16.0,
+        "prior_pool/sampled_tasks": 1024.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.5144253373146057,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1610600153088.0,
+        "prior_pool/predicted_max_after": 1256886108160.0,
+        "prior_pool/predicted_gain": 1.2814209200273639,
+        "prior_pool/ready_micro_units": 60.0,
+        "prior_pool/pending_micro_units": 224.0,
+        "prior_pool/ready_micro_steps": 2.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 4.8054471500217915,
+        "prior_pool/decode_seconds": 0.00010164082050323486,
+        "prior_pool/acknowledge_seconds": 0.0007833205163478851
+      },
+      "steps": 160,
+      "skip": 20,
+      "steady_step_ms": 515.7279738091996,
+      "steady_elapsed_step_ms": {
+        "mean": 515.7279738091996,
+        "p95": 583.6093218997121,
+        "maximum": 1596.803531050682
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 527.2813778636711,
+        "p95": 594.136144220829,
+        "maximum": 1595.2819623053074
+      },
+      "max_rank_prior_ms": {
+        "mean": 22.35015926084348,
+        "p95": 40.75643848627805,
+        "maximum": 89.19411897659302
+      },
+      "rank_mean_prior_ms": {
+        "mean": 16.506283796791518,
+        "p95": 32.39957350306209,
+        "maximum": 82.06130564212799
+      },
+      "max_rank_train_ms": {
+        "mean": 512.9708470244493,
+        "p95": 567.6177220419049,
+        "maximum": 1586.348783224821
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 12.721069024077483,
+            "p95": 29.44618742913007,
+            "maximum": 73.72542098164558
+          },
+          "train": {
+            "mean": 493.6283659722124,
+            "p95": 556.4439661800861,
+            "maximum": 1586.348783224821
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 17.59066278381007,
+            "p95": 35.54933331906795,
+            "maximum": 83.10187608003616
+          },
+          "train": {
+            "mean": 497.69105732973134,
+            "p95": 557.3632666841148,
+            "maximum": 1517.7478976547718
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 16.721003502607346,
+            "p95": 37.13336568325758,
+            "maximum": 83.97787064313889
+          },
+          "train": {
+            "mean": 498.514414552067,
+            "p95": 565.3982074931264,
+            "maximum": 1525.3620818257332
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 18.04096916956561,
+            "p95": 34.72311664372672,
+            "maximum": 82.40421861410141
+          },
+          "train": {
+            "mean": 497.2760540566274,
+            "p95": 556.6474303603172,
+            "maximum": 1519.113451242447
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 17.413562988596304,
+            "p95": 38.37851658463478,
+            "maximum": 81.56127110123634
+          },
+          "train": {
+            "mean": 497.7612992748618,
+            "p95": 557.4724597856401,
+            "maximum": 1512.4512575566769
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 17.052238434553146,
+            "p95": 34.40553750842803,
+            "maximum": 89.19411897659302
+          },
+          "train": {
+            "mean": 498.17377435309544,
+            "p95": 561.3573998212814,
+            "maximum": 1521.569561213255
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 15.480691567063332,
+            "p95": 30.909051559865468,
+            "maximum": 81.75577223300934
+          },
+          "train": {
+            "mean": 499.74319336137603,
+            "p95": 564.1308177262543,
+            "maximum": 1521.3812105357647
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 17.030072904058866,
+            "p95": 34.805543534457634,
+            "maximum": 80.76989650726318
+          },
+          "train": {
+            "mean": 498.224571639938,
+            "p95": 565.9652315080166,
+            "maximum": 1519.6881517767906
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "float32_a2": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/training/float32_a2",
+      "exit_code": 0,
+      "wall_s": 169.278509773314,
+      "configuration": {
+        "dtype": "float32",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "reference"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 1,
+        "prior_pool/completed_datasets": 444.0,
+        "prior_pool/delivered_batches": 15.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 372834304.0,
+        "prior_pool/peak_reserved_bytes": 424443904.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 332.01020024716854,
+        "prior_pool/generation_p95_ms": 1142.3930631950498,
+        "prior_pool/generation_p99_ms": 2016.6865085065365,
+        "prior_pool/encoding_mean_ms": 0.03172736614942551,
+        "prior_pool/result_transit_mean_ms": 2.8256693150143364,
+        "prior_pool/worker_busy_seconds": 197.37536861747503,
+        "prior_pool/service_fetch_wait_seconds": 39.677998539060354,
+        "prior_pool/service_uptime_seconds": 8.259160503745079,
+        "prior_pool/active_leases": 0.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 16.0,
+        "prior_pool/sampled_tasks": 1024.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.2789348363876343,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1610600153088.0,
+        "prior_pool/predicted_max_after": 1256886108160.0,
+        "prior_pool/predicted_gain": 1.2814209200273639,
+        "prior_pool/ready_micro_units": 64.0,
+        "prior_pool/pending_micro_units": 224.0,
+        "prior_pool/ready_micro_steps": 2.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 5.034723874181509,
+        "prior_pool/decode_seconds": 9.079277515411377e-05,
+        "prior_pool/acknowledge_seconds": 0.0009050071239471436
+      },
+      "steps": 160,
+      "skip": 20,
+      "steady_step_ms": 549.367680906185,
+      "steady_elapsed_step_ms": {
+        "mean": 549.3676809061851,
+        "p95": 629.1063502430914,
+        "maximum": 3066.8823197484016
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 553.4207306802273,
+        "p95": 631.9687359035012,
+        "maximum": 3069.595627486706
+      },
+      "max_rank_prior_ms": {
+        "mean": 65.55252873471805,
+        "p95": 130.7680305093525,
+        "maximum": 2610.4344986379147
+      },
+      "rank_mean_prior_ms": {
+        "mean": 59.795100348336355,
+        "p95": 119.7223244467748,
+        "maximum": 2597.4914911203086
+      },
+      "max_rank_train_ms": {
+        "mean": 496.7313501717789,
+        "p95": 558.9128794148563,
+        "maximum": 606.9242209196091
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 56.3645926969392,
+            "p95": 111.47939320653644,
+            "maximum": 2569.4116987288
+          },
+          "train": {
+            "mean": 479.4944359787873,
+            "p95": 545.5005872994661,
+            "maximum": 584.1657370328903
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 61.00307282592569,
+            "p95": 112.78356630355077,
+            "maximum": 2596.4058600366116
+          },
+          "train": {
+            "mean": 487.8604949851121,
+            "p95": 553.056619502604,
+            "maximum": 592.114794999361
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 57.94741088258369,
+            "p95": 114.10717330872998,
+            "maximum": 2594.6012437343597
+          },
+          "train": {
+            "mean": 490.9328244626522,
+            "p95": 556.8414570763707,
+            "maximum": 602.1431758999825
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 60.978497804275584,
+            "p95": 125.47019496560084,
+            "maximum": 2595.605954527855
+          },
+          "train": {
+            "mean": 487.9484177700111,
+            "p95": 551.7528723925352,
+            "maximum": 593.3350995182991
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 60.957028104790616,
+            "p95": 120.11082507669906,
+            "maximum": 2600.469756871462
+          },
+          "train": {
+            "mean": 487.92723044753075,
+            "p95": 552.8247576206923,
+            "maximum": 599.2830283939838
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 61.758253457290785,
+            "p95": 129.50365897268057,
+            "maximum": 2606.3791140913963
+          },
+          "train": {
+            "mean": 487.2526860928961,
+            "p95": 549.8683512210846,
+            "maximum": 591.41606092453
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 60.72649112237351,
+            "p95": 116.92002825438952,
+            "maximum": 2610.4344986379147
+          },
+          "train": {
+            "mean": 488.1978686366762,
+            "p95": 554.1744481772184,
+            "maximum": 598.7178944051266
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 58.62545589251177,
+            "p95": 126.69915594160531,
+            "maximum": 2606.62380233407
+          },
+          "train": {
+            "mean": 490.42814214314734,
+            "p95": 549.4905112311243,
+            "maximum": 606.9242209196091
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "float32_b1": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/training/float32_b1",
+      "exit_code": 0,
+      "wall_s": 184.55210264772177,
+      "configuration": {
+        "dtype": "float32",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 1,
+        "prior_pool/completed_datasets": 517.0,
+        "prior_pool/delivered_batches": 15.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 372834304.0,
+        "prior_pool/peak_reserved_bytes": 424443904.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 259.4004161655903,
+        "prior_pool/generation_p95_ms": 951.7097279429433,
+        "prior_pool/generation_p99_ms": 1543.0406375229356,
+        "prior_pool/encoding_mean_ms": 0.030492315324639446,
+        "prior_pool/result_transit_mean_ms": 2.152290569917376,
+        "prior_pool/worker_busy_seconds": 183.72364992275834,
+        "prior_pool/service_fetch_wait_seconds": 36.92129708081484,
+        "prior_pool/service_uptime_seconds": 7.66371626034379,
+        "prior_pool/active_leases": 0.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 16.0,
+        "prior_pool/sampled_tasks": 1024.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.2692192792892456,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1425828478976.0,
+        "prior_pool/predicted_max_after": 1186937700352.0,
+        "prior_pool/predicted_gain": 1.201266484797942,
+        "prior_pool/ready_micro_units": 83.0,
+        "prior_pool/pending_micro_units": 224.0,
+        "prior_pool/ready_micro_steps": 2.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 4.678126882761717,
+        "prior_pool/decode_seconds": 8.722394704818726e-05,
+        "prior_pool/acknowledge_seconds": 0.018093422055244446
+      },
+      "steps": 160,
+      "skip": 20,
+      "steady_step_ms": 491.99355223349164,
+      "steady_elapsed_step_ms": {
+        "mean": 491.99355223349164,
+        "p95": 567.7000293508172,
+        "maximum": 609.4589568674564
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 495.43190287160024,
+        "p95": 569.8107017204165,
+        "maximum": 615.7135739922523
+      },
+      "max_rank_prior_ms": {
+        "mean": 22.092880175582,
+        "p95": 36.276312172412865,
+        "maximum": 61.15608662366867
+      },
+      "rank_mean_prior_ms": {
+        "mean": 17.74123316032014,
+        "p95": 28.74581301584838,
+        "maximum": 54.0286828763783
+      },
+      "max_rank_train_ms": {
+        "mean": 480.0686109278883,
+        "p95": 548.5886249691248,
+        "maximum": 595.4580269753933
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 15.841327314930302,
+            "p95": 28.1359458342194,
+            "maximum": 60.95616891980171
+          },
+          "train": {
+            "mean": 469.89632908787047,
+            "p95": 533.9124632999301,
+            "maximum": 582.1707993745804
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 18.442967933203494,
+            "p95": 31.352256983518558,
+            "maximum": 55.59185519814491
+          },
+          "train": {
+            "mean": 473.1321550107428,
+            "p95": 538.2631495594977,
+            "maximum": 588.3020497858524
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 18.785512473966396,
+            "p95": 32.0820476859808,
+            "maximum": 55.447548627853394
+          },
+          "train": {
+            "mean": 472.9307232690709,
+            "p95": 541.4757838472724,
+            "maximum": 592.126153409481
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 18.145326897501945,
+            "p95": 30.861348286271078,
+            "maximum": 61.15608662366867
+          },
+          "train": {
+            "mean": 473.55097122490406,
+            "p95": 536.8368078023195,
+            "maximum": 594.4549515843391
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 17.827913644058363,
+            "p95": 32.68057778477668,
+            "maximum": 55.748969316482544
+          },
+          "train": {
+            "mean": 473.797114140221,
+            "p95": 545.9708765149117,
+            "maximum": 593.2411141693592
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 17.89901309779712,
+            "p95": 31.597037240862797,
+            "maximum": 54.98466268181801
+          },
+          "train": {
+            "mean": 473.7092638388276,
+            "p95": 538.3043892681598,
+            "maximum": 593.6228856444359
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 16.801322331385954,
+            "p95": 30.149190686643113,
+            "maximum": 56.36308342218399
+          },
+          "train": {
+            "mean": 474.9234182227935,
+            "p95": 541.267486475408,
+            "maximum": 595.4580269753933
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 18.186481589717523,
+            "p95": 31.136295944452222,
+            "maximum": 51.52681842446327
+          },
+          "train": {
+            "mean": 473.4379790723324,
+            "p95": 546.1649222299457,
+            "maximum": 591.4694592356682
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "float32_b2": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/training/float32_b2",
+      "exit_code": 0,
+      "wall_s": 158.2918407768011,
+      "configuration": {
+        "dtype": "float32",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 1,
+        "prior_pool/completed_datasets": 501.0,
+        "prior_pool/delivered_batches": 15.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 372834304.0,
+        "prior_pool/peak_reserved_bytes": 424443904.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 282.63184800744057,
+        "prior_pool/generation_p95_ms": 1043.8407510519028,
+        "prior_pool/generation_p99_ms": 1588.6536166071892,
+        "prior_pool/encoding_mean_ms": 0.03140643536449668,
+        "prior_pool/result_transit_mean_ms": 2.3802651200227873,
+        "prior_pool/worker_busy_seconds": 195.1734169535339,
+        "prior_pool/service_fetch_wait_seconds": 37.51182642579079,
+        "prior_pool/service_uptime_seconds": 7.903107818216085,
+        "prior_pool/active_leases": 0.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 16.0,
+        "prior_pool/sampled_tasks": 1024.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.4818178713321686,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1418317529088.0,
+        "prior_pool/predicted_max_after": 1204534902784.0,
+        "prior_pool/predicted_gain": 1.1774814709062325,
+        "prior_pool/ready_micro_units": 80.0,
+        "prior_pool/pending_micro_units": 224.0,
+        "prior_pool/ready_micro_steps": 2.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 4.7642631232738495,
+        "prior_pool/decode_seconds": 0.00011167675256729126,
+        "prior_pool/acknowledge_seconds": 0.0007634498178958893
+      },
+      "steps": 160,
+      "skip": 20,
+      "steady_step_ms": 493.83263840739215,
+      "steady_elapsed_step_ms": {
+        "mean": 493.83263840739215,
+        "p95": 569.4256901741027,
+        "maximum": 646.914180368185
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 497.93443738349845,
+        "p95": 571.1123326793312,
+        "maximum": 650.5893394351006
+      },
+      "max_rank_prior_ms": {
+        "mean": 18.086531066468783,
+        "p95": 31.67676106095313,
+        "maximum": 62.292542308568954
+      },
+      "rank_mean_prior_ms": {
+        "mean": 14.20784082064139,
+        "p95": 25.30282957013692,
+        "maximum": 54.09973859786987
+      },
+      "max_rank_train_ms": {
+        "mean": 485.1949858612248,
+        "p95": 561.7532728239894,
+        "maximum": 624.7616596519947
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 11.628105198698384,
+            "p95": 21.025003865361136,
+            "maximum": 49.33672398328781
+          },
+          "train": {
+            "mean": 472.7892483451537,
+            "p95": 551.5003239735961,
+            "maximum": 608.8064573705196
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 14.732470975390502,
+            "p95": 26.231744326651047,
+            "maximum": 58.2735538482666
+          },
+          "train": {
+            "mean": 478.68367388312305,
+            "p95": 555.1659865304828,
+            "maximum": 607.7653914690018
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 14.922738713877541,
+            "p95": 25.344008952379124,
+            "maximum": 54.6024814248085
+          },
+          "train": {
+            "mean": 478.5156241485051,
+            "p95": 553.919230401516,
+            "maximum": 611.4846393465996
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 14.716163463890553,
+            "p95": 28.98462153971195,
+            "maximum": 53.613632917404175
+          },
+          "train": {
+            "mean": 478.7972071341106,
+            "p95": 552.5289556011558,
+            "maximum": 611.5845330059528
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 13.8810486931886,
+            "p95": 24.158522486686692,
+            "maximum": 59.8563514649868
+          },
+          "train": {
+            "mean": 479.588423642729,
+            "p95": 558.0725019797683,
+            "maximum": 624.7616596519947
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 14.487833662756852,
+            "p95": 28.7530368193984,
+            "maximum": 62.292542308568954
+          },
+          "train": {
+            "mean": 478.9942100111927,
+            "p95": 555.1627056673169,
+            "maximum": 621.2990507483482
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 14.291844383946486,
+            "p95": 25.753208622336377,
+            "maximum": 60.160551220178604
+          },
+          "train": {
+            "mean": 479.2163465704237,
+            "p95": 553.162789531052,
+            "maximum": 610.4013249278069
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 15.0025214733822,
+            "p95": 27.716384455561588,
+            "maximum": 53.84889245033264
+          },
+          "train": {
+            "mean": 478.4180502274207,
+            "p95": 554.1372049599886,
+            "maximum": 614.4174821674824
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    }
+  },
+  "training_comparisons": {
+    "float32": {
+      "throughput_gain": 0.08040916829666278,
+      "observed_launch_wall_reduction": 0.40832288324634136,
+      "launch_wall_comparison_controlled": false,
+      "launch_wall_caveat": "Runs share compiler caches; the first run can pay cold compilation. Launch wall includes startup, compilation, warmup and shutdown. Use steady-step throughput for the ABBA performance comparison."
+    },
+    "bfloat16": {
+      "throughput_gain": 0.17841804211759427,
+      "observed_launch_wall_reduction": 0.4202125236196288,
+      "launch_wall_comparison_controlled": false,
+      "launch_wall_caveat": "Runs share compiler caches; the first run can pay cold compilation. Launch wall includes startup, compilation, warmup and shutdown. Use steady-step throughput for the ABBA performance comparison."
+    }
+  }
+}

@@ -1,0 +1,170 @@
+[
+  {
+    "wall_seconds": 66.97502474486828,
+    "exit_code": 0,
+    "dtype": "bfloat16",
+    "gpus": 8,
+    "steps": 32,
+    "stage": 2,
+    "directory": "/tmp/tabicl-window-shapes-2-window_fifo",
+    "skip": 4,
+    "prior_time": {
+      "mean_ms": 1.7066214765821184,
+      "p95_ms": 2.099516429007053,
+      "max_ms": 4.171479493379593,
+      "samples": 28
+    },
+    "train_time": {
+      "mean_ms": 744.4303603842854,
+      "p95_ms": 862.9063650965691,
+      "max_ms": 868.277307599783,
+      "samples": 28
+    },
+    "rank_timing/prior_max_s": {
+      "mean_ms": 4.14677948823997,
+      "p95_ms": 4.924998432397842,
+      "max_ms": 5.430508404970169,
+      "samples": 28
+    },
+    "rank_timing/train_max_s": {
+      "mean_ms": 746.9172421842813,
+      "p95_ms": 866.2811450660229,
+      "max_ms": 871.9439879059792,
+      "samples": 28
+    },
+    "rank_timing/step_max_s": {
+      "mean_ms": 749.7789551104818,
+      "p95_ms": 869.3911369889975,
+      "samples": 28
+    },
+    "steady_elapsed_per_step_ms": 748.2721306649702,
+    "oom_micro_batches": 0.0,
+    "nonfinite_loss": 0
+  },
+  {
+    "wall_seconds": 67.59015123918653,
+    "exit_code": 0,
+    "dtype": "bfloat16",
+    "gpus": 8,
+    "steps": 32,
+    "stage": 2,
+    "directory": "/tmp/tabicl-window-shapes-2-window_bucketed",
+    "skip": 4,
+    "prior_time": {
+      "mean_ms": 3.1136380774634227,
+      "p95_ms": 6.657371856272221,
+      "max_ms": 7.297731935977936,
+      "samples": 28
+    },
+    "train_time": {
+      "mean_ms": 751.4055695916925,
+      "p95_ms": 1386.450370401144,
+      "max_ms": 1472.0287397503853,
+      "samples": 28
+    },
+    "rank_timing/prior_max_s": {
+      "mean_ms": 4.408628945904119,
+      "p95_ms": 7.624428533017635,
+      "max_ms": 8.653584867715836,
+      "samples": 28
+    },
+    "rank_timing/train_max_s": {
+      "mean_ms": 756.1194142326713,
+      "p95_ms": 1396.2286734953523,
+      "max_ms": 1477.8047017753124,
+      "samples": 28
+    },
+    "rank_timing/step_max_s": {
+      "mean_ms": 759.1910640309964,
+      "p95_ms": 1399.4300410151482,
+      "samples": 28
+    },
+    "steady_elapsed_per_step_ms": 757.7055278899414,
+    "oom_micro_batches": 0.0,
+    "nonfinite_loss": 0
+  },
+  {
+    "wall_seconds": 96.69480320066214,
+    "exit_code": 0,
+    "dtype": "bfloat16",
+    "gpus": 8,
+    "steps": 32,
+    "stage": 3,
+    "directory": "/tmp/tabicl-window-shapes-3-window_fifo",
+    "skip": 4,
+    "prior_time": {
+      "mean_ms": 4.350877633052213,
+      "p95_ms": 6.395396590232849,
+      "max_ms": 7.1929097175598145,
+      "samples": 28
+    },
+    "train_time": {
+      "mean_ms": 1661.886948027781,
+      "p95_ms": 2063.4076327085495,
+      "max_ms": 2079.96416836977,
+      "samples": 28
+    },
+    "rank_timing/prior_max_s": {
+      "mean_ms": 7.1361438770379335,
+      "p95_ms": 8.443558774888515,
+      "max_ms": 8.986424654722214,
+      "samples": 28
+    },
+    "rank_timing/train_max_s": {
+      "mean_ms": 1665.6342022387046,
+      "p95_ms": 2068.82436349988,
+      "max_ms": 2085.496496409178,
+      "samples": 28
+    },
+    "rank_timing/step_max_s": {
+      "mean_ms": 1670.671985750752,
+      "p95_ms": 2074.55021943897,
+      "samples": 28
+    },
+    "steady_elapsed_per_step_ms": 1669.0806300778474,
+    "oom_micro_batches": 0.0,
+    "nonfinite_loss": 0
+  },
+  {
+    "wall_seconds": 96.58227615430951,
+    "exit_code": 0,
+    "dtype": "bfloat16",
+    "gpus": 8,
+    "steps": 32,
+    "stage": 3,
+    "directory": "/tmp/tabicl-window-shapes-3-window_bucketed",
+    "skip": 4,
+    "prior_time": {
+      "mean_ms": 4.599555262497494,
+      "p95_ms": 11.072870157659052,
+      "max_ms": 11.657454073429108,
+      "samples": 28
+    },
+    "train_time": {
+      "mean_ms": 1656.770962423512,
+      "p95_ms": 4007.980476506054,
+      "max_ms": 4120.501097291708,
+      "samples": 28
+    },
+    "rank_timing/prior_max_s": {
+      "mean_ms": 6.105148366519383,
+      "p95_ms": 11.5495590493083,
+      "max_ms": 11.657454073429108,
+      "samples": 28
+    },
+    "rank_timing/train_max_s": {
+      "mean_ms": 1661.9433511846833,
+      "p95_ms": 4012.8822680562735,
+      "max_ms": 4128.624740988016,
+      "samples": 28
+    },
+    "rank_timing/step_max_s": {
+      "mean_ms": 1666.4384128525853,
+      "p95_ms": 4018.97746771574,
+      "samples": 28
+    },
+    "steady_elapsed_per_step_ms": 1665.047982973712,
+    "oom_micro_batches": 0.0,
+    "nonfinite_loss": 0
+  }
+]

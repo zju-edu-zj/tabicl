@@ -14,4 +14,4 @@ export TRAIN_DTYPE=${TRAIN_DTYPE:-float32}
 export WANDB_NAME=${WANDB_NAME:-tabiclv2_clf_stage1_pure_token_sparse}
 export CKPT_DIR=${CKPT_DIR:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1-token-sparse}
 
-exec bash "$REPO_ROOT/scripts/train_v2_clf_stage1.sh" "$@"
+exec bash "$REPO_ROOT/scripts/train_v2_clf_stage1_fast.sh" "$@"

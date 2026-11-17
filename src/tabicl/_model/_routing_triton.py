@@ -46,15 +46,104 @@ def _centroid_scores(Q, CENTROIDS, OUT, N, NK, H: tl.constexpr, D: tl.constexpr,
     tl.store(OUT + offsets, score, (row[:, None] < N) & (leaf[None, :] < NK))
 
 
-def centroid_scores(q, centroids):
+def centroid_scores(q, centroids, out=None):
     b, h, n, d = q.shape
     nk = centroids.shape[-2]
-    out = torch.empty((b, h, n, nk), device=q.device, dtype=torch.float32)
+    if out is None:
+        out = torch.empty((b, h, n, nk), device=q.device, dtype=torch.float32)
     leaf_tiles = triton.cdiv(nk, 128)
     _centroid_scores[(triton.cdiv(n, 16) * leaf_tiles, h, b)](
         q, centroids, out, n, nk, h, d, *q.stride(), 128, leaf_tiles,
         triton.next_power_of_2(d), 16, num_warps=4
     )
+    return out
+
+
+@triton.jit(do_not_specialize=["ROWS", "CHUNK_N", "FULL_N", "START", "NK"])
+def _score_topk(SCORES, VALUES, INDICES, ROWS, CHUNK_N, FULL_N, START,
+                NK, K: tl.constexpr,
+                WIDTH: tl.constexpr, SELECT: tl.constexpr, TILE: tl.constexpr):
+    row = tl.program_id(0) * TILE + tl.arange(0, TILE)
+    leaf = tl.arange(0, WIDTH)
+    scores = tl.load(SCORES + row[:, None] * NK + leaf[None, :],
+                     (row[:, None] < ROWS) & (leaf[None, :] < NK), other=-float("inf"))
+    alive = leaf[None, :] < NK
+    slot = tl.arange(0, SELECT)
+    chosen_ids = tl.full((TILE, SELECT), 2147483647, tl.int32)
+    chosen_values = tl.full((TILE, SELECT), -float("inf"), tl.float32)
+    threshold_nan = tl.full((TILE,), False, tl.int1)
+    threshold = tl.full((TILE,), -float("inf"), tl.float32)
+    for i in tl.static_range(K):
+        nan = (scores != scores) & alive
+        has_nan = tl.sum(nan.to(tl.int32), 1) > 0
+        best = tl.max(tl.where(alive & ~nan, scores, -float("inf")), 1)
+        equal = tl.where(has_nan[:, None], nan, alive & (scores == best[:, None]))
+        index = tl.min(tl.where(equal, leaf[None, :], 2147483647), 1)
+        value = tl.where(has_nan, float("nan"), best)
+        chosen_ids = tl.where(slot[None, :] == i, index[:, None], chosen_ids)
+        chosen_values = tl.where(slot[None, :] == i, value[:, None], chosen_values)
+        alive = alive & (leaf[None, :] != index[:, None])
+        threshold_nan, threshold = has_nan, best
+    # Match gatherTopK's input to the final small sort: strict winners in
+    # input order, then the first threshold-equal entries in input order.
+    strict = ~threshold_nan[:, None] & ((chosen_values != chosen_values) |
+                                       (chosen_values > threshold[:, None]))
+    key = tl.where(slot[None, :] < K, chosen_ids + tl.where(strict, 0, NK), 2147483647)
+    position = tl.sum((key[:, :, None] > key[:, None, :]).to(tl.int32), 2)
+    mask = (row[:, None] < ROWS) & (slot[None, :] < K)
+    tl.store(VALUES + row[:, None]*K + position, chosen_values, mask)
+    tl.store(INDICES + row[:, None]*K + position, chosen_ids, mask)
+
+
+@triton.jit(do_not_specialize=["ROWS", "CHUNK_N", "FULL_N", "START"])
+def _write_topk(INDICES, SORT, OUT, ROWS, CHUNK_N, FULL_N, START,
+                K: tl.constexpr, TILE: tl.constexpr):
+    edge = tl.program_id(0)*TILE + tl.arange(0, TILE)
+    row, slot = edge//K, edge%K
+    position = tl.load(SORT + edge, row < ROWS, other=0)
+    index = tl.load(INDICES + row*K + position, row < ROWS, other=0)
+    output_row = row//CHUNK_N*FULL_N + START + row%CHUNK_N
+    tl.store(OUT + output_row*K + slot, index, row < ROWS)
+
+
+def centroid_topk(q, centroids, budget, chunk_elements=8 * 1024**2):
+    """Exact-score candidates followed by the framework's small output sort.
+
+    Scores use the unchanged IEEE dot kernel. No device-to-host reads occur.
+    Candidate order mirrors gatherTopK before sorting, including NaN/Inf/ties.
+    Output uses int32 directly without int64 chunk lists and concatenation.
+    """
+    b, h, n, _ = q.shape
+    nk = centroids.shape[-2]
+    if not 1 <= budget <= min(8, nk) or nk > 1024 or chunk_elements < 1:
+        raise ValueError("centroid_topk requires 1 <= budget <= min(8, leaves), leaves <= 1024, positive tile")
+    out = torch.empty((b, h, n, budget), device=q.device, dtype=torch.int32)
+    # Account for candidates, sorted values and int64 sort positions as well
+    # as scores. A score-only cap makes small-leaf routes allocate much more
+    # than the configured tile budget. One row per batch/head is the minimum.
+    chunk = max(1, chunk_elements // (b*h*(nk+5*budget)))
+    max_rows = b*h*min(n, chunk)
+    workspace = torch.empty((max_rows*nk,), device=q.device, dtype=torch.float32)
+    values_workspace = torch.empty((max_rows*budget,), device=q.device, dtype=torch.float32)
+    indices_workspace = torch.empty((max_rows*budget,), device=q.device, dtype=torch.int32)
+    sorted_workspace = torch.empty_like(values_workspace)
+    sort_workspace = torch.empty((max_rows*budget,), device=q.device, dtype=torch.int64)
+    for start in range(0, n, chunk):
+        count = min(chunk, n-start)
+        rows = b*h*count
+        scores = workspace[:rows*nk].view(b, h, count, nk)
+        centroid_scores(q[:, :, start:start+count], centroids, out=scores)
+        values = values_workspace[:rows*budget].view(b, h, count, budget)
+        indices = indices_workspace[:rows*budget].view(b, h, count, budget)
+        sorted_values = sorted_workspace[:rows*budget].view_as(values)
+        sort = sort_workspace[:rows*budget].view_as(indices)
+        _score_topk[(triton.cdiv(rows, 16),)](
+            scores, values, indices, rows, count, n, start, nk, budget,
+            triton.next_power_of_2(nk), triton.next_power_of_2(budget), 16,
+            num_warps=4)
+        torch.sort(values, dim=-1, descending=True, out=(sorted_values, sort))
+        _write_topk[(triton.cdiv(rows*budget, 256),)](
+            indices, sort, out, rows, count, n, start, budget, 256)
     return out
 
 

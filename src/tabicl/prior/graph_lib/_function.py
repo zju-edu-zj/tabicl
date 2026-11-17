@@ -1,4 +1,5 @@
 from typing import Optional, List
+import os
 
 import torch
 import numpy as np
@@ -7,6 +8,7 @@ from tabicl.prior.graph_lib._base import RandomTensorTransformer, Context
 from tabicl.prior.graph_lib._activation import RandomActivation
 from tabicl.prior.graph_lib._matrix import RandomMatrix, RandomGaussianMatrix
 from tabicl.prior.graph_lib._weights import RandomWeights
+from tabicl.prior.graph_lib._distance import nearest_center, compact_cdist, compact_em_probabilities, _native_available
 
 
 class RandomFunction(RandomTensorTransformer):
@@ -152,6 +154,17 @@ class RandomTreeFunction(RandomFunction):
             by conversion to long integer indices. This resolves the "baddbmm_cuda not implemented
             for Long" error while maintaining index integrity.
         """
+        if (x.device.type == 'cpu' and x.dtype in (torch.float32, torch.float64)
+                and os.environ.get('TABICL_PRIOR_TREE', 'native') == 'native'
+                and _native_available() and hasattr(torch.ops.tabicl_prior_exact, 'tree_cpu')):
+            return torch.ops.tabicl_prior_exact.tree_cpu(
+                x, self.split_dims_, self.split_points_, self.leaf_values_)
+        # Bound boolean/index/gather temporaries per worker on long tables.
+        # Chunk rows only: tree reduction order and all random draws stay intact.
+        bytes_per_row = self.n_trees_ * (self.depth_ * 9 + self.out_features * x.element_size() + 16)
+        rows = max(1, int((16 * 1024**2) // bytes_per_row))
+        if x.shape[0] > rows:
+            return torch.cat([self._transform(chunk) for chunk in x.split(rows)], dim=0)
         split_dims = self.split_dims_.to(x.device)
         split_points = self.split_points_.to(x.device)
         split_sides = x[:, split_dims] > split_points
@@ -198,8 +211,10 @@ class RandomDiscretizationFunction(RandomFunction):
         self.targets_ = RandomLinearFunction(self.context, self.in_features, self.out_features)(self.centers_)
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
-        dists = torch.cdist(x, self.centers_, self.p_)  # this is faster than manually calculating the distance matrix
-        closest_idx = dists.argmin(dim=-1)
+        if self.config.graph_execution == 'optimized':
+            closest_idx = nearest_center(x, self.centers_, self.p_, vectorized=True)
+        else:
+            closest_idx = nearest_center(x, self.centers_, self.p_)
         return self.targets_[closest_idx]
 
 
@@ -268,10 +283,24 @@ class RandomQuadraticFunction(RandomFunction):
             self.idxs_ = torch.arange(x.shape[1])
         self.n_feat_ = len(self.idxs_) + 1  # +1 for constant term
         self.tensor_3d_ = RandomMatrix(self.context).sample(self.out_features, self.n_feat_, self.n_feat_)
+        if self.config.graph_execution == 'optimized':
+            self.triu_ = torch.triu_indices(self.n_feat_, self.n_feat_, device=x.device)
+            i, j = self.triu_
+            # x_i*x_j equals x_j*x_i: retain every original coefficient, but
+            # form the common polynomial basis only once for all outputs.
+            self.coefficients_ = (self.tensor_3d_[:, i, j] +
+                self.tensor_3d_[:, j, i] * (i != j)).t().contiguous()
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
         # append ones to get the affine + linear part
         x = torch.cat([x[:, self.idxs_], torch.ones(x.shape[0], 1)], dim=-1)
+        if self.config.graph_execution == 'optimized':
+            if (x.device.type == 'cpu' and x.dtype in (torch.float32, torch.float64)
+                    and _native_available() and hasattr(torch.ops.tabicl_prior_exact, 'quadratic_features_cpu')):
+                phi = torch.ops.tabicl_prior_exact.quadratic_features_cpu(x)
+            else:
+                phi = x[:, self.triu_[0]] * x[:, self.triu_[1]]
+            return phi @ self.coefficients_
         return torch.einsum("oij,bi,bj->bo", self.tensor_3d_, x, x)
 
 
@@ -291,9 +320,19 @@ class RandomEMAssignmentFunction(RandomFunction):
         self.out_func_ = RandomLinearFunction(self.context, in_features=n_ind, out_features=self.out_features)
         self.p_ = self.sampler.numerical("gen_em_assignment_p_inv", 1.0, 4.0, use_log=True)
         self.q_ = self.sampler.numerical("gen_em_assignment_q", 1.0, 2.0)
+        if self.config.graph_execution == 'optimized':
+            self.inverse_std_q_ = self.stds_.pow(-self.q_)
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
-        dists = torch.cdist(x, self.x_ind_, p=self.p_)
+        if self.config.graph_execution == 'optimized':
+            result, inverse = compact_em_probabilities(x, self.x_ind_, self.stds_, self.consts,
+                self.p_, self.q_, self.inverse_std_q_)
+            # RandomLinearFunction._fit only samples a matrix: it is independent
+            # of the row count and values. Sample once at the original lazy call.
+            output = self.out_func_(result)
+            return output if inverse is None else output[inverse]
+        else:
+            dists = compact_cdist(x, self.x_ind_, p=self.p_)
         logits = self.consts - torch.clamp(dists / self.stds_[None, :], min=0.0) ** self.q_
         result = torch.softmax(logits, dim=-1)
         return self.out_func_(result)

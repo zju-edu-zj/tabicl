@@ -13,7 +13,9 @@ from tabicl._model.rope import RotaryEmbedding
 
 
 @pytest.fixture(autouse=True)
-def limit_threads():
+def limit_threads(monkeypatch):
+    from tabicl._model import attention
+    monkeypatch.setattr(attention, "_use_flash_attn3", False)
     previous = torch.get_num_threads()
     torch.set_num_threads(4)
     # Tests intentionally create many different architectures / freeze modes.

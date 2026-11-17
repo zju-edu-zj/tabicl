@@ -1,0 +1,9 @@
+cpu_unit_exit=0
+production_profile_exit=0
+kernel8_2_balanced-numpy_exit=0
+kernel8_2_window_bucketed-mmap_exit=0
+kernel8_3_balanced-numpy_exit=0
+kernel8_3_window_bucketed-mmap_exit=0
+ddp16_budget_exit=0
+drained_replay_exit=0
+cpu_full_tests_exit=0

@@ -286,6 +286,7 @@ class MultiheadAttention(nn.MultiheadAttention):
             ssmax_layer=self.ssmax_layer,
             qk_norm=self.qk_norm,
             need_kv=need_kv,
+            fp32_math=getattr(self, "fp32_math", False),
         )
 
 

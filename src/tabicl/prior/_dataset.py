@@ -40,6 +40,7 @@ from .graph_lib._config import PriorConfig
 from ._mlp_scm import MLPSCM
 from ._tree_scm import TreeSCM
 from ._graph_scm import GraphSCM
+from ._filter_forest import planned_oob_prediction, planned_classification_oob_prediction
 
 from ._hp_sampling import HpSamplerList
 from ._reg2cls import Reg2Cls
@@ -178,7 +179,8 @@ class Prior:
 
     @staticmethod
     def sample_seq_len(
-            min_seq_len: Optional[int], max_seq_len: int, log: bool = False, replay_small: bool = False
+            min_seq_len: Optional[int], max_seq_len: int, log: bool = False, replay_small: bool = False,
+            rng=None,
     ) -> int:
         """
         Selects a random sequence length within the specified range.
@@ -207,27 +209,30 @@ class Prior:
         int
             The sampled sequence length
         """
+        rng = np.random if rng is None else rng
+        random_state = None if rng is np.random else rng
         if min_seq_len is None:
             return max_seq_len
 
         if log:
-            seq_len = int(loguniform.rvs(min_seq_len, max_seq_len))
+            seq_len = int(loguniform.rvs(min_seq_len, max_seq_len, random_state=random_state))
         else:
-            seq_len = np.random.randint(min_seq_len, max_seq_len)
+            seq_len = rng.randint(min_seq_len, max_seq_len)
 
         if replay_small:
-            p = np.random.random()
+            p = rng.random()
             if p < 0.05:
-                return np.random.randint(200, 1000)
+                return rng.randint(200, 1000)
             elif p < 0.3:
-                return int(loguniform.rvs(1000, 10000))
+                return int(loguniform.rvs(1000, 10000, random_state=random_state))
             else:
                 return seq_len
         else:
             return seq_len
 
     @staticmethod
-    def sample_train_size(min_train_size: Union[int, float], max_train_size: Union[int, float], seq_len: int) -> int:
+    def sample_train_size(min_train_size: Union[int, float], max_train_size: Union[int, float], seq_len: int,
+                          rng=None) -> int:
         """
         Selects a random training size within the specified range.
 
@@ -257,10 +262,11 @@ class Prior:
         ValueError
             If training size range has incompatible types
         """
+        rng = np.random if rng is None else rng
         if isinstance(min_train_size, int) and isinstance(max_train_size, int):
-            train_size = np.random.randint(min_train_size, max_train_size)
-        elif isinstance(min_train_size, float) and isinstance(min_train_size, float):
-            train_size = np.random.uniform(min_train_size, max_train_size)
+            train_size = rng.randint(min_train_size, max_train_size)
+        elif isinstance(min_train_size, float) and isinstance(max_train_size, float):
+            train_size = rng.uniform(min_train_size, max_train_size)
             train_size = int(seq_len * train_size)
         else:
             raise ValueError("Invalid training size range.")
@@ -342,8 +348,11 @@ class Prior:
             # Only consider actual features (up to di, ignoring padding)
             xi = xi[:, :di]
             # Identify features with more than one unique value (informative features)
-            unique_mask = [len(torch.unique(xi[:, j])) > 1 for j in range(di)]
-            di_new = sum(unique_mask)
+            # Comparing with the first row is linear in the table size, whereas
+            # unique sorts every column. This also preserves unique's NaN
+            # behavior (each NaN is distinct), including the single-row case.
+            unique_mask = (xi[1:] != xi[:1]).any(dim=0)
+            di_new = int(unique_mask.sum())
             # Create new tensor with only informative features, padding the rest
             xi_new = F.pad(xi[:, unique_mask], pad=(0, num_features - di_new), mode="constant", value=0)
             return xi_new, torch.tensor(di_new, device=xi.device)
@@ -926,7 +935,7 @@ class GraphPrior(Prior):
         self.device = device
 
     @torch.no_grad()
-    def generate_dataset(self, params: Dict[str, Any]) -> Tuple[Tensor, Tensor, Tensor]:
+    def generate_dataset(self, params: Dict[str, Any], *, compact: bool = False, trace=None) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Generates a single valid dataset based on the provided parameters.
 
@@ -958,7 +967,11 @@ class GraphPrior(Prior):
         """
 
         while True:
-            X, y = GraphSCM(**params)()
+            if trace is not None:
+                trace.begin_attempt()
+            X, y = GraphSCM(**params, defer_padding=compact)()
+            if trace is not None:
+                trace.mark('sanity')
 
             # Add batch dim for single dataset to be compatible with delete_unique_features and sanity_check
             X, y = X.unsqueeze(0), y.unsqueeze(0)
@@ -967,46 +980,52 @@ class GraphPrior(Prior):
             # Only keep valid datasets with sufficient features and balanced classes
             X, d = self.delete_unique_features(X, d)
             if not (d > 0).all():
+                if trace is not None:
+                    trace.end_attempt('no_features')
                 continue
 
             if not (self.regression or self.cls_sanity_check(X, y, params["train_size"])):
+                if trace is not None:
+                    trace.end_attempt('class_sanity')
                 continue
 
-            if should_filter(X[0], y[0], self.config, is_classif=not self.regression):
+            # Padding columns affect ExtraTrees' random feature selection. Keep
+            # the original filter input, even when transporting compact tables.
+            filter_x = X[0]
+            if compact and filter_x.shape[-1] < params["max_features"]:
+                filter_x = F.pad(filter_x, (0, params["max_features"] - filter_x.shape[-1]))
+            if trace is not None:
+                trace.mark('filter')
+            if should_filter(filter_x, y[0], self.config, is_classif=not self.regression):
+                if trace is not None:
+                    trace.end_attempt('filter_rejected')
                 continue
 
-            return X.squeeze(0), y.squeeze(0), d.squeeze(0)
+            if trace is not None:
+                trace.end_attempt('accepted')
+
+            x = X.squeeze(0)
+            if compact:
+                x = x[:, :int(d.item())].contiguous()
+            return x, y.squeeze(0), d.squeeze(0)
 
     @torch.no_grad()
-    def get_batch(self, batch_size: Optional[int] = None) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
-        """
-        Generates a batch of datasets by first creating a parameter list and then processing it.
+    def sample_parameters(self, batch_size: Optional[int] = None, *, shape=None) -> List[Dict[str, Any]]:
+        """Sample one batch's parameters, preserving all group correlations.
 
-        Parameters
-        ----------
-        batch_size : int, optional
-            Batch size override. If None, uses self.batch_size
-
-        Returns
-        -------
-        X : Tensor or NestedTensor
-            Features tensor. If seq_len_per_gp=False, shape is (batch_size, seq_len, max_features).
-            If seq_len_per_gp=True, returns a NestedTensor.
-
-        y : Tensor or NestedTensor
-            Targets tensor. If seq_len_per_gp=False, shape is (batch_size, seq_len).
-            If seq_len_per_gp=True, returns a NestedTensor.
-
-        d : Tensor
-            Number of active features per dataset after filtering, shape (batch_size,)
-
-        seq_lens : Tensor
-            Sequence length for each dataset, shape (batch_size,)
-
-        train_sizes : Tensor
-            Position for train/test split for each dataset, shape (batch_size,)
+        Length/split are shared by group (or globally), feature count by
+        subgroup, and class count is sampled independently for each dataset.
+        Execution order is separate from this sampling hierarchy.
         """
         batch_size = batch_size or self.batch_size
+
+        if shape is not None:
+            self.validate_shape(shape)
+            # Only the conditioning variables are shared. Graphs, classes,
+            # rejection loops and task RNGs remain independent per dataset.
+            return [dict(regression=self.regression, device=self.device, config=self.config,
+                         **shape, num_classes=None if self.regression else
+                         np.random.randint(2, self.max_classes + 1)) for _ in range(batch_size)]
 
         # Calculate number of groups and subgroups
         size_per_gp = min(self.batch_size_per_gp, batch_size)
@@ -1040,7 +1059,7 @@ class GraphPrior(Prior):
                 )
                 gp_train_size = self.sample_train_size(self.min_train_size, self.max_train_size, gp_seq_len)
                 # Adjust max features based on seq_len for this group
-                gp_max_features = self.adjust_max_features(gp_seq_len, self.max_features)
+                gp_max_features = self.feature_limit(gp_seq_len)
             else:
                 gp_seq_len = global_seq_len
                 gp_train_size = global_train_size
@@ -1057,7 +1076,7 @@ class GraphPrior(Prior):
                     break
 
                 # Each subgroup shares the same number of features
-                if self.log_n_features:
+                if self.log_n_features and self.min_features < gp_max_features:
                     subgp_num_features = int(loguniform.rvs(self.min_features, gp_max_features))
                 else:
                     subgp_num_features = round(np.random.uniform(self.min_features, gp_max_features))
@@ -1099,6 +1118,40 @@ class GraphPrior(Prior):
 
                     param_list.append(params)
 
+        return param_list
+
+    def feature_limit(self, seq_len):
+        return (max(self.min_features, self.adjust_max_features(seq_len, self.max_features))
+                if getattr(self, "adaptive_feature_limit", True) else self.max_features)
+
+    def sample_shape(self, rng):
+        """Draw the original single-table shape law from an isolated RNG.
+
+        Sharing this draw changes within-step correlations, not task marginals.
+        It is intentionally independent of graph/class/node-local randomness.
+        """
+        rows = self.sample_seq_len(self.min_seq_len, self.max_seq_len, log=self.log_seq_len,
+                                   replay_small=self.replay_small, rng=rng)
+        split = self.sample_train_size(self.min_train_size, self.max_train_size, rows, rng=rng)
+        cap = self.feature_limit(rows) if self.seq_len_per_gp else self.max_features
+        if self.log_n_features and self.min_features < cap:
+            width = int(loguniform.rvs(self.min_features, cap, random_state=rng))
+        else:
+            width = round(rng.uniform(self.min_features, cap))
+        return dict(seq_len=int(rows), train_size=int(split), max_features=int(cap), num_features=int(width))
+
+    def validate_shape(self, shape):
+        if set(shape) != {"seq_len", "train_size", "max_features", "num_features"}:
+            raise ValueError("shape requires exactly rows, split, feature count and feature cap")
+        if (any(not isinstance(v, (int, np.integer)) for v in shape.values()) or
+                not 0 < shape["train_size"] < shape["seq_len"] or
+                not self.min_features <= shape["num_features"] <= shape["max_features"] <= self.max_features):
+            raise ValueError("invalid cohort shape")
+
+    @torch.no_grad()
+    def get_batch(self, batch_size: Optional[int] = None) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+        """Generate and assemble a batch using the shared parameter sampler."""
+        param_list = self.sample_parameters(batch_size)
         with threadpoolctl.threadpool_limits(limits=1):
             if self.n_jobs == 1:
                 n_threads_old = torch.get_num_threads()
@@ -1538,6 +1591,52 @@ class DisablePrinting:
         sys.stdout = self.original_stdout
 
 
+@functools.lru_cache(maxsize=2)
+def _small_bootstrap_indices(n, n_boot):
+    return np.random.default_rng(0).integers(0, n, size=(n_boot, n))
+
+
+def _bootstrap_pvalue(imp, n_boot=200):
+    """Same RNG stream and row-wise reductions, bounded index/gather memory."""
+    n = len(imp)
+    if n < 1 or n_boot < 1:
+        raise ValueError("bootstrap needs nonempty improvements and positive repetitions")
+    if n * n_boot * 8 <= 2 * 1024**2:
+        idx = _small_bootstrap_indices(n, n_boot)
+        return float(np.mean(imp[idx].mean(axis=1) <= 0.0))
+    rng = np.random.default_rng(0)
+    rows = max(1, (8 * 1024**2) // (n * (8 + imp.dtype.itemsize)))
+    nonpositive = 0
+    for start in range(0, n_boot, rows):
+        idx = rng.integers(0, n, size=(min(rows, n_boot - start), n))
+        nonpositive += np.count_nonzero(imp[idx].mean(axis=1) <= 0.0)
+    return float(nonpositive / n_boot)
+
+
+def _classification_filter_statistics(labels, prediction):
+    """Brier improvement and errors, without constructing one-hot targets.
+
+    Keep the original full-table baseline, even when invalid OOB rows are
+    masked. Zero-vote rows remain zeros, as in sklearn and the MSE executor.
+    """
+    classes = prediction.shape[1]
+    baseline = np.bincount(labels, minlength=classes).astype(np.float64) / len(labels)
+    mask = ~np.isnan(prediction).any(axis=1)
+    labels, prediction = labels[mask], prediction[mask]
+    baseline_error = 1 - 2 * baseline[labels] + baseline @ baseline
+    model_error = 1 - 2 * prediction[np.arange(len(labels)), labels] + np.einsum('ij,ij->i', prediction, prediction)
+    return baseline_error - model_error, baseline_error.mean(), model_error.mean()
+
+
+def _filter_from_statistics(imp, baseline_mse, extratrees_mse, config, n_boot):
+    pval = _bootstrap_pvalue(imp, n_boot)
+    if config.remove_trivial_datasets and np.sqrt(extratrees_mse) <= config.trivial_dataset_threshold * np.sqrt(baseline_mse):
+        return True
+    if config.filter_unpredictable_datasets and pval >= 0.05:
+        return True
+    return False
+
+
 def should_filter(
         X: torch.Tensor,
         y: torch.Tensor,
@@ -1549,10 +1648,20 @@ def should_filter(
 ) -> bool:
     if not (config.remove_trivial_datasets or config.filter_unpredictable_datasets):
         return False
+    if config.dataset_filter_mode not in ('full', 'progressive'):
+        raise ValueError('dataset_filter_mode must be full or progressive')
+    if config.filter_execution not in ('reference', 'planned', 'sufficient'):
+        raise ValueError('filter_execution must be reference, planned or sufficient')
 
     if is_classif:
         y_int = y.to(torch.long)
         C = int(y_int.max().item() + 1)
+        if C > 2 and config.filter_execution == 'sufficient' and config.dataset_filter_mode == 'full':
+            labels = y_int.detach().cpu().numpy()
+            prediction = planned_classification_oob_prediction(
+                X.detach().cpu().numpy(), labels, C, n_estimators)
+            if prediction is not None:
+                return _filter_from_statistics(*_classification_filter_statistics(labels, prediction), config, n_boot)
         Y = F.one_hot(y_int, num_classes=C).to(torch.float32)  # (n, C)
         if C == 2:
             # drop one dimension to make it faster
@@ -1564,17 +1673,45 @@ def should_filter(
     X_np = X.detach().cpu().numpy()
     Y_np = Y.detach().cpu().numpy()
 
-    # do the squeeze to avoid a sklearn warning
+    # Binary targets use one column; class count, rather than target width,
+    # determines eligibility. Other shapes use the established full filter.
+    progressive = (config.dataset_filter_mode == 'progressive' and is_classif
+                   and config.filter_unpredictable_datasets and not config.remove_trivial_datasets
+                   and n_estimators == 25 and n_boot == 200
+                   and len(Y_np) in (2048, 4096) and 2 <= C <= 10
+                   and 1 <= X_np.shape[1] <= 100)
     et = ExtraTreesRegressor(
-        n_estimators=n_estimators,
+        n_estimators=4 if progressive else n_estimators,
         bootstrap=True,
         oob_score=True,
         n_jobs=1,
         random_state=1,  # don't set to 0 because it doesn't give OOB scores for all samples for some 133 <= n <= 257
         max_depth=6,  # make it faster
-    ).fit(X_np, np.squeeze(Y_np, axis=-1) if Y_np.shape[-1] == 1 else Y_np)
-
-    Yhat = et.oob_prediction_  # (n, d)
+        warm_start=progressive,
+    )
+    # Squeeze the single target dimension to avoid sklearn's column warning.
+    fit_target = np.squeeze(Y_np, axis=-1) if Y_np.shape[-1] == 1 else Y_np
+    if progressive:
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Some inputs do not have OOB scores.*', category=UserWarning)
+            et.fit(X_np, fit_target)
+        pred = et.oob_prediction_.reshape(Y_np.shape)
+        baseline = Y_np.mean(axis=0, keepdims=True)
+        imp = ((Y_np-baseline)**2).sum(1)-((Y_np-pred)**2).sum(1)
+        # Only early ACCEPT: weak evidence defers, it never rejects an
+        # interaction/multi-hop task before the complete forest sees it.
+        # This is an audited empirical score, not a confidence test: sklearn
+        # zero-fills rows with no OOB votes in this four-tree prefix.
+        z = imp.mean()/(imp.std(ddof=1)/np.sqrt(len(imp))+1e-30)
+        if np.isfinite(z) and z >= 2.0:
+            return False
+        et.set_params(n_estimators=n_estimators)
+    Yhat = None
+    if config.filter_execution in ('planned', 'sufficient') and not progressive:
+        Yhat = planned_oob_prediction(X_np, Y_np, n_estimators)
+    if Yhat is None:
+        et.fit(X_np, fit_target)
+        Yhat = et.oob_prediction_  # (n, d)
     if len(Yhat.shape) == 1:
         Yhat = Yhat[:, None]
     mask = ~np.isnan(Yhat).any(axis=1)  # keep valid OOB rows
@@ -1586,17 +1723,7 @@ def should_filter(
     baseline_mse = ((Yv - baseline) ** 2).sum(axis=1).mean()
     extratrees_mse = ((Yv - Yhatv) ** 2).sum(axis=1).mean()
 
-    # Vectorized bootstrap (no retraining)
-    rng = np.random.default_rng(0)
-    n = imp.shape[0]
-    idx = rng.integers(0, n, size=(n_boot, n))
-    pval = float(np.mean(imp[idx].mean(axis=1) <= 0.0))
-
-    if config.remove_trivial_datasets and np.sqrt(extratrees_mse) <= config.trivial_dataset_threshold * np.sqrt(baseline_mse):
-        return True
-    if config.filter_unpredictable_datasets and pval >= 0.05:
-        return True
-    return False
+    return _filter_from_statistics(imp, baseline_mse, extratrees_mse, config, n_boot)
 
 
 def compute_predictability_pvalue(
@@ -1647,8 +1774,5 @@ def compute_predictability_pvalue(
     imp = ((Yv - baseline) ** 2).sum(axis=1) - ((Yv - Yhatv) ** 2).sum(axis=1)
 
     # Vectorized bootstrap (no retraining)
-    rng = np.random.default_rng(0)
-    n = imp.shape[0]
-    idx = rng.integers(0, n, size=(n_boot, n))
-    pval = float(np.mean(imp[idx].mean(axis=1) <= 0.0))
+    pval = _bootstrap_pvalue(imp, n_boot)
     return pval

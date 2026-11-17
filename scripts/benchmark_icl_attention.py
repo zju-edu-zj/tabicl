@@ -15,7 +15,7 @@ from pathlib import Path
 import torch
 
 from tabicl._model.encoders import Encoder
-from tabicl._model.attention import HAS_FLASH_ATTN3
+from tabicl._model.attention import HAS_FLASH_ATTN3, set_flash_attn3_enabled
 from tabicl._model.icl_attention import ICL_ATTENTION_TYPES, SetRetrievalAttention
 from tabicl._model.token_sparse import TokenSparseAttention
 from tabicl._model.kv_cache import KVCache
@@ -68,6 +68,10 @@ def compiled_variants():
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--attention", choices=ICL_ATTENTION_TYPES, default="global_sparse")
+    p.add_argument(
+        "--sdpa-backend", choices=("auto", "math", "flash", "fa3"), default="auto",
+        help="Dense attention backend: PyTorch auto/math/flash SDPA or FlashAttention-3.",
+    )
     p.add_argument("--rows", type=int, required=True)
     p.add_argument("--batch-size", type=int, default=1)
     p.add_argument("--blocks", type=int, default=12)
@@ -134,6 +138,15 @@ def main():
             args.memory_limit_gib * 2**30 / total
         )
     dtype = getattr(torch, args.dtype)
+    if args.sdpa_backend == "fa3" and not HAS_FLASH_ATTN3:
+        p.error("--sdpa-backend fa3 requested but flash_attn_interface is unavailable")
+    if args.attention != "dense" and args.sdpa_backend != "auto":
+        p.error("--sdpa-backend is only valid with --attention dense")
+    # The repository's dense path normally prefers FA3 when installed.  Make
+    # each benchmark label explicit so math and PyTorch flash SDPA are not
+    # accidentally reported as the same implementation.
+    if args.attention == "dense":
+        set_flash_attn3_enabled(args.sdpa_backend == "fa3")
     s = args.rows * 4 // 5
     result = dict(
         vars(args),
@@ -148,6 +161,7 @@ def main():
         seed=123,
         optimizer_step=args.optimizer_step,
         flash_attn3_available=HAS_FLASH_ATTN3,
+        sdpa_backend=args.sdpa_backend,
     )
     result["gpu_state"] = subprocess.check_output(
         [
@@ -318,7 +332,13 @@ def main():
                 torch.set_grad_enabled(training),
                 torch.autocast("cuda", dtype=dtype, enabled=dtype != torch.float32),
             ):
-                output = forward()
+                if args.attention == "dense" and args.sdpa_backend in ("math", "flash"):
+                    from torch.nn.attention import SDPBackend, sdpa_kernel
+                    backend = SDPBackend.MATH if args.sdpa_backend == "math" else SDPBackend.FLASH_ATTENTION
+                    with sdpa_kernel(backend):
+                        output = forward()
+                else:
+                    output = forward()
                 if training:
                     target = output[:, s:] if args.scope == "encoder" else output
                     loss = target.float().square().mean()
@@ -379,7 +399,13 @@ def main():
                     torch.set_grad_enabled(training),
                     torch.autocast("cuda", dtype=dtype, enabled=dtype != torch.float32),
                 ):
-                    output = forward()
+                    if args.attention == "dense" and args.sdpa_backend in ("math", "flash"):
+                        from torch.nn.attention import SDPBackend, sdpa_kernel
+                        backend = SDPBackend.MATH if args.sdpa_backend == "math" else SDPBackend.FLASH_ATTENTION
+                        with sdpa_kernel(backend):
+                            output = forward()
+                    else:
+                        output = forward()
                     if training:
                         target = output[:, s:] if args.scope == "encoder" else output
                         loss = target.float().square().mean()

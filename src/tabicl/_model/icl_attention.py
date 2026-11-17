@@ -62,9 +62,12 @@ class SetRetrievalAttention(GlobalLinearAttention):
         self.router = router
         self.router_beam = router_beam
         self.partition = partition
-        # A 32 MiB score tile amortizes GEMM/top-k dispatch at long contexts.
+        # A 32 MiB route tile amortizes GEMM/top-k dispatch at long contexts.
+        # Fast selection includes candidates/sort buffers in this bound.
         # This is a workspace bound, not an attention or candidate budget.
         self.route_score_chunk_elements = 8 * 1024**2
+        # Keep a reference switch for backend validation and matched ablations.
+        self.use_fast_centroid_topk = True
         self.diagnostic_query_start = 0
         self.use_triton = True
         self._route_record = None
@@ -121,6 +124,11 @@ class SetRetrievalAttention(GlobalLinearAttention):
         with torch.autocast(device_type=q.device.type, enabled=False):
             if self.router == "hierarchical":
                 selected = self._route_tree(q, centroids, lengths, budget)
+            elif (q.is_cuda and self.use_triton and self.use_fast_centroid_topk
+                  and budget <= 8 and nk <= 1024):
+                from ._routing_triton import centroid_topk
+
+                selected = centroid_topk(q, centroids, budget, self.route_score_chunk_elements)
             else:
                 # Routing scores are discrete; positive scaling by sqrt(d)
                 # cannot change top-k, so no temperature operation is needed.

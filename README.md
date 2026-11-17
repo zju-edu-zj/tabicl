@@ -310,6 +310,11 @@ bash scripts/train_v2_clf_stage2.sh   # loads the stage-1 checkpoint
 bash scripts/train_v2_clf_stage3.sh   # loads the stage-2 checkpoint
 ```
 
+For the optimized Stage 1 training setup, use `bash scripts/train_v2_clf_stage1_fast.sh`.
+It activates the installed PPU SDK when present and prepares the native CPU prior
+runtime before launching workers. Installation, overrides and measured performance
+are documented in [the performance guide](docs/performance/prior_fast_default_20261103.md).
+
 Available recipes:
 - **TabICLv2** ([arXiv](https://arxiv.org/abs/2602.11139), §4.1): classifier [stage 1](./scripts/train_v2_clf_stage1.sh), [stage 2](./scripts/train_v2_clf_stage2.sh),
   [stage 3](./scripts/train_v2_clf_stage3.sh); regressor [stage 1](./scripts/train_v2_reg_stage1.sh),

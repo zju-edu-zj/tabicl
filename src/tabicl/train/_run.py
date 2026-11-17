@@ -32,10 +32,13 @@ from tabicl._model.tabicl import TabICL
 from tabicl._model.attention import HAS_FLASH_ATTN3, set_flash_attn3_enabled
 from tabicl.prior._dataset import PriorDataset
 from tabicl.prior._genload import LoadPriorDataset, seed_worker, pad_prior_batch
+from tabicl.prior._node_pool import NodePriorPool, iter_micro_batches
+from tabicl.prior._scheduling import available_cpu_cores
 from tabicl.prior.graph_lib._config import PriorConfig
 from tabicl.train._optim import get_scheduler
 from tabicl.train._optimizer import build_optimizer, optimizer_spec, validate_optimizer_checkpoint
 from tabicl.train._train_config import build_parser
+from tabicl.train._performance import resolve_attention_backend, warmup_frontend
 from tabicl.train._screening import (
     EVAL_ATTENTION_POLICIES,
     StepSeededPrior,
@@ -73,6 +76,8 @@ def ddp_cleanup(func):
             return func(self, *args, **kwargs)
         finally:
             self.close_local_logging()
+            if isinstance(getattr(self, "dataloader", None), NodePriorPool):
+                self.dataloader.close()
             if self.ddp:
                 destroy_process_group()
 
@@ -147,6 +152,9 @@ class Trainer:
 
             # Adjust batch size for distributed training
             original_batch_size = self.config.batch_size
+            if (getattr(self.config, "prior_schedule", "none") != "none"
+                    and original_batch_size % self.ddp_world_size):
+                raise ValueError("balanced scheduling requires global batch size divisible by world size")
             self.config.batch_size = math.ceil(original_batch_size / self.ddp_world_size)
 
             if self.master_process:
@@ -362,6 +370,20 @@ class Trainer:
             for param in model.icl_predictor.parameters():
                 param.requires_grad = False
 
+        device_name = torch.cuda.get_device_name(self.config.device) if "cuda" in self.config.device else "cpu"
+        compute_dtype = self.config.dtype if self.config.amp and "cuda" in self.config.device else "float32"
+        self.attention_backend = resolve_attention_backend(
+            getattr(self.config, "attention_backend", "native"), compute_dtype,
+            self.config.max_seq_len, device_name)
+        if self.attention_backend.startswith("fp32_") and compute_dtype == "float32" and self.config.use_flash_attn3:
+            raise ValueError("FP32 SDPA policies require --use_flash_attn3 False (FA3 casts FP32 to FP16)")
+        if self.attention_backend == "fp32_row_math":
+            from tabicl._model.layers import MultiheadAttention
+            for module in model.row_interactor.modules():
+                if isinstance(module, MultiheadAttention):
+                    module.fp32_math = True
+        if self.master_process:
+            print(f"Training attention backend: {self.attention_backend} ({device_name}, {compute_dtype})")
         model.compile_frontend(getattr(self.config, "compile_frontend", "none"))
         self.raw_model = model
 
@@ -373,6 +395,9 @@ class Trainer:
 
     def configure_prior(self):
         """Set up a tabular dataset generator for synthetic data during training."""
+
+        if self.config.prior_schedule != "none" and self.config.prior_backend != "node_pool":
+            raise ValueError("prior_schedule requires prior_backend=node_pool")
 
         if self.config.prior_dir is None:
             # Generate prior data on the fly
@@ -408,8 +433,37 @@ class Trainer:
                 device=self.config.prior_device,
             )
 
+        if self.config.prior_dir is None and self.config.prior_type == "graph_scm":
+            dataset.prior.adaptive_feature_limit = getattr(self.config, "adaptive_feature_limit", True)
+
         if self.master_process:
             print(dataset)
+
+        if self.config.prior_backend == "node_pool":
+            if self.config.prior_dir is not None or self.config.prior_seed_by_step:
+                raise ValueError("node_pool requires online generation and prior_seed_by_step=False")
+            local_world = int(os.environ.get("LOCAL_WORLD_SIZE", 1))
+            available = available_cpu_cores()
+            workers = self.config.prior_pool_workers or max(1, available - local_world)
+            self.dataloader = NodePriorPool(
+                dataset.prior, workers=workers, window=self.config.prior_pool_window,
+                byte_budget=self.config.prior_pool_mb * 1024**2,
+                seed=self.config.np_seed + 100003 * int(os.environ.get("GROUP_RANK", 0)),
+                schedule=self.config.prior_schedule, micro_size=self.config.micro_batch_size,
+                cost_model={**self.model_config, "col_feature_group_size": self.config.col_feature_group_size},
+                transport=self.config.prior_pool_transport, bucket_steps=self.config.prior_bucket_steps,
+                kernel_threads=self.config.prior_pool_kernel_threads,
+                shape_seed=self.config.np_seed,
+                ready_max_delay=getattr(self.config, 'prior_ready_max_delay', 2),
+            )
+            if self.master_process:
+                print(f"Prior pipeline: node_pool workers/node={workers}, CPU quota/affinity={available}, "
+                      f"schedule={self.config.prior_schedule}, window={self.config.prior_pool_window}, "
+                      f"output budget={self.config.prior_pool_mb} MiB, "
+                      f"transport={self.config.prior_pool_transport}, bucket_steps={self.config.prior_bucket_steps}; "
+                      f"kernel_threads<={self.config.prior_pool_kernel_threads}; "
+                      "padding per micro-batch")
+            return
 
         # For on-the-fly generation, parallelize dataset creation across dataloader workers.
         # For pre-generated data loaded from disk, a single worker is enough.
@@ -505,23 +559,20 @@ class Trainer:
             self.amp_ctx = nullcontext()
 
     def _sdpa_ctx(self):
-        """Apply the configured PyTorch SDPA dispatch policy."""
-        backend = getattr(self.config, "attention_backend", None)
-        if backend == "auto":
-            return nullcontext()
+        """Apply the resolved training SDPA policy."""
+        backend = getattr(self, "attention_backend", getattr(self.config, "attention_backend", "native"))
 
         from torch.nn.attention import sdpa_kernel, SDPBackend
 
         choices = {
             "math": SDPBackend.MATH,
+            "fp32_math": SDPBackend.MATH,
             "flash": SDPBackend.FLASH_ATTENTION,
             "efficient": SDPBackend.EFFICIENT_ATTENTION,
         }
         if backend in choices:
             return sdpa_kernel(choices[backend])
-        # Compatibility for tests and callers that construct Trainer manually
-        # without parsing the current command-line configuration.
-        if backend is None and self._disable_cudnn_sdp:
+        if getattr(self, "_disable_cudnn_sdp", False):
             return sdpa_kernel([
                 SDPBackend.FLASH_ATTENTION,
                 SDPBackend.EFFICIENT_ATTENTION,
@@ -731,17 +782,38 @@ class Trainer:
             step_progress = range(self.curr_step, self.config.max_steps)
 
         self.validate_screen()
+        warmup_frontend(self)
+        if isinstance(self.dataloader, NodePriorPool):
+            self.dataloader.set_start_step(self.curr_step)
         dataloader = iter(self.dataloader)
         for step in step_progress:
             # Get the next batch
             with Timer() as prior_timer:
-                batch = next(dataloader)
+                batch = self.fetch_batch(dataloader)
             prior_time = prior_timer.elapsed
 
             # Train the model on the batch
             with Timer() as train_timer:
                 results = self.run_batch(batch)
             train_time = train_timer.elapsed
+            timing_every = getattr(self.config, "rank_timing_every", 0)
+            if timing_every > 0 and (step + 1) % timing_every == 0:
+                timing = torch.tensor([prior_time, train_time], dtype=torch.float64, device=self.config.device)
+                rows = [torch.empty_like(timing) for _ in range(self.ddp_world_size)]
+                if self.ddp:
+                    torch.distributed.all_gather(rows, timing)
+                else:
+                    rows = [timing]
+                if self.master_process:
+                    values = torch.stack(rows).cpu()
+                    for col, name in enumerate(("prior", "train")):
+                        results.update({f"rank_timing/{name}_max_s": values[:, col].max().item(),
+                                        f"rank_timing/{name}_mean_s": values[:, col].mean().item()})
+                        results.update({f"rank_timing/rank{r}_{name}_s": values[r, col].item()
+                                        for r in range(len(rows))})
+            if self.master_process and isinstance(self.dataloader, NodePriorPool) and step % 200 == 0:
+                results.update({f"prior_pool/{key}": value for key, value in self.dataloader.stats().items()
+                                if key != "worker_pids"})
 
             self.curr_step = step + 1
             if self.master_process:
@@ -778,6 +850,10 @@ class Trainer:
                 self.validate_screen()
         if self.master_process and self.curr_step > 0:
             self.save_checkpoint(f"step-{self.curr_step}.ckpt")
+
+    def fetch_batch(self, iterator):
+        """Fetch one complete local batch; also a profiling boundary."""
+        return next(iterator)
 
     def validate_screen(self):
         """Rank zero evaluates without DDP collectives; other ranks wait."""
@@ -981,9 +1057,7 @@ class Trainer:
         micro_X, micro_y = self.align_micro_batch(micro_X, micro_y, micro_d, seq_len)
 
         # Move to device
-        micro_X = micro_X.to(self.config.device, non_blocking=True)
-        micro_y = micro_y.to(self.config.device, non_blocking=True)
-        micro_d = micro_d.to(self.config.device, non_blocking=True)
+        micro_X, micro_y, micro_d = self.move_micro_batch(micro_X, micro_y, micro_d)
 
         y_train = micro_y[:, :train_size]
         y_test = micro_y[:, train_size:]
@@ -1097,6 +1171,10 @@ class Trainer:
                 if getattr(self.config, "fail_fast", False) and not torch.isfinite(grad_rms):
                     raise FloatingPointError(f"Non-finite ICL projection gradient: {name}")
         return micro_results
+
+    def move_micro_batch(self, x, y, d):
+        """Transfer a complete aligned micro-batch; also a profiling boundary."""
+        return tuple(t.to(self.config.device, non_blocking=True) for t in (x, y, d))
 
     @staticmethod
     def _gradient_statistics(parameters):
@@ -1224,13 +1302,8 @@ class Trainer:
         self.model.train()
         self.optimizer.zero_grad(set_to_none=True)
 
-        # Pad nested tensors to the same size
-        batch = [t.to_padded_tensor(padding=0.0) if t.is_nested else t for t in batch]
-
-        # Split the batch into micro-batches along the first dimension
-        num_micro_batches = math.ceil(self.config.batch_size / self.config.micro_batch_size)
-        micro_batches = [torch.split(t, self.config.micro_batch_size, dim=0) for t in batch]
-        micro_batches = list(zip(*micro_batches))
+        num_micro_batches = math.ceil(len(batch[2]) / self.config.micro_batch_size)
+        micro_batches = iter_micro_batches(batch, self.config.micro_batch_size)
 
         results = {"pinball": 0.0} if self.regression else {"ce": 0.0, "accuracy": 0.0}
         failed_batches = 0

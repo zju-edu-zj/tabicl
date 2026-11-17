@@ -1,0 +1,148 @@
+...............sss...................................................... [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 15%]
+........................................................................ [ 20%]
+........................................................................ [ 25%]
+........................................................................ [ 30%]
+........................................................................ [ 35%]
+........................................................................ [ 41%]
+..............ss.ss.s.s.sss............................................. [ 46%]
+...............................ssssssssssss............................. [ 51%]
+...................ss..ss..ss..ss.ss.ss.ss.ss........................... [ 56%]
+........................................................................ [ 61%]
+............................................................s.....s..... [ 66%]
+........................................s.....s......................... [ 71%]
+.................s.....s.............................................s.. [ 76%]
+...s.......................sssssssssssssssssssssssssssssssssssssssssssss [ 82%]
+ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss [ 87%]
+ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss [ 92%]
+sssssssssssss..ss...ss..ss..ss..ss...................................... [ 97%]
+....................................                                     [100%]
+=============================== warnings summary ===============================
+tests/test_finetune_early_stopping.py::test_early_stopping_false_with_nan_validation_classifier
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_early_stopping.py:49: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    clf_finetuned.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+
+tests/test_finetune_early_stopping.py::test_early_stopping_true_with_baseline_nan_raises
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_early_stopping.py:97: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    clf.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+
+tests/test_finetune_early_stopping.py::test_early_stopping_false_with_valid_metrics_works
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_early_stopping.py:121: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    clf.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+
+tests/test_finetune_freezing.py::test_classifier_partial_freezing[True-False-False]
+tests/test_finetune_freezing.py::test_classifier_partial_freezing[False-True-False]
+tests/test_finetune_freezing.py::test_classifier_partial_freezing[False-False-True]
+tests/test_finetune_freezing.py::test_classifier_partial_freezing[True-True-False]
+tests/test_finetune_freezing.py::test_classifier_partial_freezing[True-False-True]
+tests/test_finetune_freezing.py::test_classifier_partial_freezing[False-True-True]
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_freezing.py:41: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X, y)
+
+tests/test_finetune_freezing.py::test_regressor_partial_freezing[True-True-False]
+tests/test_finetune_freezing.py::test_regressor_partial_freezing[True-False-True]
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_freezing.py:71: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X, y)
+
+tests/test_finetune_string_input.py::TestFinetunedClassifierStringCategoricals::test_fit_predict_with_category_dtype
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_string_input.py:59: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X, y)
+
+tests/test_finetune_string_input.py::TestFinetunedClassifierStringCategoricals::test_fit_predict_with_object_dtype
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_string_input.py:75: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X, y)
+
+tests/test_finetune_string_input.py::TestFinetunedClassifierStringCategoricals::test_fit_predict_with_string_dtype
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_string_input.py:91: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X, y)
+
+tests/test_finetune_string_input.py::TestFinetunedClassifierStringCategoricals::test_explicit_validation_set_with_categoricals
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_string_input.py:107: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+
+tests/test_finetune_string_input.py::TestFinetunedClassifierStringCategoricals::test_unseen_validation_categories
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_string_input.py:127: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+
+tests/test_finetune_string_input.py::TestFinetunedRegressorStringCategoricals::test_fit_predict_with_category_dtype
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_string_input.py:145: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X, y)
+
+tests/test_finetune_string_input.py::TestFinetunedRegressorStringCategoricals::test_fit_predict_with_object_dtype
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_string_input.py:161: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X, y)
+
+tests/test_finetune_string_input.py::TestFinetunedRegressorStringCategoricals::test_explicit_validation_set_with_categoricals
+  /ossfs/workspace/tabicl-training-perf/tests/test_finetune_string_input.py:177: UserWarning: `output_dir` is not set; no checkpoints will be saved and all fine-tuning progress is lost if the run is interrupted.
+    est.fit(X_train, y_train, X_val=X_val, y_val=y_val)
+
+tests/test_hybrid_optimizer.py::test_trainer_hybrid_checkpoint_resumes_identical_next_update[nested-cpu-False]
+  /opt/conda/lib/python3.12/site-packages/torch/nested/__init__.py:250: UserWarning: The PyTorch API of nested tensors is in prototype stage and will change in the near future. We recommend specifying layout=torch.jagged when constructing a nested tensor, as this layout receives active development, has better operator coverage, and works with torch.compile. (Triggered internally at /job_3594441/source/pytorch/aten/src/ATen/NestedTensorImpl.cpp:178.)
+    return _nested.nested_tensor(
+
+tests/test_icl_screening.py::test_actual_prior_replays_across_workers_and_resume
+tests/test_icl_screening.py::test_actual_prior_replays_across_workers_and_resume
+tests/test_icl_screening.py::test_actual_prior_replays_across_workers_and_resume
+tests/test_icl_screening.py::test_actual_prior_replays_across_workers_and_resume
+tests/test_prior_pipeline.py::test_worker_padding_preserves_values_and_final_pinned_layout
+  /opt/conda/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=464015) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    self.pid = os.fork()
+
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLClassifier(device='cpu',n_estimators=2)-check_supervised_y_no_nan]
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLClassifier(device='cpu',n_estimators=2)-check_supervised_y_no_nan]
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLClassifier(device='cuda',n_estimators=2)-check_supervised_y_no_nan]
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLClassifier(device='cuda',n_estimators=2)-check_supervised_y_no_nan]
+  /tmp/tabicl-perf-venv/lib/python3.12/site-packages/sklearn/externals/array_api_compat/numpy/_aliases.py:106: RuntimeWarning: invalid value encountered in cast
+    return x.astype(dtype=dtype, copy=copy)
+
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cpu',n_estimators=2)-check_complex_data]
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cuda',n_estimators=2)-check_complex_data]
+  /ossfs/workspace/tabicl-training-perf/src/tabicl/_sklearn/regressor.py:392: ComplexWarning: Casting complex values to real discards the imaginary part
+    y = np.asarray(y, dtype=np.float32)
+
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cpu',n_estimators=2)-check_complex_data]
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cuda',n_estimators=2)-check_complex_data]
+  /ossfs/workspace/tabicl-training-perf/src/tabicl/_sklearn/preprocessing.py:117: ComplexWarning: Casting complex values to real discards the imaginary part
+    X_arr.astype(np.float64)
+
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cpu',n_estimators=2)-check_supervised_y_no_nan]
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cuda',n_estimators=2)-check_supervised_y_no_nan]machineintelligence-kmaker-011036028231 accl-lite version: v1.1.149.gd6267d6
+
+  /tmp/tabicl-perf-venv/lib/python3.12/site-packages/sklearn/utils/extmath.py:1211: RuntimeWarning: invalid value encountered in divide
+    updated_mean = (last_sum + new_sum) / updated_sample_count
+
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cpu',n_estimators=2)-check_supervised_y_no_nan]
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cuda',n_estimators=2)-check_supervised_y_no_nan]
+  /tmp/tabicl-perf-venv/lib/python3.12/site-packages/sklearn/utils/extmath.py:1216: RuntimeWarning: invalid value encountered in divide
+    T = new_sum / new_sample_count
+
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cpu',n_estimators=2)-check_supervised_y_no_nan]
+tests/test_sklearn.py::test_sklearn_compatible_estimator[TabICLRegressor(device='cuda',n_estimators=2)-check_supervised_y_no_nan]
+  /tmp/tabicl-perf-venv/lib/python3.12/site-packages/sklearn/utils/extmath.py:1240: RuntimeWarning: invalid value encountered in divide
+    new_unnormalized_variance -= correction**2 / new_sample_count
+
+tests/test_training_performance.py::test_dynamic_frontend_compile_outputs_gradients_and_checkpoint_keys[True-dtype0]
+  /opt/conda/lib/python3.12/site-packages/torch/_inductor/compile_fx.py:282: UserWarning: TensorFloat32 tensor cores for float32 matrix multiplication available but not enabled. Consider setting `torch.set_float32_matmul_precision('high')` for better performance.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_cgroup_memory_docker.py:107: docker command is not available on this host
+SKIPPED [1] tests/test_cgroup_memory_docker.py:134: docker command is not available on this host
+SKIPPED [1] tests/test_cgroup_memory_docker.py:167: docker command is not available on this host
+SKIPPED [1] tests/test_inference.py:57: xpu backend is not available on this host
+SKIPPED [1] tests/test_inference.py:57: mps backend is not available on this host
+SKIPPED [1] tests/test_inference.py:83: xpu backend is not available on this host
+SKIPPED [1] tests/test_inference.py:83: mps backend is not available on this host
+SKIPPED [1] tests/test_inference.py:113: xpu async stream setup is not supported in this runtime
+SKIPPED [1] tests/test_inference.py:158: MPS not available
+SKIPPED [1] tests/test_inference.py:202: MPS not available
+SKIPPED [1] tests/test_inference.py:235: MPS not available
+SKIPPED [1] tests/test_inference.py:272: MPS not available
+SKIPPED [120] tests/torch_devices_helpers.py:42: xpu device is not available on this host
+SKIPPED [120] tests/torch_devices_helpers.py:42: mps device is not available on this host
+SKIPPED [2] ../../../opt/conda/lib/python3.12/site-packages/_pytest/unittest.py:371: TabICLClassifier is non deterministic
+SKIPPED [4] ../../../opt/conda/lib/python3.12/site-packages/_pytest/unittest.py:371: SCIPY_ARRAY_API is not set: not checking array_api input
+SKIPPED [2] ../../../opt/conda/lib/python3.12/site-packages/_pytest/unittest.py:371: TabICLRegressor is non deterministic
+1144 passed, 260 skipped, 40 warnings in 718.88s (0:11:58)

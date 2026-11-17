@@ -7,6 +7,7 @@ from tabicl.prior.graph_lib._activation import Standardize, RandomActivation, Ku
 from tabicl.prior.graph_lib._function import CheapRandomFunction
 from tabicl.prior.graph_lib._points import RandomPoints
 from tabicl.prior.graph_lib._weights import RandomWeights
+from tabicl.prior.graph_lib._distance import nearest_center
 
 
 class Converter(RandomTransformer):
@@ -74,9 +75,10 @@ class NumericalConverter(Converter):
 
 
 class CategoricalNeighborDiscretizer(Converter):
-    def __init__(self, context: Context, n_values: int):
+    def __init__(self, context: Context, n_values: int, return_values: bool = True):
         super().__init__(context)
         self.n_values = n_values
+        self.return_values = return_values
 
     def _fit(self, x: torch.Tensor):
         # Create permutation on same device as x
@@ -87,18 +89,28 @@ class CategoricalNeighborDiscretizer(Converter):
 
     def _transform(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # All operations happen on the same device as x and centers
-        dists = torch.cdist(x, self.centers_, p=self.p_)  # this is faster than manually calculating the distance matrix
-        closest_idx = dists.argmin(dim=-1)
-        return self.centers_[closest_idx], closest_idx[:, None]
+        if self.config.graph_execution == 'optimized':
+            closest_idx = nearest_center(x, self.centers_, self.p_, vectorized=True)
+        else:
+            closest_idx = nearest_center(x, self.centers_, self.p_)
+        values = self.centers_[closest_idx] if self.return_values else None
+        return values, closest_idx[:, None]
 
 
 class CategoricalSoftmaxDiscretizer(Converter):
-    def __init__(self, context: Context, n_values: int):
+    def __init__(self, context: Context, n_values: int, return_values: bool = True):
         super().__init__(context)
         self.n_values = n_values
+        self.return_values = return_values
 
     def _fit(self, x: torch.Tensor):
-        self.embeddings_ = RandomPoints(self.context).sample(self.n_values, self.n_values)
+        # id/int consumers never read the embedding. In ordinary meta/local
+        # mode its numerical hyperparameters can be lazily sampled at their
+        # first live use. Keep global/corrected categorical caches untouched:
+        # first-use bounds/cardinalities may then be part of shared state.
+        prune = (not self.return_values and self.config.meta_sampling_mode != 'global'
+                 and not self.config.use_corrected_cat_meta_sampling)
+        self.embeddings_ = None if prune else RandomPoints(self.context).sample(self.n_values, self.n_values)
         self.standardize_ = Standardize(self.context)
         self.bias_ = torch.log(RandomWeights(self.context).sample(1, x.shape[1]) + 1e-4)
         self.factor_ = self.sampler.numerical("softmax_disc_factor", 0.1, 10, use_log=True)
@@ -107,7 +119,8 @@ class CategoricalSoftmaxDiscretizer(Converter):
         x = self.factor_ * self.standardize_(x) + self.bias_
         x[~torch.isfinite(x)] = 0.0  # this is only a quick fix, but whatever
         idxs = torch.multinomial(torch.softmax(x, dim=-1), num_samples=1, replacement=True).squeeze(-1)
-        return self.embeddings_[idxs], idxs[:, None]
+        values = self.embeddings_[idxs] if self.return_values else None
+        return values, idxs[:, None]
 
 
 class CategoricalConverter(Converter):
@@ -134,9 +147,12 @@ class CategoricalConverter(Converter):
         )
         # self.mode = "softmax_id"
         self.disc = (
-            CategoricalSoftmaxDiscretizer(self.context, n_values=self.n_values)
+            CategoricalSoftmaxDiscretizer(self.context, n_values=self.n_values,
+                return_values=self.config.graph_execution != 'optimized' or self.mode == 'softmax_disc')
             if self.mode.startswith("softmax")
-            else CategoricalNeighborDiscretizer(self.context, n_values=self.n_values)
+            else CategoricalNeighborDiscretizer(self.context, n_values=self.n_values,
+                return_values=self.config.graph_execution != 'optimized'
+                              or self.mode in ('neighbor_disc', 'neighbor_func'))
         )
         if self.mode.startswith("softmax"):
             self.n_features = n_values

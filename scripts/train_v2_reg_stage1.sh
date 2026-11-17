@@ -34,6 +34,7 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 source "$REPO_ROOT/scripts/icl_recipe.sh"
+source "$REPO_ROOT/scripts/prior_recipe.sh"
 
 NUM_GPUS=${NUM_GPUS:-4}                                   # the paper used 4 GPUs for pre-training
 CKPT_DIR=${CKPT_DIR:-/path/to/checkpoints/tabiclv2-reg/stage1}
@@ -69,7 +70,7 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --num_quantiles 999 \
             --prior_type graph_scm \
             --prior_device cpu \
-            --n_jobs 16 \
+            "${PRIOR_ARGS[@]}" \
             --batch_size_per_gp 4 \
             --min_features 1 \
             --max_features 100 \

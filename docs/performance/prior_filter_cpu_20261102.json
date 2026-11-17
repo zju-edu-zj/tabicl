@@ -1,0 +1,3681 @@
+{
+  "base_commit": "05c11f80e4e4e6ae1cd146c4a0b9e3642eaead60",
+  "experiment_directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102",
+  "environment": {
+    "python": "3.12.11",
+    "numpy": "1.26.0",
+    "sklearn": "1.7.2",
+    "torch": "2.8.0"
+  },
+  "cpu": {
+    "abba-final": {
+      "2048": {
+        "means": {
+          "reference": {
+            "wall_s": 21.971143156290054,
+            "cpu_s": 143.422150973,
+            "filter_s": 50.96590994670987,
+            "graph_s": 92.6909030303359,
+            "tables_per_s": 23.305167616806624
+          },
+          "planned": {
+            "wall_s": 20.1205668784678,
+            "cpu_s": 129.27844260850003,
+            "filter_s": 37.33226535283029,
+            "graph_s": 91.83664431795478,
+            "tables_per_s": 25.44668692164492
+          }
+        },
+        "mismatches": {
+          "a1": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "b1": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "b2": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "a2": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          }
+        },
+        "throughput_gain": 0.09197436081200405,
+        "cpu_reduction": 0.09861592695791177,
+        "summaries": {
+          "a1": {
+            "wall_s": 21.774122532457113,
+            "cpu_s": 142.227228639,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 2048,
+            "seed": 83,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "reference",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 156,
+            "filter_calls": 668,
+            "forest_fit_sizes": {
+              "25": 668
+            },
+            "graph_calls": 741,
+            "graph_s": 91.55891106650233,
+            "filter_s": 50.935388181358576,
+            "p50_s": 0.19926454313099384,
+            "p95_s": 0.7792904919013379,
+            "p99_s": 1.2628776148334144,
+            "tables_per_s": 23.514150764826393
+          },
+          "b1": {
+            "wall_s": 20.083198431879282,
+            "cpu_s": 129.29667153700004,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 2048,
+            "seed": 83,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "planned",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 156,
+            "filter_calls": 668,
+            "forest_fit_sizes": {
+              "25": 668
+            },
+            "graph_calls": 741,
+            "graph_s": 91.8588295020163,
+            "filter_s": 37.347050961107016,
+            "p50_s": 0.17251968383789062,
+            "p95_s": 0.740753245912492,
+            "p99_s": 1.2377668091282246,
+            "tables_per_s": 25.493947178616295
+          },
+          "b2": {
+            "wall_s": 20.157935325056314,
+            "cpu_s": 129.26021368,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 2048,
+            "seed": 83,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "planned",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 156,
+            "filter_calls": 668,
+            "forest_fit_sizes": {
+              "25": 668
+            },
+            "graph_calls": 741,
+            "graph_s": 91.81445913389325,
+            "filter_s": 37.317479744553566,
+            "p50_s": 0.1719176545739174,
+            "p95_s": 0.7396600333973764,
+            "p99_s": 1.2257867257669566,
+            "tables_per_s": 25.399426664673538
+          },
+          "a2": {
+            "wall_s": 22.168163780122995,
+            "cpu_s": 144.617073307,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 2048,
+            "seed": 83,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "reference",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 156,
+            "filter_calls": 668,
+            "forest_fit_sizes": {
+              "25": 668
+            },
+            "graph_calls": 741,
+            "graph_s": 93.82289499416947,
+            "filter_s": 50.99643171206117,
+            "p50_s": 0.2011056337505579,
+            "p95_s": 0.7837771153077482,
+            "p99_s": 1.4044324904680239,
+            "tables_per_s": 23.096184468786856
+          }
+        }
+      },
+      "4096": {
+        "means": {
+          "reference": {
+            "wall_s": 37.093959111720324,
+            "cpu_s": 252.910115326,
+            "filter_s": 87.1900056116283,
+            "graph_s": 165.45042593963444,
+            "tables_per_s": 13.802804058089542
+          },
+          "planned": {
+            "wall_s": 35.363004898652434,
+            "cpu_s": 237.8500921855,
+            "filter_s": 71.91060285829008,
+            "graph_s": 165.59048472344875,
+            "tables_per_s": 14.478420304831847
+          }
+        },
+        "mismatches": {
+          "a1": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "b1": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "b2": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "a2": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          }
+        },
+        "throughput_gain": 0.04894816540700275,
+        "cpu_reduction": 0.059546938725988596,
+        "summaries": {
+          "a1": {
+            "wall_s": 37.052184734493494,
+            "cpu_s": 252.71133288400003,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 4096,
+            "seed": 83,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "reference",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 141,
+            "filter_calls": 653,
+            "forest_fit_sizes": {
+              "25": 653
+            },
+            "graph_calls": 726,
+            "graph_s": 165.1904064528644,
+            "filter_s": 87.14221886917949,
+            "p50_s": 0.33033022843301296,
+            "p95_s": 1.488436115533113,
+            "p99_s": 2.163986501805484,
+            "tables_per_s": 13.818348463629377
+          },
+          "b1": {
+            "wall_s": 35.329919777810574,
+            "cpu_s": 237.44114866899997,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 4096,
+            "seed": 83,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "planned",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 141,
+            "filter_calls": 653,
+            "forest_fit_sizes": {
+              "25": 653
+            },
+            "graph_calls": 726,
+            "graph_s": 165.2449043802917,
+            "filter_s": 71.92838130891323,
+            "p50_s": 0.3019084185361862,
+            "p95_s": 1.4376903111115094,
+            "p99_s": 2.1242690416797996,
+            "tables_per_s": 14.491966107479486
+          },
+          "b2": {
+            "wall_s": 35.396090019494295,
+            "cpu_s": 238.25903570199998,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 4096,
+            "seed": 83,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "planned",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 141,
+            "filter_calls": 653,
+            "forest_fit_sizes": {
+              "25": 653
+            },
+            "graph_calls": 726,
+            "graph_s": 165.9360650666058,
+            "filter_s": 71.89282440766692,
+            "p50_s": 0.30258700996637344,
+            "p95_s": 1.435323287732899,
+            "p99_s": 2.111878472864627,
+            "tables_per_s": 14.464874502184209
+          },
+          "a2": {
+            "wall_s": 37.13573348894715,
+            "cpu_s": 253.108897768,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 4096,
+            "seed": 83,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "reference",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 141,
+            "filter_calls": 653,
+            "forest_fit_sizes": {
+              "25": 653
+            },
+            "graph_calls": 726,
+            "graph_s": 165.71044542640448,
+            "filter_s": 87.2377923540771,
+            "p50_s": 0.32939422503113747,
+            "p95_s": 1.4958424314856529,
+            "p99_s": 2.097792801186442,
+            "tables_per_s": 13.787259652549706
+          }
+        }
+      }
+    },
+    "abba-seed84": {
+      "2048": {
+        "means": {
+          "reference": {
+            "wall_s": 22.11835964769125,
+            "cpu_s": 144.87574752300003,
+            "filter_s": 53.74175534769893,
+            "graph_s": 91.30946046486497,
+            "tables_per_s": 23.148316580987533
+          },
+          "planned": {
+            "wall_s": 20.40465289540589,
+            "cpu_s": 131.71855548850004,
+            "filter_s": 40.283768529072404,
+            "graph_s": 91.28831925056875,
+            "tables_per_s": 25.092349776411
+          }
+        },
+        "mismatches": {
+          "a1": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "b1": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "b2": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "a2": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          }
+        },
+        "throughput_gain": 0.08398607714964879,
+        "cpu_reduction": 0.09081707780255766,
+        "summaries": {
+          "a1": {
+            "wall_s": 22.17000437527895,
+            "cpu_s": 144.913481463,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 2048,
+            "seed": 84,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "reference",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 144,
+            "filter_calls": 656,
+            "forest_fit_sizes": {
+              "25": 656
+            },
+            "graph_calls": 743,
+            "graph_s": 91.35069224610925,
+            "filter_s": 53.809584941715,
+            "p50_s": 0.2196103949099779,
+            "p95_s": 0.7173963671550153,
+            "p99_s": 1.0018252799659964,
+            "tables_per_s": 23.0942669804303
+          },
+          "b1": {
+            "wall_s": 20.381008081138134,
+            "cpu_s": 131.40671458900002,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 2048,
+            "seed": 84,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "planned",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 144,
+            "filter_calls": 656,
+            "forest_fit_sizes": {
+              "25": 656
+            },
+            "graph_calls": 743,
+            "graph_s": 91.052147295326,
+            "filter_s": 40.200215972959995,
+            "p50_s": 0.18898390978574753,
+            "p95_s": 0.6781725527718663,
+            "p99_s": 0.979076342023908,
+            "tables_per_s": 25.121426671423432
+          },
+          "b2": {
+            "wall_s": 20.428297709673643,
+            "cpu_s": 132.03039638800004,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 2048,
+            "seed": 84,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "planned",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 144,
+            "filter_calls": 656,
+            "forest_fit_sizes": {
+              "25": 656
+            },
+            "graph_calls": 743,
+            "graph_s": 91.5244912058115,
+            "filter_s": 40.36732108518481,
+            "p50_s": 0.19091230630874634,
+            "p95_s": 0.6817331427708267,
+            "p99_s": 0.9768695218488563,
+            "tables_per_s": 25.06327288139857
+          },
+          "a2": {
+            "wall_s": 22.06671492010355,
+            "cpu_s": 144.83801358300002,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 2048,
+            "seed": 84,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "reference",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 144,
+            "filter_calls": 656,
+            "forest_fit_sizes": {
+              "25": 656
+            },
+            "graph_calls": 743,
+            "graph_s": 91.26822868362069,
+            "filter_s": 53.67392575368285,
+            "p50_s": 0.21751924231648445,
+            "p95_s": 0.714719896018505,
+            "p99_s": 1.0341798847913735,
+            "tables_per_s": 23.202366181544768
+          }
+        }
+      },
+      "4096": {
+        "means": {
+          "reference": {
+            "wall_s": 34.35917869582772,
+            "cpu_s": 239.41809484799998,
+            "filter_s": 88.9648073874414,
+            "graph_s": 150.11657552421093,
+            "tables_per_s": 14.901431247690429
+          },
+          "planned": {
+            "wall_s": 32.48512648791075,
+            "cpu_s": 224.92788040250002,
+            "filter_s": 74.03692969307303,
+            "graph_s": 150.4550403803587,
+            "tables_per_s": 15.761067285137845
+          }
+        },
+        "mismatches": {
+          "a1": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "b1": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "b2": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          },
+          "a2": {
+            "digest": 0,
+            "filter_decisions": 0,
+            "width": 0,
+            "classes": 0,
+            "forest_fit_sizes": 0
+          }
+        },
+        "throughput_gain": 0.057689546279414916,
+        "cpu_reduction": 0.060522636999093105,
+        "summaries": {
+          "a1": {
+            "wall_s": 34.31264637038112,
+            "cpu_s": 239.209151773,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 4096,
+            "seed": 84,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "reference",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 125,
+            "filter_calls": 637,
+            "forest_fit_sizes": {
+              "25": 637
+            },
+            "graph_calls": 716,
+            "graph_s": 149.78499801456928,
+            "filter_s": 89.00394124910235,
+            "p50_s": 0.342024527490139,
+            "p95_s": 1.2309624020010228,
+            "p99_s": 1.9745631209760885,
+            "tables_per_s": 14.92161212147022
+          },
+          "b1": {
+            "wall_s": 32.46178477630019,
+            "cpu_s": 224.713226057,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 4096,
+            "seed": 84,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "planned",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 125,
+            "filter_calls": 637,
+            "forest_fit_sizes": {
+              "25": 637
+            },
+            "graph_calls": 716,
+            "graph_s": 150.2787468470633,
+            "filter_s": 74.08039373531938,
+            "p50_s": 0.31486720591783524,
+            "p95_s": 1.194887745939195,
+            "p99_s": 1.8887481188774096,
+            "tables_per_s": 15.772392169077612
+          },
+          "b2": {
+            "wall_s": 32.5084681995213,
+            "cpu_s": 225.142534748,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 4096,
+            "seed": 84,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "planned",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 125,
+            "filter_calls": 637,
+            "forest_fit_sizes": {
+              "25": 637
+            },
+            "graph_calls": 716,
+            "graph_s": 150.6313339136541,
+            "filter_s": 73.99346565082669,
+            "p50_s": 0.31337712332606316,
+            "p95_s": 1.1938441833481188,
+            "p99_s": 1.9309878370165805,
+            "tables_per_s": 15.749742401198077
+          },
+          "a2": {
+            "wall_s": 34.40571102127433,
+            "cpu_s": 239.62703792299996,
+            "tasks": 512,
+            "workers": 8,
+            "rows": 4096,
+            "seed": 84,
+            "filter_mode": "full",
+            "categorical_sampling": "marginal",
+            "graph_execution": "optimized",
+            "filter_execution": "reference",
+            "disabled": [],
+            "tree": "native",
+            "one_dimensional_mode": "legacy",
+            "native_library": "/ossfs/workspace/tabicl-training-experiments/prior-graph-cpu-recovery-20261102/tabicl_prior_exact_cpu.so",
+            "python_hash_seed": "42",
+            "rejected_by_filter": 125,
+            "filter_calls": 637,
+            "forest_fit_sizes": {
+              "25": 637
+            },
+            "graph_calls": 716,
+            "graph_s": 150.44815303385258,
+            "filter_s": 88.92567352578044,
+            "p50_s": 0.3446653261780739,
+            "p95_s": 1.2276973010972136,
+            "p99_s": 1.9574931639060364,
+            "tables_per_s": 14.881250373910639
+          }
+        }
+      }
+    }
+  },
+  "training_summary": {
+    "bfloat16_a1": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102/training/bfloat16_a1",
+      "exit_code": 0,
+      "wall_s": 158.59044589847326,
+      "configuration": {
+        "dtype": "bfloat16",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized",
+        "filter_execution": "reference"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 201,
+        "prior_pool/completed_datasets": 13299.0,
+        "prior_pool/delivered_batches": 1615.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 455835648.0,
+        "prior_pool/peak_reserved_bytes": 472154112.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 213.21691200137138,
+        "prior_pool/generation_p95_ms": 858.1535238772631,
+        "prior_pool/generation_p99_ms": 1350.8345320820824,
+        "prior_pool/encoding_mean_ms": 0.02631361894600559,
+        "prior_pool/result_transit_mean_ms": 2.571416526734538,
+        "prior_pool/worker_busy_seconds": 4018.4165986701846,
+        "prior_pool/service_fetch_wait_seconds": 111.90160964801908,
+        "prior_pool/service_uptime_seconds": 76.6760922819376,
+        "prior_pool/active_leases": 2.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 217.0,
+        "prior_pool/sampled_tasks": 13888.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.38413703441619873,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1484679806976.0,
+        "prior_pool/predicted_max_after": 1058988359680.0,
+        "prior_pool/predicted_gain": 1.401979345103126,
+        "prior_pool/ready_micro_units": 83.0,
+        "prior_pool/pending_micro_units": 240.0,
+        "prior_pool/ready_micro_steps": 202.0,
+        "prior_pool/ready_micro_max_late_steps": 2.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 14309.0,
+        "prior_pool/rpc_seconds": 16.563497878611088,
+        "prior_pool/decode_seconds": 0.011761289089918137,
+        "prior_pool/acknowledge_seconds": 0.5199329033493996
+      },
+      "steps": 240,
+      "skip": 40,
+      "steady_step_ms": 359.02661841362715,
+      "steady_elapsed_step_ms": {
+        "mean": 359.02661841362715,
+        "p95": 702.9715783894056,
+        "maximum": 2544.292241334915
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 371.18395080789924,
+        "p95": 900.2226851880549,
+        "maximum": 2547.0626428723335
+      },
+      "max_rank_prior_ms": {
+        "mean": 65.1020927913487,
+        "p95": 191.3829073309891,
+        "maximum": 2274.8795934021473
+      },
+      "rank_mean_prior_ms": {
+        "mean": 60.0149645912461,
+        "p95": 183.09991408605057,
+        "maximum": 2265.177602879703
+      },
+      "max_rank_train_ms": {
+        "mean": 314.92767268791795,
+        "p95": 337.834270298481,
+        "maximum": 1485.3367358446121
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 57.79907299205661,
+            "p95": 169.7309955954543,
+            "maximum": 2252.8557628393173
+          },
+          "train": {
+            "mean": 287.1814633719623,
+            "p95": 318.38510408997536,
+            "maximum": 869.2686818540096
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 60.52947932854295,
+            "p95": 186.24030891805825,
+            "maximum": 2274.323172867298
+          },
+          "train": {
+            "mean": 298.1326777115464,
+            "p95": 323.7843453884125,
+            "maximum": 1485.3367358446121
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 60.958333909511566,
+            "p95": 190.8162590116257,
+            "maximum": 2265.321761369705
+          },
+          "train": {
+            "mean": 297.666328381747,
+            "p95": 326.2372061610222,
+            "maximum": 889.7900320589542
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 60.53639102727175,
+            "p95": 176.33295971900142,
+            "maximum": 2274.8795934021473
+          },
+          "train": {
+            "mean": 298.1195999868214,
+            "p95": 325.7804550230503,
+            "maximum": 905.6272618472576
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 60.37531776353717,
+            "p95": 184.40444637089902,
+            "maximum": 2247.172124683857
+          },
+          "train": {
+            "mean": 298.28439369797707,
+            "p95": 327.8510060161352,
+            "maximum": 886.62239164114
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 60.35904673859477,
+            "p95": 187.00774032622496,
+            "maximum": 2269.8828540742397
+          },
+          "train": {
+            "mean": 298.2814032398164,
+            "p95": 323.6740102991462,
+            "maximum": 887.330174446106
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 59.27146188914776,
+            "p95": 183.4260802716008,
+            "maximum": 2269.5276588201523
+          },
+          "train": {
+            "mean": 299.37822733074427,
+            "p95": 324.3821354582906,
+            "maximum": 889.8039422929287
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 60.29061308130622,
+            "p95": 186.84052247554007,
+            "maximum": 2267.4578949809074
+          },
+          "train": {
+            "mean": 298.3141963556409,
+            "p95": 326.38352625071997,
+            "maximum": 916.7314544320107
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "bfloat16_b1": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102/training/bfloat16_b1",
+      "exit_code": 0,
+      "wall_s": 168.99587278813124,
+      "configuration": {
+        "dtype": "bfloat16",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized",
+        "filter_execution": "planned"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 201,
+        "prior_pool/completed_datasets": 13359.0,
+        "prior_pool/delivered_batches": 1612.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 469532672.0,
+        "prior_pool/peak_reserved_bytes": 472154112.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 226.08114033937454,
+        "prior_pool/generation_p95_ms": 971.8841211870313,
+        "prior_pool/generation_p99_ms": 1585.4006456211248,
+        "prior_pool/encoding_mean_ms": 0.02832695099641569,
+        "prior_pool/result_transit_mean_ms": 2.241261703602504,
+        "prior_pool/worker_busy_seconds": 4491.702655363828,
+        "prior_pool/service_fetch_wait_seconds": 92.53406108915806,
+        "prior_pool/service_uptime_seconds": 85.30225498974323,
+        "prior_pool/active_leases": 4.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 217.0,
+        "prior_pool/sampled_tasks": 13888.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.5643442273139954,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1484679806976.0,
+        "prior_pool/predicted_max_after": 1058988359680.0,
+        "prior_pool/predicted_gain": 1.401979345103126,
+        "prior_pool/ready_micro_units": 94.0,
+        "prior_pool/pending_micro_units": 240.0,
+        "prior_pool/ready_micro_steps": 202.0,
+        "prior_pool/ready_micro_max_late_steps": 2.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 9888.0,
+        "prior_pool/rpc_seconds": 13.439436007291079,
+        "prior_pool/decode_seconds": 0.013784803450107574,
+        "prior_pool/acknowledge_seconds": 0.31606101617217064
+      },
+      "steps": 240,
+      "skip": 40,
+      "steady_step_ms": 392.67858140170574,
+      "steady_elapsed_step_ms": {
+        "mean": 392.67858140170574,
+        "p95": 824.1331260651341,
+        "maximum": 2001.6565807163715
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 413.11472656205297,
+        "p95": 1080.7975850999353,
+        "maximum": 2002.69715487957
+      },
+      "max_rank_prior_ms": {
+        "mean": 47.51119427382946,
+        "p95": 49.79072213172895,
+        "maximum": 1479.3470166623592
+      },
+      "rank_mean_prior_ms": {
+        "mean": 42.58493938948959,
+        "p95": 40.547091863117934,
+        "maximum": 1471.6002009809017
+      },
+      "max_rank_train_ms": {
+        "mean": 372.67504965886474,
+        "p95": 390.04551731050014,
+        "maximum": 1984.444249421358
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 39.892124850302935,
+            "p95": 36.909845098853026,
+            "maximum": 1461.7865532636642
+          },
+          "train": {
+            "mean": 327.57051192224026,
+            "p95": 366.84999894350767,
+            "maximum": 967.8644239902496
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 43.360994439572096,
+            "p95": 48.63233771175145,
+            "maximum": 1479.3470166623592
+          },
+          "train": {
+            "mean": 348.92182134091854,
+            "p95": 372.3255299031734,
+            "maximum": 1777.9513411223888
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 41.38117168098688,
+            "p95": 43.29279270023088,
+            "maximum": 1477.9814034700394
+          },
+          "train": {
+            "mean": 351.00964149460196,
+            "p95": 377.63341721147293,
+            "maximum": 1498.4517395496368
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 43.43237152323127,
+            "p95": 46.23346198350182,
+            "maximum": 1478.091511875391
+          },
+          "train": {
+            "mean": 348.82788993418217,
+            "p95": 377.18588523566723,
+            "maximum": 1301.1291734874249
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 44.69921676442027,
+            "p95": 46.03147599846107,
+            "maximum": 1470.602136105299
+          },
+          "train": {
+            "mean": 347.5925047136843,
+            "p95": 374.1154763847589,
+            "maximum": 1301.598809659481
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 42.03616604208946,
+            "p95": 43.02358087152243,
+            "maximum": 1463.3589014410973
+          },
+          "train": {
+            "mean": 350.19632333889604,
+            "p95": 373.1581810861826,
+            "maximum": 1984.444249421358
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 42.948236633092165,
+            "p95": 42.503899894654445,
+            "maximum": 1474.5602495968342
+          },
+          "train": {
+            "mean": 349.4097364321351,
+            "p95": 377.01318077743053,
+            "maximum": 1299.4577698409557
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 42.92923318222165,
+            "p95": 44.88677177578203,
+            "maximum": 1467.0738354325294
+          },
+          "train": {
+            "mean": 349.27260594442487,
+            "p95": 373.57083186507225,
+            "maximum": 1305.5317513644695
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "bfloat16_b2": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102/training/bfloat16_b2",
+      "exit_code": 0,
+      "wall_s": 167.23027015849948,
+      "configuration": {
+        "dtype": "bfloat16",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized",
+        "filter_execution": "planned"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 201,
+        "prior_pool/completed_datasets": 13328.0,
+        "prior_pool/delivered_batches": 1615.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 469532672.0,
+        "prior_pool/peak_reserved_bytes": 472154112.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 223.26375544071198,
+        "prior_pool/generation_p95_ms": 958.2388298586011,
+        "prior_pool/generation_p99_ms": 1659.286019019784,
+        "prior_pool/encoding_mean_ms": 0.028286150154599454,
+        "prior_pool/result_transit_mean_ms": 2.014691403019242,
+        "prior_pool/worker_busy_seconds": 4489.5401617996395,
+        "prior_pool/service_fetch_wait_seconds": 105.83706559985876,
+        "prior_pool/service_uptime_seconds": 85.20131893083453,
+        "prior_pool/active_leases": 7.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 217.0,
+        "prior_pool/sampled_tasks": 13888.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.3619752824306488,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1484679806976.0,
+        "prior_pool/predicted_max_after": 1058988359680.0,
+        "prior_pool/predicted_gain": 1.401979345103126,
+        "prior_pool/ready_micro_units": 88.0,
+        "prior_pool/pending_micro_units": 240.0,
+        "prior_pool/ready_micro_steps": 202.0,
+        "prior_pool/ready_micro_max_late_steps": 2.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 11735.0,
+        "prior_pool/rpc_seconds": 15.116374921053648,
+        "prior_pool/decode_seconds": 0.014551926404237747,
+        "prior_pool/acknowledge_seconds": 0.2567914314568043
+      },
+      "steps": 240,
+      "skip": 40,
+      "steady_step_ms": 386.18883280083537,
+      "steady_elapsed_step_ms": {
+        "mean": 386.18883280083537,
+        "p95": 625.431427359581,
+        "maximum": 2620.013263076544
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 399.9426266737282,
+        "p95": 666.3706954568602,
+        "maximum": 2625.1294538378716
+      },
+      "max_rank_prior_ms": {
+        "mean": 52.56691999733448,
+        "p95": 212.68632281571539,
+        "maximum": 2358.158629387617
+      },
+      "rank_mean_prior_ms": {
+        "mean": 47.90979926008731,
+        "p95": 202.78800965752356,
+        "maximum": 2354.8711058683693
+      },
+      "max_rank_train_ms": {
+        "mean": 354.37568018212914,
+        "p95": 377.7060773223638,
+        "maximum": 1969.2076705396175
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 45.49059323966503,
+            "p95": 196.68569490313436,
+            "maximum": 2351.392462849617
+          },
+          "train": {
+            "mean": 323.3348558470607,
+            "p95": 360.114674270153,
+            "maximum": 1056.0482181608677
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 47.229762487113476,
+            "p95": 202.85601355135347,
+            "maximum": 2352.862022817135
+          },
+          "train": {
+            "mean": 338.5032532736659,
+            "p95": 365.2770455926657,
+            "maximum": 1924.7360713779926
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 47.3596933670342,
+            "p95": 207.31219779699953,
+            "maximum": 2354.2084880173206
+          },
+          "train": {
+            "mean": 338.3930482901633,
+            "p95": 368.9034892246127,
+            "maximum": 1969.2076705396175
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 47.936531379818916,
+            "p95": 202.0545277744522,
+            "maximum": 2354.6635657548904
+          },
+          "train": {
+            "mean": 337.8145136125386,
+            "p95": 367.0114316046238,
+            "maximum": 1833.6253054440022
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 48.13433790579438,
+            "p95": 212.66587041318328,
+            "maximum": 2358.1009693443775
+          },
+          "train": {
+            "mean": 337.7851751446724,
+            "p95": 373.1082050129771,
+            "maximum": 1171.9824634492397
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 50.02424223348498,
+            "p95": 206.00747372955,
+            "maximum": 2358.158629387617
+          },
+          "train": {
+            "mean": 335.7817626558244,
+            "p95": 363.80778346210707,
+            "maximum": 1866.5363229811192
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 49.47029599919915,
+            "p95": 192.10729021578905,
+            "maximum": 2354.84441742301
+          },
+          "train": {
+            "mean": 336.33913341909647,
+            "p95": 364.87543880939484,
+            "maximum": 1171.6989390552044
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 47.63293746858835,
+            "p95": 202.46203131973638,
+            "maximum": 2354.7382913529873
+          },
+          "train": {
+            "mean": 338.2909670472145,
+            "p95": 375.34670475870365,
+            "maximum": 1172.488335520029
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "bfloat16_a2": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102/training/bfloat16_a2",
+      "exit_code": 0,
+      "wall_s": 172.83353013172746,
+      "configuration": {
+        "dtype": "bfloat16",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized",
+        "filter_execution": "reference"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 201,
+        "prior_pool/completed_datasets": 13143.0,
+        "prior_pool/delivered_batches": 1615.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 463536128.0,
+        "prior_pool/peak_reserved_bytes": 472154112.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 245.26777490973473,
+        "prior_pool/generation_p95_ms": 997.6115534082055,
+        "prior_pool/generation_p99_ms": 1641.7537461966283,
+        "prior_pool/encoding_mean_ms": 0.029065109629300423,
+        "prior_pool/result_transit_mean_ms": 1.9978522213932592,
+        "prior_pool/worker_busy_seconds": 4771.4046909846365,
+        "prior_pool/service_fetch_wait_seconds": 154.86296550557017,
+        "prior_pool/service_uptime_seconds": 90.18283792585135,
+        "prior_pool/active_leases": 5.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 217.0,
+        "prior_pool/sampled_tasks": 13888.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.361759215593338,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1484679806976.0,
+        "prior_pool/predicted_max_after": 1058988359680.0,
+        "prior_pool/predicted_gain": 1.401979345103126,
+        "prior_pool/ready_micro_units": 40.0,
+        "prior_pool/pending_micro_units": 240.0,
+        "prior_pool/ready_micro_steps": 202.0,
+        "prior_pool/ready_micro_max_late_steps": 2.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 18118.0,
+        "prior_pool/rpc_seconds": 21.259419206529856,
+        "prior_pool/decode_seconds": 0.014190729707479477,
+        "prior_pool/acknowledge_seconds": 0.27240991592407227
+      },
+      "steps": 240,
+      "skip": 40,
+      "steady_step_ms": 407.4597819522023,
+      "steady_elapsed_step_ms": {
+        "mean": 407.4597819522023,
+        "p95": 1054.3904649093747,
+        "maximum": 2958.1543765962124
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 428.52748638018966,
+        "p95": 1111.720764450729,
+        "maximum": 2959.826059639454
+      },
+      "max_rank_prior_ms": {
+        "mean": 84.39179869368672,
+        "p95": 378.75621449202225,
+        "maximum": 2685.779932886362
+      },
+      "rank_mean_prior_ms": {
+        "mean": 79.86987942364067,
+        "p95": 370.2661862364032,
+        "maximum": 2679.684847127646
+      },
+      "max_rank_train_ms": {
+        "mean": 350.3445425070822,
+        "p95": 388.6312372982495,
+        "maximum": 1795.5984696745872
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 75.29027489945292,
+            "p95": 356.5015673637382,
+            "maximum": 2683.2203939557076
+          },
+          "train": {
+            "mean": 307.94239008799195,
+            "p95": 352.48279180377716,
+            "maximum": 1012.6662254333496
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 80.85732573643327,
+            "p95": 377.32562590390387,
+            "maximum": 2685.779932886362
+          },
+          "train": {
+            "mean": 326.3217933103442,
+            "p95": 371.1155410856008,
+            "maximum": 1138.7326307594776
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 80.7440908625722,
+            "p95": 373.38996455073294,
+            "maximum": 2677.9063269495964
+          },
+          "train": {
+            "mean": 326.32791467010975,
+            "p95": 363.4352466091512,
+            "maximum": 1138.9263831079006
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 81.65150001645088,
+            "p95": 378.65701243281296,
+            "maximum": 2678.10807749629
+          },
+          "train": {
+            "mean": 325.5138718523085,
+            "p95": 363.70683144778013,
+            "maximum": 1138.4920850396156
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 81.62561606615782,
+            "p95": 375.49150567501704,
+            "maximum": 2685.1511001586914
+          },
+          "train": {
+            "mean": 325.5547367967665,
+            "p95": 367.04819463193417,
+            "maximum": 1130.0813890993595
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 79.24661045894027,
+            "p95": 375.38216840475746,
+            "maximum": 2677.559945732355
+          },
+          "train": {
+            "mean": 327.96276023611426,
+            "p95": 368.72855164110655,
+            "maximum": 1137.7508603036404
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 79.20184599235654,
+            "p95": 377.68873590975926,
+            "maximum": 2676.6841635107994
+          },
+          "train": {
+            "mean": 327.80717024579644,
+            "p95": 370.01996021717787,
+            "maximum": 1148.4658159315586
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 80.34177135676146,
+            "p95": 376.8430616706605,
+            "maximum": 2673.0688363313675
+          },
+          "train": {
+            "mean": 326.71041939407587,
+            "p95": 365.64179901033634,
+            "maximum": 1795.5984696745872
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "float32_a1": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102/training/float32_a1",
+      "exit_code": 0,
+      "wall_s": 192.38764568045735,
+      "configuration": {
+        "dtype": "float32",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized",
+        "filter_execution": "reference"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 201,
+        "prior_pool/completed_datasets": 13858.0,
+        "prior_pool/delivered_batches": 1615.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 461078528.0,
+        "prior_pool/peak_reserved_bytes": 472154112.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 216.7683932930231,
+        "prior_pool/generation_p95_ms": 847.4206030368805,
+        "prior_pool/generation_p99_ms": 1329.8478025943045,
+        "prior_pool/encoding_mean_ms": 0.025373019525432028,
+        "prior_pool/result_transit_mean_ms": 1.2103672925150022,
+        "prior_pool/worker_busy_seconds": 4187.166848491877,
+        "prior_pool/service_fetch_wait_seconds": 36.211173959076405,
+        "prior_pool/service_uptime_seconds": 102.61697063222528,
+        "prior_pool/active_leases": 4.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 217.0,
+        "prior_pool/sampled_tasks": 13888.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.3585033118724823,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1484679806976.0,
+        "prior_pool/predicted_max_after": 1058988359680.0,
+        "prior_pool/predicted_gain": 1.401979345103126,
+        "prior_pool/ready_micro_units": 222.0,
+        "prior_pool/pending_micro_units": 240.0,
+        "prior_pool/ready_micro_steps": 202.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 7.623919311910868,
+        "prior_pool/decode_seconds": 0.009144511073827744,
+        "prior_pool/acknowledge_seconds": 0.38105426356196404
+      },
+      "steps": 240,
+      "skip": 40,
+      "steady_step_ms": 481.0302621126175,
+      "steady_elapsed_step_ms": {
+        "mean": 481.0302621126175,
+        "p95": 565.1523023843765,
+        "maximum": 605.3457222878933
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 482.5451006554067,
+        "p95": 564.9126326665282,
+        "maximum": 612.5536076724529
+      },
+      "max_rank_prior_ms": {
+        "mean": 19.170121978968382,
+        "p95": 29.00777254253626,
+        "maximum": 46.61112278699875
+      },
+      "rank_mean_prior_ms": {
+        "mean": 16.03684744099155,
+        "p95": 23.96850720979273,
+        "maximum": 43.40161709114909
+      },
+      "max_rank_train_ms": {
+        "mean": 469.5208039134741,
+        "p95": 545.977428369224,
+        "maximum": 602.6763953268528
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 15.14140922576189,
+            "p95": 23.8340677693486,
+            "maximum": 42.45401918888092
+          },
+          "train": {
+            "mean": 463.382115829736,
+            "p95": 539.1539080068469,
+            "maximum": 591.4587341248989
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 16.31700163707137,
+            "p95": 26.613643579185005,
+            "maximum": 43.23691129684448
+          },
+          "train": {
+            "mean": 464.402824845165,
+            "p95": 542.1531442552804,
+            "maximum": 589.2659164965153
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 16.10278595238924,
+            "p95": 24.763968028128147,
+            "maximum": 39.55309838056564
+          },
+          "train": {
+            "mean": 464.61233261972666,
+            "p95": 540.6382082030176,
+            "maximum": 602.6763953268528
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 15.963060073554516,
+            "p95": 23.775108344852924,
+            "maximum": 44.46930065751076
+          },
+          "train": {
+            "mean": 464.7516034916043,
+            "p95": 541.2610504776239,
+            "maximum": 592.7841141819954
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 16.254554465413094,
+            "p95": 24.047440849244584,
+            "maximum": 46.61112278699875
+          },
+          "train": {
+            "mean": 464.4675493426621,
+            "p95": 543.6667643487453,
+            "maximum": 593.36207062006
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 15.658214408904314,
+            "p95": 24.997200816869704,
+            "maximum": 45.13770714402199
+          },
+          "train": {
+            "mean": 465.0608602166176,
+            "p95": 539.8365721106528,
+            "maximum": 590.4808081686497
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 16.642161831259727,
+            "p95": 26.327136717736693,
+            "maximum": 46.393077820539474
+          },
+          "train": {
+            "mean": 464.0348937548697,
+            "p95": 539.004916511476,
+            "maximum": 592.4389809370041
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 16.215591933578253,
+            "p95": 24.2152852937579,
+            "maximum": 44.521842151880264
+          },
+          "train": {
+            "mean": 464.511324390769,
+            "p95": 542.6746672019362,
+            "maximum": 590.8643789589405
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "float32_b1": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102/training/float32_b1",
+      "exit_code": 0,
+      "wall_s": 191.9601190648973,
+      "configuration": {
+        "dtype": "float32",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized",
+        "filter_execution": "planned"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 201,
+        "prior_pool/completed_datasets": 13856.0,
+        "prior_pool/delivered_batches": 1612.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 469532672.0,
+        "prior_pool/peak_reserved_bytes": 472154112.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 191.60754419863224,
+        "prior_pool/generation_p95_ms": 808.0155393108726,
+        "prior_pool/generation_p99_ms": 1302.1838668733849,
+        "prior_pool/encoding_mean_ms": 0.024254962227132637,
+        "prior_pool/result_transit_mean_ms": 1.3108062585160951,
+        "prior_pool/worker_busy_seconds": 3809.0594869330525,
+        "prior_pool/service_fetch_wait_seconds": 35.46393185853958,
+        "prior_pool/service_uptime_seconds": 102.92537232115865,
+        "prior_pool/active_leases": 4.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 217.0,
+        "prior_pool/sampled_tasks": 13888.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.38922205567359924,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1484679806976.0,
+        "prior_pool/predicted_max_after": 1058988359680.0,
+        "prior_pool/predicted_gain": 1.401979345103126,
+        "prior_pool/ready_micro_units": 222.0,
+        "prior_pool/pending_micro_units": 240.0,
+        "prior_pool/ready_micro_steps": 202.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 7.7646717093884945,
+        "prior_pool/decode_seconds": 0.009716980159282684,
+        "prior_pool/acknowledge_seconds": 0.4875076003372669
+      },
+      "steps": 240,
+      "skip": 40,
+      "steady_step_ms": 482.88205394521356,
+      "steady_elapsed_step_ms": {
+        "mean": 482.88205394521356,
+        "p95": 563.1920237094164,
+        "maximum": 611.3390773534775
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 484.29284542798996,
+        "p95": 563.6456843465567,
+        "maximum": 612.835843116045
+      },
+      "max_rank_prior_ms": {
+        "mean": 21.639203391969204,
+        "p95": 30.873973667621602,
+        "maximum": 120.977483689785
+      },
+      "rank_mean_prior_ms": {
+        "mean": 18.16704490687698,
+        "p95": 26.101598492823538,
+        "maximum": 115.72438199073076
+      },
+      "max_rank_train_ms": {
+        "mean": 469.59402222186327,
+        "p95": 547.2706222906709,
+        "maximum": 600.7414683699608
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 16.383349876850843,
+            "p95": 27.480582147836685,
+            "maximum": 117.95953288674355
+          },
+          "train": {
+            "mean": 463.75179316848516,
+            "p95": 543.1127613410354,
+            "maximum": 591.1438427865505
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 17.7517581731081,
+            "p95": 28.111712075769894,
+            "maximum": 120.22367119789124
+          },
+          "train": {
+            "mean": 464.79759380221367,
+            "p95": 545.3602446243167,
+            "maximum": 591.6111618280411
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 18.801683075726032,
+            "p95": 27.297313138842572,
+            "maximum": 119.905486702919
+          },
+          "train": {
+            "mean": 463.76637978479266,
+            "p95": 542.2319322824478,
+            "maximum": 594.4365486502647
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 19.239643830806017,
+            "p95": 29.041746258735657,
+            "maximum": 120.977483689785
+          },
+          "train": {
+            "mean": 463.3211902156472,
+            "p95": 542.2944890335202,
+            "maximum": 592.8428992629051
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 17.83268939703703,
+            "p95": 28.72920408844947,
+            "maximum": 102.8667502105236
+          },
+          "train": {
+            "mean": 464.7332273982465,
+            "p95": 544.5241298526525,
+            "maximum": 600.7414683699608
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 18.205608315765858,
+            "p95": 29.266393557190895,
+            "maximum": 111.96500435471535
+          },
+          "train": {
+            "mean": 464.3578615039587,
+            "p95": 540.8017003908753,
+            "maximum": 592.2921746969223
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 18.276895228773355,
+            "p95": 27.919371612369975,
+            "maximum": 118.62295493483543
+          },
+          "train": {
+            "mean": 464.2836612276733,
+            "p95": 543.2029059156775,
+            "maximum": 589.2876051366329
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 18.844731356948614,
+            "p95": 29.021793045103546,
+            "maximum": 113.27417194843292
+          },
+          "train": {
+            "mean": 463.72880605980754,
+            "p95": 542.6657600328326,
+            "maximum": 591.0791642963886
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "float32_b2": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102/training/float32_b2",
+      "exit_code": 0,
+      "wall_s": 193.47496031597257,
+      "configuration": {
+        "dtype": "float32",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized",
+        "filter_execution": "planned"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 201,
+        "prior_pool/completed_datasets": 13859.0,
+        "prior_pool/delivered_batches": 1614.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 469532672.0,
+        "prior_pool/peak_reserved_bytes": 472154112.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 194.50649060308933,
+        "prior_pool/generation_p95_ms": 819.3545378744602,
+        "prior_pool/generation_p99_ms": 1266.4094822481284,
+        "prior_pool/encoding_mean_ms": 0.024266858417831827,
+        "prior_pool/result_transit_mean_ms": 1.2130990908190142,
+        "prior_pool/worker_busy_seconds": 3840.7202216126025,
+        "prior_pool/service_fetch_wait_seconds": 35.38449565693736,
+        "prior_pool/service_uptime_seconds": 103.05913200601935,
+        "prior_pool/active_leases": 6.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 217.0,
+        "prior_pool/sampled_tasks": 13888.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.3577284514904022,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1484679806976.0,
+        "prior_pool/predicted_max_after": 1058988359680.0,
+        "prior_pool/predicted_gain": 1.401979345103126,
+        "prior_pool/ready_micro_units": 222.0,
+        "prior_pool/pending_micro_units": 240.0,
+        "prior_pool/ready_micro_steps": 202.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 7.726783037185669,
+        "prior_pool/decode_seconds": 0.010020807385444641,
+        "prior_pool/acknowledge_seconds": 0.4629416652023792
+      },
+      "steps": 240,
+      "skip": 40,
+      "steady_step_ms": 484.1305665485561,
+      "steady_elapsed_step_ms": {
+        "mean": 484.1305665485561,
+        "p95": 565.7266603782772,
+        "maximum": 628.8520991802216
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 485.68352073431015,
+        "p95": 566.9919101521372,
+        "maximum": 631.1002895236015
+      },
+      "max_rank_prior_ms": {
+        "mean": 21.29747875034809,
+        "p95": 33.09734780341386,
+        "maximum": 60.57435646653175
+      },
+      "rank_mean_prior_ms": {
+        "mean": 17.77705644024536,
+        "p95": 27.631065342575287,
+        "maximum": 51.68010387569666
+      },
+      "max_rank_train_ms": {
+        "mean": 471.70811178162694,
+        "p95": 552.6783952489494,
+        "maximum": 608.0426536500454
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 17.034498751163483,
+            "p95": 26.446118764579296,
+            "maximum": 55.97696825861931
+          },
+          "train": {
+            "mean": 464.26293225958943,
+            "p95": 545.3947065398097,
+            "maximum": 599.7572466731071
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 16.83953197672963,
+            "p95": 29.724021069705472,
+            "maximum": 48.40397462248802
+          },
+          "train": {
+            "mean": 466.98550168424845,
+            "p95": 551.5760006383061,
+            "maximum": 598.6201390624046
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 18.60781379044056,
+            "p95": 30.144027993082997,
+            "maximum": 60.3971928358078
+          },
+          "train": {
+            "mean": 465.1934467256069,
+            "p95": 548.6525319516659,
+            "maximum": 598.7614430487156
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 17.84059628844261,
+            "p95": 30.548065714538097,
+            "maximum": 46.49704694747925
+          },
+          "train": {
+            "mean": 465.94859736040235,
+            "p95": 547.2169438377023,
+            "maximum": 608.0426536500454
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 18.238641563802958,
+            "p95": 30.560782924294458,
+            "maximum": 60.27526408433914
+          },
+          "train": {
+            "mean": 465.5586692877114,
+            "p95": 545.0321987271308,
+            "maximum": 596.5678505599499
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 17.53806944936514,
+            "p95": 28.90608739107847,
+            "maximum": 60.57435646653175
+          },
+          "train": {
+            "mean": 466.28405410796404,
+            "p95": 547.519095055759,
+            "maximum": 598.012663424015
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 17.588210124522448,
+            "p95": 29.585066996514794,
+            "maximum": 48.80398139357567
+          },
+          "train": {
+            "mean": 466.23973634094,
+            "p95": 547.0873478800058,
+            "maximum": 598.6012630164623
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 18.529089577496052,
+            "p95": 31.263460591435432,
+            "maximum": 60.394059866666794
+          },
+          "train": {
+            "mean": 465.2568868175149,
+            "p95": 547.2845368087292,
+            "maximum": 594.3627059459686
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    },
+    "float32_a2": {
+      "directory": "/ossfs/workspace/tabicl-training-experiments/prior-filter-cpu-20261102/training/float32_a2",
+      "exit_code": 0,
+      "wall_s": 197.16312731429935,
+      "configuration": {
+        "dtype": "float32",
+        "batch_size": "64",
+        "micro_batch_size": "4",
+        "prior_backend": "node_pool",
+        "prior_schedule": "ready_micro",
+        "prior_ready_max_delay": "2",
+        "prior_pool_workers": "56",
+        "prior_pool_window": "128",
+        "prior_pool_mb": "2048",
+        "n_jobs": "8",
+        "categorical_sampling": "marginal",
+        "dataset_filter_mode": "full",
+        "compile_frontend": "all",
+        "compile_warmup": "True",
+        "rank_timing_every": "1",
+        "graph_execution": "optimized",
+        "filter_execution": "reference"
+      },
+      "latest_pool_diagnostics": {
+        "logged_step": 201,
+        "prior_pool/completed_datasets": 13855.0,
+        "prior_pool/delivered_batches": 1615.0,
+        "prior_pool/buffered_batches": 16.0,
+        "prior_pool/ready_batches": 1.0,
+        "prior_pool/buffered_local_batches": 128.0,
+        "prior_pool/reserved_bytes": 466780160.0,
+        "prior_pool/peak_reserved_bytes": 472154112.0,
+        "prior_pool/admission_batches": 0.0,
+        "prior_pool/admission_bypasses": 0.0,
+        "prior_pool/admission_blocked": 0.0,
+        "prior_pool/generation_p50_ms": 247.5134078413248,
+        "prior_pool/generation_p95_ms": 955.3474010899663,
+        "prior_pool/generation_p99_ms": 1578.1723232939855,
+        "prior_pool/encoding_mean_ms": 0.02849635166057851,
+        "prior_pool/result_transit_mean_ms": 1.3454421723508858,
+        "prior_pool/worker_busy_seconds": 4922.572789274156,
+        "prior_pool/service_fetch_wait_seconds": 37.727089531719685,
+        "prior_pool/service_uptime_seconds": 106.23765384405851,
+        "prior_pool/active_leases": 6.0,
+        "prior_pool/cpu_slots": 61.0,
+        "prior_pool/parallel_distance_calls": 0.0,
+        "prior_pool/parallel_distance_max_threads": 1.0,
+        "prior_pool/parallel_distance_extra_thread_seconds": 0.0,
+        "prior_pool/planned_windows": 217.0,
+        "prior_pool/sampled_tasks": 13888.0,
+        "prior_pool/metadata_tasks": 64.0,
+        "prior_pool/window_steps": 1.0,
+        "prior_pool/window_planning_ms": 0.36188215017318726,
+        "prior_pool/assignment_uses_requested_features": 0.0,
+        "prior_pool/predicted_max_before": 1484679806976.0,
+        "prior_pool/predicted_max_after": 1058988359680.0,
+        "prior_pool/predicted_gain": 1.401979345103126,
+        "prior_pool/ready_micro_units": 222.0,
+        "prior_pool/pending_micro_units": 240.0,
+        "prior_pool/ready_micro_steps": 202.0,
+        "prior_pool/ready_micro_max_late_steps": 1.0,
+        "prior_pool/ready_micro_max_early_steps": 1.0,
+        "prior_pool/ready_micro_fairness_wait_checks": 0.0,
+        "prior_pool/rpc_seconds": 7.312722515314817,
+        "prior_pool/decode_seconds": 0.010854475200176239,
+        "prior_pool/acknowledge_seconds": 0.24047382175922394
+      },
+      "steps": 240,
+      "skip": 40,
+      "steady_step_ms": 490.75719952583313,
+      "steady_elapsed_step_ms": {
+        "mean": 490.75719952583313,
+        "p95": 563.2334981113672,
+        "maximum": 612.6914583146572
+      },
+      "aligned_max_rank_step_ms": {
+        "mean": 493.64502158015966,
+        "p95": 566.8501008301973,
+        "maximum": 614.2821684479713
+      },
+      "max_rank_prior_ms": {
+        "mean": 19.104323890060186,
+        "p95": 30.66697046160697,
+        "maximum": 53.640857338905334
+      },
+      "rank_mean_prior_ms": {
+        "mean": 15.49321403959766,
+        "p95": 25.425972277298563,
+        "maximum": 44.513171538710594
+      },
+      "max_rank_train_ms": {
+        "mean": 480.37631817162037,
+        "p95": 547.5681254640222,
+        "maximum": 598.9828296005726
+      },
+      "per_rank": {
+        "0": {
+          "prior": {
+            "mean": 13.390821106731892,
+            "p95": 23.97320345044136,
+            "maximum": 39.908796548843384
+          },
+          "train": {
+            "mean": 473.5788983106613,
+            "p95": 542.6690381020306,
+            "maximum": 591.1479480564594
+          }
+        },
+        "1": {
+          "prior": {
+            "mean": 15.217452682554722,
+            "p95": 27.26679425686598,
+            "maximum": 37.2743122279644
+          },
+          "train": {
+            "mean": 475.28013333678246,
+            "p95": 542.9758924990892,
+            "maximum": 591.0406112670898
+          }
+        },
+        "2": {
+          "prior": {
+            "mean": 15.846078414469957,
+            "p95": 29.381657578051076,
+            "maximum": 45.88840529322624
+          },
+          "train": {
+            "mean": 474.5349842123687,
+            "p95": 541.2718463689088,
+            "maximum": 591.1083556711674
+          }
+        },
+        "3": {
+          "prior": {
+            "mean": 15.403526946902275,
+            "p95": 26.37280691415071,
+            "maximum": 48.013921827077866
+          },
+          "train": {
+            "mean": 475.0909715332091,
+            "p95": 545.1959755271673,
+            "maximum": 597.3402447998524
+          }
+        },
+        "4": {
+          "prior": {
+            "mean": 15.442331358790398,
+            "p95": 26.23192835599182,
+            "maximum": 46.10497131943703
+          },
+          "train": {
+            "mean": 475.05429942160845,
+            "p95": 543.2309495285152,
+            "maximum": 598.9828296005726
+          }
+        },
+        "5": {
+          "prior": {
+            "mean": 16.10459703952074,
+            "p95": 28.316711634397496,
+            "maximum": 45.988600701093674
+          },
+          "train": {
+            "mean": 474.31453542783856,
+            "p95": 541.7632697150111,
+            "maximum": 593.3178663253784
+          }
+        },
+        "6": {
+          "prior": {
+            "mean": 16.468515042215586,
+            "p95": 29.534116573631763,
+            "maximum": 53.640857338905334
+          },
+          "train": {
+            "mean": 473.9126939699054,
+            "p95": 541.9759009033442,
+            "maximum": 593.1443683803082
+          }
+        },
+        "7": {
+          "prior": {
+            "mean": 16.072389725595713,
+            "p95": 28.171015717089162,
+            "maximum": 42.63110086321831
+          },
+          "train": {
+            "mean": 474.3847035802901,
+            "p95": 545.0969465076923,
+            "maximum": 592.6821380853653
+          }
+        }
+      },
+      "oom": 0.0,
+      "nonfinite": 0
+    }
+  },
+  "training_comparisons": {
+    "bfloat16": {
+      "reference_ms": 383.24320018291473,
+      "planned_ms": 389.43370710127056,
+      "throughput_gain": -0.015896176436381304,
+      "caveat": "Short steady windows include scheduling/shape variation; shared compile caches make launch wall unsuitable for performance comparisons."
+    },
+    "float32": {
+      "reference_ms": 485.8937308192253,
+      "planned_ms": 483.5063102468848,
+      "throughput_gain": 0.004937723710620068,
+      "caveat": "Short steady windows include scheduling/shape variation; shared compile caches make launch wall unsuitable for performance comparisons."
+    }
+  },
+  "validation": {
+    "regression.log": [
+      "tests/test_prior_filter_cascade.py::test_unvalidated_modes_use_complete_filter[trees]",
+      "  /opt/conda/lib/python3.12/site-packages/sklearn/ensemble/_forest.py:611: UserWarning: Some inputs do not have OOB scores. This probably means too few trees were used to compute any reliable OOB estimates.",
+      "    warn(",
+      "",
+      "tests/test_prior_filter_forest.py::test_filter_decisions_equal[False-2]",
+      "  /tmp/tabicl-filter-cpu-20261102/tests/test_prior_filter_forest.py:87: UserWarning: torch.searchsorted(): input value tensor is non-contiguous, this will lower the performance due to extra data copy when converting non-contiguous tensor to contiguous, please use contiguous input value tensor if possible. This message will only appear once per program. (Triggered internally at /job_3594441/source/pytorch/aten/src/ATen/native/BucketizationUtils.h:32.)",
+      "    y = torch.bucketize(y, torch.linspace(-1.5, 1.5, classes-1))",
+      "",
+      "tests/test_prior_pipeline.py::test_worker_padding_preserves_values_and_final_pinned_layout",
+      "  /opt/conda/lib/python3.12/site-packages/torch/nested/__init__.py:250: UserWarning: The PyTorch API of nested tensors is in prototype stage and will change in the near future. We recommend specifying layout=torch.jagged when constructing a nested tensor, as this layout receives active development, has better operator coverage, and works with torch.compile. (Triggered internally at /job_3594441/source/pytorch/aten/src/ATen/NestedTensorImpl.cpp:178.)",
+      "    return _nested.nested_tensor(",
+      "",
+      "tests/test_prior_pipeline.py::test_worker_padding_preserves_values_and_final_pinned_layout",
+      "  /opt/conda/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=71836) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+      "    self.pid = os.fork()",
+      "",
+      "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+      "677 passed, 6 warnings in 258.04s (0:04:18)"
+    ],
+    "training-recipe-test.log": [
+      "...............                                                          [100%]",
+      "15 passed in 16.71s"
+    ]
+  },
+  "std_mean_probe_not_retained": [
+    {
+      "rows": 2048,
+      "width": 1,
+      "stride": 1,
+      "times": {
+        "separate": 1.2430429458618164e-05,
+        "joint": 1.6366679221391678e-05
+      }
+    },
+    {
+      "rows": 2048,
+      "width": 1,
+      "stride": 2,
+      "times": {
+        "separate": 1.3212405145168304e-05,
+        "joint": 1.6351766884326936e-05
+      }
+    },
+    {
+      "rows": 2048,
+      "width": 8,
+      "stride": 1,
+      "times": {
+        "separate": 0.00011406001448631287,
+        "joint": 0.00010917142406105995
+      }
+    },
+    {
+      "rows": 2048,
+      "width": 8,
+      "stride": 2,
+      "times": {
+        "separate": 0.00011718418449163437,
+        "joint": 0.00010951577126979827
+      }
+    },
+    {
+      "rows": 2048,
+      "width": 32,
+      "stride": 1,
+      "times": {
+        "separate": 0.0004344679117202759,
+        "joint": 0.00042971953004598617
+      }
+    },
+    {
+      "rows": 2048,
+      "width": 32,
+      "stride": 2,
+      "times": {
+        "separate": 0.0004492439217865467,
+        "joint": 0.00042834942042827603
+      }
+    },
+    {
+      "rows": 2048,
+      "width": 100,
+      "stride": 1,
+      "times": {
+        "separate": 0.001350734282284975,
+        "joint": 0.0013294995054602622
+      }
+    },
+    {
+      "rows": 2048,
+      "width": 100,
+      "stride": 2,
+      "times": {
+        "separate": 0.001413235042244196,
+        "joint": 0.0013434946909546852
+      }
+    },
+    {
+      "rows": 4096,
+      "width": 1,
+      "stride": 1,
+      "times": {
+        "separate": 1.3956505805253984e-05,
+        "joint": 2.9471110552549363e-05
+      }
+    },
+    {
+      "rows": 4096,
+      "width": 1,
+      "stride": 2,
+      "times": {
+        "separate": 1.5638332813978194e-05,
+        "joint": 2.9811270534992218e-05
+      }
+    },
+    {
+      "rows": 4096,
+      "width": 8,
+      "stride": 1,
+      "times": {
+        "separate": 0.0002212561033666134,
+        "joint": 0.0002143590897321701
+      }
+    },
+    {
+      "rows": 4096,
+      "width": 8,
+      "stride": 2,
+      "times": {
+        "separate": 0.0002260010354220867,
+        "joint": 0.00021429857611656187
+      }
+    },
+    {
+      "rows": 4096,
+      "width": 32,
+      "stride": 1,
+      "times": {
+        "separate": 0.0008575459159910679,
+        "joint": 0.0008498657755553723
+      }
+    },
+    {
+      "rows": 4096,
+      "width": 32,
+      "stride": 2,
+      "times": {
+        "separate": 0.0008930411860346794,
+        "joint": 0.0008478449471294881
+      }
+    },
+    {
+      "rows": 4096,
+      "width": 100,
+      "stride": 1,
+      "times": {
+        "separate": 0.0026961383484303955,
+        "joint": 0.0026508154310286042
+      }
+    },
+    {
+      "rows": 4096,
+      "width": 100,
+      "stride": 2,
+      "times": {
+        "separate": 0.002857260003685951,
+        "joint": 0.0026543480679392813
+      }
+    }
+  ],
+  "class_count_forest_investigation_only": {
+    "records": [
+      {
+        "n": 2048,
+        "d": 1,
+        "classes": 2,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.0039110661794741946,
+        "gini_s": 0.004137215514977774,
+        "throughput_gain": -0.05466220811675415
+      },
+      {
+        "n": 2048,
+        "d": 1,
+        "classes": 2,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.0026628846923510236,
+        "gini_s": 0.002928374956051509,
+        "throughput_gain": -0.09066129429629477
+      },
+      {
+        "n": 2048,
+        "d": 1,
+        "classes": 5,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.006994849070906639,
+        "gini_s": 0.004265668491522471,
+        "throughput_gain": 0.6398013780977359
+      },
+      {
+        "n": 2048,
+        "d": 1,
+        "classes": 5,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.004786695043245951,
+        "gini_s": 0.002987250064810117,
+        "throughput_gain": 0.6023750738625275
+      },
+      {
+        "n": 2048,
+        "d": 1,
+        "classes": 10,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.01080343561867873,
+        "gini_s": 0.004424321775635083,
+        "throughput_gain": 1.4418286387246249
+      },
+      {
+        "n": 2048,
+        "d": 1,
+        "classes": 10,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.007219340031345686,
+        "gini_s": 0.0031073223799467087,
+        "throughput_gain": 1.3233315210343575
+      },
+      {
+        "n": 2048,
+        "d": 8,
+        "classes": 2,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.011081995442509651,
+        "gini_s": 0.011406273891528446,
+        "throughput_gain": -0.028429831871707
+      },
+      {
+        "n": 2048,
+        "d": 8,
+        "classes": 2,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.010821005329489708,
+        "gini_s": 0.0111607958873113,
+        "throughput_gain": -0.030445011382019826
+      },
+      {
+        "n": 2048,
+        "d": 8,
+        "classes": 5,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.01450074091553688,
+        "gini_s": 0.011763413126269977,
+        "throughput_gain": 0.2326984319843295
+      },
+      {
+        "n": 2048,
+        "d": 8,
+        "classes": 5,
+        "kind": "discrete",
+        "exact": false,
+        "maximum_prediction_difference": 0.15853658536585363,
+        "mse_s": 0.01457853801548481,
+        "gini_s": 0.011682431523998577,
+        "throughput_gain": 0.2479027149045916
+      },
+      {
+        "n": 2048,
+        "d": 8,
+        "classes": 10,
+        "kind": "continuous",
+        "exact": false,
+        "maximum_prediction_difference": 0.031944444444444456,
+        "mse_s": 0.018262585625052452,
+        "gini_s": 0.01192384772002697,
+        "throughput_gain": 0.5316017156424357
+      },
+      {
+        "n": 2048,
+        "d": 8,
+        "classes": 10,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.018076047922174137,
+        "gini_s": 0.011787815640370052,
+        "throughput_gain": 0.5334518687473024
+      },
+      {
+        "n": 2048,
+        "d": 100,
+        "classes": 2,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.1042289026081562,
+        "gini_s": 0.10630106801788011,
+        "throughput_gain": -0.019493363974248723
+      },
+      {
+        "n": 2048,
+        "d": 100,
+        "classes": 2,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.10476057914396128,
+        "gini_s": 0.10595247521996498,
+        "throughput_gain": -0.01124934621422713
+      },
+      {
+        "n": 2048,
+        "d": 100,
+        "classes": 5,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.11259135728081068,
+        "gini_s": 0.10866048994163673,
+        "throughput_gain": 0.036175682083573246
+      },
+      {
+        "n": 2048,
+        "d": 100,
+        "classes": 5,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.10887238072852293,
+        "gini_s": 0.1055077196409305,
+        "throughput_gain": 0.03189018868991966
+      },
+      {
+        "n": 2048,
+        "d": 100,
+        "classes": 10,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.11660181358456612,
+        "gini_s": 0.10580096952617168,
+        "throughput_gain": 0.10208643745672541
+      },
+      {
+        "n": 2048,
+        "d": 100,
+        "classes": 10,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.1148234692712625,
+        "gini_s": 0.10334737785160542,
+        "throughput_gain": 0.11104385673079564
+      },
+      {
+        "n": 4096,
+        "d": 1,
+        "classes": 2,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.006687025850017866,
+        "gini_s": 0.00710431548456351,
+        "throughput_gain": -0.058737486454865984
+      },
+      {
+        "n": 4096,
+        "d": 1,
+        "classes": 2,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.004737457260489464,
+        "gini_s": 0.005342565476894379,
+        "throughput_gain": -0.11326173147000207
+      },
+      {
+        "n": 4096,
+        "d": 1,
+        "classes": 5,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.01290407155950864,
+        "gini_s": 0.007463977361718814,
+        "throughput_gain": 0.7288465564875555
+      },
+      {
+        "n": 4096,
+        "d": 1,
+        "classes": 5,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.009161661689480145,
+        "gini_s": 0.005407216648260753,
+        "throughput_gain": 0.6943396733376719
+      },
+      {
+        "n": 4096,
+        "d": 1,
+        "classes": 10,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.02004073063532511,
+        "gini_s": 0.007536414389808973,
+        "throughput_gain": 1.6591863980336528
+      },
+      {
+        "n": 4096,
+        "d": 1,
+        "classes": 10,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.014490287130077679,
+        "gini_s": 0.005758582924803099,
+        "throughput_gain": 1.5162939075976127
+      },
+      {
+        "n": 4096,
+        "d": 8,
+        "classes": 2,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.01986567055185636,
+        "gini_s": 0.020275960365931194,
+        "throughput_gain": -0.02023528388644047
+      },
+      {
+        "n": 4096,
+        "d": 8,
+        "classes": 2,
+        "kind": "discrete",
+        "exact": false,
+        "maximum_prediction_difference": 0.16666666666666669,
+        "mse_s": 0.02035748027265072,
+        "gini_s": 0.021035930141806602,
+        "throughput_gain": -0.032251954849742526
+      },
+      {
+        "n": 4096,
+        "d": 8,
+        "classes": 5,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.026040852069854736,
+        "gini_s": 0.020663417254885037,
+        "throughput_gain": 0.2602393761224766
+      },
+      {
+        "n": 4096,
+        "d": 8,
+        "classes": 5,
+        "kind": "discrete",
+        "exact": false,
+        "maximum_prediction_difference": 0.1428571428571429,
+        "mse_s": 0.02625025250017643,
+        "gini_s": 0.020609211176633835,
+        "throughput_gain": 0.2737145674909798
+      },
+      {
+        "n": 4096,
+        "d": 8,
+        "classes": 10,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.03472834577163061,
+        "gini_s": 0.02174497147401174,
+        "throughput_gain": 0.5970747909757343
+      },
+      {
+        "n": 4096,
+        "d": 8,
+        "classes": 10,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.033670784905552864,
+        "gini_s": 0.02058584988117218,
+        "throughput_gain": 0.6356276325685328
+      },
+      {
+        "n": 4096,
+        "d": 100,
+        "classes": 2,
+        "kind": "continuous",
+        "exact": false,
+        "maximum_prediction_difference": 0.09342105263157896,
+        "mse_s": 0.19487603567540646,
+        "gini_s": 0.19598208243648213,
+        "throughput_gain": -0.005643611636967583
+      },
+      {
+        "n": 4096,
+        "d": 100,
+        "classes": 2,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.19096103434761363,
+        "gini_s": 0.19205061967174214,
+        "throughput_gain": -0.005673427797269537
+      },
+      {
+        "n": 4096,
+        "d": 100,
+        "classes": 5,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.20164685261746246,
+        "gini_s": 0.19249333751698333,
+        "throughput_gain": 0.04755237359667852
+      },
+      {
+        "n": 4096,
+        "d": 100,
+        "classes": 5,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.20076587113241354,
+        "gini_s": 0.19139504867295426,
+        "throughput_gain": 0.04896063155464203
+      },
+      {
+        "n": 4096,
+        "d": 100,
+        "classes": 10,
+        "kind": "continuous",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.2163528675834338,
+        "gini_s": 0.1930560103307168,
+        "throughput_gain": 0.1206740842349745
+      },
+      {
+        "n": 4096,
+        "d": 100,
+        "classes": 10,
+        "kind": "discrete",
+        "exact": true,
+        "maximum_prediction_difference": 0.0,
+        "mse_s": 0.21477867042024928,
+        "gini_s": 0.19267958650986355,
+        "throughput_gain": 0.11469343644898489
+      }
+    ],
+    "caveat": "Synthetic forest-only probe. No full-prior distribution or training validation. Gini and one-hot MSE have equal real-arithmetic split rankings but float ties can differ."
+  },
+  "profiles": {
+    "2048": {
+      "tasks": 128,
+      "self_total_s": 32.914641649000004,
+      "top_self": [
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_filter_forest.py",
+          "line": 54,
+          "function": "planned_oob_prediction",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 9.509755373,
+          "cumulative_s": 9.599926844
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch._ops.tabicl_prior_exact.nearest_vector_cpu>",
+          "primitive_calls": 2214,
+          "calls": 2214,
+          "self_s": 4.164255818,
+          "cumulative_s": 4.164255818
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'std' of 'torch._C.TensorBase' objects>",
+          "primitive_calls": 6812,
+          "calls": 6812,
+          "self_s": 1.7417623150000001,
+          "cumulative_s": 1.7417623150000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch._ops.tabicl_prior_exact.cdist_vector_cpu>",
+          "primitive_calls": 696,
+          "calls": 696,
+          "self_s": 1.527355929,
+          "cumulative_s": 1.527355929
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method unique_dim>",
+          "primitive_calls": 1279,
+          "calls": 1279,
+          "self_s": 1.257311249,
+          "cumulative_s": 1.257311249
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_weights.py",
+          "line": 24,
+          "function": "sample",
+          "primitive_calls": 9230,
+          "calls": 9230,
+          "self_s": 0.928868679,
+          "cumulative_s": 2.19560126
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch._ops.tabicl_prior_exact.tree_cpu>",
+          "primitive_calls": 1034,
+          "calls": 1034,
+          "self_s": 0.707438876,
+          "cumulative_s": 0.707438876
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 260,
+          "function": "_transform",
+          "primitive_calls": 1042,
+          "calls": 1042,
+          "self_s": 0.6339123210000001,
+          "cumulative_s": 0.9791130440000001
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_base.py",
+          "line": 25,
+          "function": "numerical",
+          "primitive_calls": 51822,
+          "calls": 158588,
+          "self_s": 0.576387133,
+          "cumulative_s": 0.8108657220000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.softmax>",
+          "primitive_calls": 11494,
+          "calls": 11494,
+          "self_s": 0.48641402200000006,
+          "cumulative_s": 0.48641402200000006
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.multinomial>",
+          "primitive_calls": 3879,
+          "calls": 3879,
+          "self_s": 0.480176641,
+          "cumulative_s": 0.480176641
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.randn>",
+          "primitive_calls": 32726,
+          "calls": 32726,
+          "self_s": 0.44296115700000005,
+          "cumulative_s": 0.44296115700000005
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.isfinite>",
+          "primitive_calls": 10236,
+          "calls": 10236,
+          "self_s": 0.35455682400000005,
+          "cumulative_s": 0.35455682400000005
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.cos>",
+          "primitive_calls": 1042,
+          "calls": 1042,
+          "self_s": 0.34520072300000004,
+          "cumulative_s": 0.34520072300000004
+        },
+        {
+          "file": "/opt/conda/lib/python3.12/copy.py",
+          "line": 247,
+          "function": "_reconstruct",
+          "primitive_calls": 104781,
+          "calls": 104781,
+          "self_s": 0.281810065,
+          "cumulative_s": 0.5327617960000001
+        },
+        {
+          "file": "/opt/conda/lib/python3.12/copy.py",
+          "line": 61,
+          "function": "copy",
+          "primitive_calls": 104781,
+          "calls": 104781,
+          "self_s": 0.274716548,
+          "cumulative_s": 0.9931427380000001
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_activation.py",
+          "line": 181,
+          "function": "_transform",
+          "primitive_calls": 5778,
+          "calls": 5778,
+          "self_s": 0.269701203,
+          "cumulative_s": 0.269701203
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.randperm>",
+          "primitive_calls": 86301,
+          "calls": 86301,
+          "self_s": 0.26751360900000004,
+          "cumulative_s": 0.26751360900000004
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_node_function.py",
+          "line": 42,
+          "function": "_transform",
+          "primitive_calls": 1805,
+          "calls": 1805,
+          "self_s": 0.251940631,
+          "cumulative_s": 20.954183753000002
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'pow' of 'torch._C.TensorBase' objects>",
+          "primitive_calls": 8724,
+          "calls": 8724,
+          "self_s": 0.23572827000000002,
+          "cumulative_s": 0.23572827000000002
+        }
+      ],
+      "top_cumulative": [
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/scripts/benchmark_prior_exact.py",
+          "line": 59,
+          "function": "generate",
+          "primitive_calls": 128,
+          "calls": 128,
+          "self_s": 0.016794222,
+          "cumulative_s": 32.914608377
+        },
+        {
+          "file": "/opt/conda/lib/python3.12/site-packages/torch/utils/_contextlib.py",
+          "line": 117,
+          "function": "decorate_context",
+          "primitive_calls": 128,
+          "calls": 128,
+          "self_s": 0.0009907,
+          "cumulative_s": 32.771260178
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_dataset.py",
+          "line": 937,
+          "function": "generate_dataset",
+          "primitive_calls": 128,
+          "calls": 128,
+          "self_s": 0.011753431,
+          "cumulative_s": 32.767544093000005
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/scripts/benchmark_prior_exact.py",
+          "line": 90,
+          "function": "audit_scm",
+          "primitive_calls": 188,
+          "calls": 188,
+          "self_s": 0.011329674000000001,
+          "cumulative_s": 22.502108729
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_graph_scm.py",
+          "line": 106,
+          "function": "__call__",
+          "primitive_calls": 188,
+          "calls": 188,
+          "self_s": 0.106927531,
+          "cumulative_s": 22.490635538000003
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_dataset.py",
+          "line": 33,
+          "function": "sample",
+          "primitive_calls": 188,
+          "calls": 188,
+          "self_s": 0.010249186,
+          "cumulative_s": 21.545069376
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_base.py",
+          "line": 205,
+          "function": "__call__",
+          "primitive_calls": 188,
+          "calls": 53243,
+          "self_s": 0.12391210300000001,
+          "cumulative_s": 21.411685522000003
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_graph_function.py",
+          "line": 40,
+          "function": "_transform",
+          "primitive_calls": 188,
+          "calls": 188,
+          "self_s": 0.009826629,
+          "cumulative_s": 21.385026282000002
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_node_function.py",
+          "line": 42,
+          "function": "_transform",
+          "primitive_calls": 1805,
+          "calls": 1805,
+          "self_s": 0.251940631,
+          "cumulative_s": 20.954183753000002
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_base.py",
+          "line": 225,
+          "function": "__call__",
+          "primitive_calls": 14284,
+          "calls": 35108,
+          "self_s": 0.038357781,
+          "cumulative_s": 17.311260913
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 53,
+          "function": "_transform",
+          "primitive_calls": 5476,
+          "calls": 5476,
+          "self_s": 0.0053124140000000005,
+          "cumulative_s": 15.19130359
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_multi_function.py",
+          "line": 33,
+          "function": "_transform",
+          "primitive_calls": 1330,
+          "calls": 1330,
+          "self_s": 0.0012536070000000001,
+          "cumulative_s": 13.666365614
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/scripts/benchmark_prior_exact.py",
+          "line": 83,
+          "function": "audit_filter",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 0.0030113500000000003,
+          "cumulative_s": 10.028535308
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_dataset.py",
+          "line": 1601,
+          "function": "should_filter",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 0.030483818000000003,
+          "cumulative_s": 10.025300317000001
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/scripts/benchmark_prior_exact.py",
+          "line": 73,
+          "function": "audit_planned",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 0.001027899,
+          "cumulative_s": 9.601041968
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_filter_forest.py",
+          "line": 54,
+          "function": "planned_oob_prediction",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 9.509755373,
+          "cumulative_s": 9.599926844
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_multi_function.py",
+          "line": 51,
+          "function": "_transform",
+          "primitive_calls": 672,
+          "calls": 672,
+          "self_s": 0.011568134,
+          "cumulative_s": 9.472225263
+        },
+        {
+          "file": "/opt/conda/lib/python3.12/site-packages/torch/_ops.py",
+          "line": 1232,
+          "function": "__call__",
+          "primitive_calls": 4983,
+          "calls": 4983,
+          "self_s": 0.004539928,
+          "cumulative_s": 6.536146885000001
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_distance.py",
+          "line": 86,
+          "function": "nearest_center",
+          "primitive_calls": 3126,
+          "calls": 3126,
+          "self_s": 0.077449944,
+          "cumulative_s": 5.900427446
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 213,
+          "function": "_transform",
+          "primitive_calls": 1073,
+          "calls": 1073,
+          "self_s": 0.038790208,
+          "cumulative_s": 5.247279456
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch._ops.tabicl_prior_exact.nearest_vector_cpu>",
+          "primitive_calls": 2214,
+          "calls": 2214,
+          "self_s": 4.164255818,
+          "cumulative_s": 4.164255818
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_multi_function.py",
+          "line": 42,
+          "function": "_transform",
+          "primitive_calls": 658,
+          "calls": 658,
+          "self_s": 0.0018647580000000002,
+          "cumulative_s": 4.128843444
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_converter.py",
+          "line": 31,
+          "function": "__call__",
+          "primitive_calls": 9866,
+          "calls": 13482,
+          "self_s": 0.012239314000000001,
+          "cumulative_s": 3.8088216260000003
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 74,
+          "function": "_transform",
+          "primitive_calls": 1830,
+          "calls": 1830,
+          "self_s": 0.0018939330000000002,
+          "cumulative_s": 3.420131708
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_converter.py",
+          "line": 177,
+          "function": "_transform",
+          "primitive_calls": 3616,
+          "calls": 3616,
+          "self_s": 0.006379267,
+          "cumulative_s": 3.29717399
+        }
+      ]
+    },
+    "4096": {
+      "tasks": 128,
+      "self_total_s": 56.291844089,
+      "top_self": [
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_filter_forest.py",
+          "line": 54,
+          "function": "planned_oob_prediction",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 18.537405089,
+          "cumulative_s": 18.654887177000003
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch._ops.tabicl_prior_exact.nearest_vector_cpu>",
+          "primitive_calls": 2270,
+          "calls": 2270,
+          "self_s": 7.743960439,
+          "cumulative_s": 7.743960439
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'std' of 'torch._C.TensorBase' objects>",
+          "primitive_calls": 7013,
+          "calls": 7013,
+          "self_s": 3.537142664,
+          "cumulative_s": 3.537142664
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch._ops.tabicl_prior_exact.cdist_vector_cpu>",
+          "primitive_calls": 726,
+          "calls": 726,
+          "self_s": 3.04017147,
+          "cumulative_s": 3.04017147
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method unique_dim>",
+          "primitive_calls": 1202,
+          "calls": 1202,
+          "self_s": 2.2203478970000003,
+          "cumulative_s": 2.2203478970000003
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch._ops.tabicl_prior_exact.tree_cpu>",
+          "primitive_calls": 1101,
+          "calls": 1101,
+          "self_s": 1.329220454,
+          "cumulative_s": 1.329220454
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 260,
+          "function": "_transform",
+          "primitive_calls": 1074,
+          "calls": 1074,
+          "self_s": 1.327355102,
+          "cumulative_s": 2.0427285370000003
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_weights.py",
+          "line": 24,
+          "function": "sample",
+          "primitive_calls": 9372,
+          "calls": 9372,
+          "self_s": 0.949241968,
+          "cumulative_s": 2.262795022
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.softmax>",
+          "primitive_calls": 11668,
+          "calls": 11668,
+          "self_s": 0.9390591340000001,
+          "cumulative_s": 0.9390591340000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.multinomial>",
+          "primitive_calls": 4004,
+          "calls": 4004,
+          "self_s": 0.8656576640000001,
+          "cumulative_s": 0.8656576640000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.cos>",
+          "primitive_calls": 1074,
+          "calls": 1074,
+          "self_s": 0.7153734350000001,
+          "cumulative_s": 0.7153734350000001
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_base.py",
+          "line": 25,
+          "function": "numerical",
+          "primitive_calls": 52321,
+          "calls": 159699,
+          "self_s": 0.602332313,
+          "cumulative_s": 0.849092359
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.isfinite>",
+          "primitive_calls": 10436,
+          "calls": 10436,
+          "self_s": 0.586273213,
+          "cumulative_s": 0.586273213
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_activation.py",
+          "line": 181,
+          "function": "_transform",
+          "primitive_calls": 5912,
+          "calls": 5912,
+          "self_s": 0.547499022,
+          "cumulative_s": 0.547499022
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch.randn>",
+          "primitive_calls": 33672,
+          "calls": 33672,
+          "self_s": 0.487370815,
+          "cumulative_s": 0.487370815
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'integers' of 'numpy.random._generator.Generator' objects>",
+          "primitive_calls": 334,
+          "calls": 334,
+          "self_s": 0.44151454900000003,
+          "cumulative_s": 0.446053222
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'pow' of 'torch._C.TensorBase' objects>",
+          "primitive_calls": 8469,
+          "calls": 8469,
+          "self_s": 0.431782838,
+          "cumulative_s": 0.431782838
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'reduce' of 'numpy.ufunc' objects>",
+          "primitive_calls": 9859,
+          "calls": 9859,
+          "self_s": 0.37481778000000004,
+          "cumulative_s": 0.37481778000000004
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 294,
+          "function": "_transform",
+          "primitive_calls": 1064,
+          "calls": 1064,
+          "self_s": 0.35017687000000003,
+          "cumulative_s": 0.655943605
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_node_function.py",
+          "line": 42,
+          "function": "_transform",
+          "primitive_calls": 1792,
+          "calls": 1792,
+          "self_s": 0.335458788,
+          "cumulative_s": 33.924345294000005
+        }
+      ],
+      "top_cumulative": [
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/scripts/benchmark_prior_exact.py",
+          "line": 59,
+          "function": "generate",
+          "primitive_calls": 128,
+          "calls": 128,
+          "self_s": 0.024325651,
+          "cumulative_s": 56.291812932000006
+        },
+        {
+          "file": "/opt/conda/lib/python3.12/site-packages/torch/utils/_contextlib.py",
+          "line": 117,
+          "function": "decorate_context",
+          "primitive_calls": 128,
+          "calls": 128,
+          "self_s": 0.0012229550000000002,
+          "cumulative_s": 56.084945459000004
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_dataset.py",
+          "line": 937,
+          "function": "generate_dataset",
+          "primitive_calls": 128,
+          "calls": 128,
+          "self_s": 0.011457838000000001,
+          "cumulative_s": 56.080553697000006
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/scripts/benchmark_prior_exact.py",
+          "line": 90,
+          "function": "audit_scm",
+          "primitive_calls": 181,
+          "calls": 181,
+          "self_s": 0.016572774000000002,
+          "cumulative_s": 36.152733981000004
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_graph_scm.py",
+          "line": 106,
+          "function": "__call__",
+          "primitive_calls": 181,
+          "calls": 181,
+          "self_s": 0.162705392,
+          "cumulative_s": 36.136009042000005
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_dataset.py",
+          "line": 33,
+          "function": "sample",
+          "primitive_calls": 181,
+          "calls": 181,
+          "self_s": 0.010399129,
+          "cumulative_s": 34.521204724
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_base.py",
+          "line": 205,
+          "function": "__call__",
+          "primitive_calls": 181,
+          "calls": 53784,
+          "self_s": 0.135711898,
+          "cumulative_s": 34.386939413
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_graph_function.py",
+          "line": 40,
+          "function": "_transform",
+          "primitive_calls": 181,
+          "calls": 181,
+          "self_s": 0.010300889,
+          "cumulative_s": 34.359898233
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_node_function.py",
+          "line": 42,
+          "function": "_transform",
+          "primitive_calls": 1792,
+          "calls": 1792,
+          "self_s": 0.335458788,
+          "cumulative_s": 33.924345294000005
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_base.py",
+          "line": 225,
+          "function": "__call__",
+          "primitive_calls": 14268,
+          "calls": 35943,
+          "self_s": 0.042388726,
+          "cumulative_s": 28.505426900000003
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 53,
+          "function": "_transform",
+          "primitive_calls": 5639,
+          "calls": 5639,
+          "self_s": 0.0054531580000000005,
+          "cumulative_s": 25.251778349000002
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_multi_function.py",
+          "line": 33,
+          "function": "_transform",
+          "primitive_calls": 1323,
+          "calls": 1323,
+          "self_s": 0.0013392130000000001,
+          "cumulative_s": 23.028969539000002
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/scripts/benchmark_prior_exact.py",
+          "line": 83,
+          "function": "audit_filter",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 0.003402567,
+          "cumulative_s": 19.526125508
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_dataset.py",
+          "line": 1601,
+          "function": "should_filter",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 0.054460461,
+          "cumulative_s": 19.522489335
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/scripts/benchmark_prior_exact.py",
+          "line": 73,
+          "function": "audit_planned",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 0.001284765,
+          "cumulative_s": 18.656271806
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/_filter_forest.py",
+          "line": 54,
+          "function": "planned_oob_prediction",
+          "primitive_calls": 167,
+          "calls": 167,
+          "self_s": 18.537405089,
+          "cumulative_s": 18.654887177000003
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_multi_function.py",
+          "line": 51,
+          "function": "_transform",
+          "primitive_calls": 673,
+          "calls": 673,
+          "self_s": 0.013867072000000001,
+          "cumulative_s": 15.561645298
+        },
+        {
+          "file": "/opt/conda/lib/python3.12/site-packages/torch/_ops.py",
+          "line": 1232,
+          "function": "__call__",
+          "primitive_calls": 5161,
+          "calls": 5161,
+          "self_s": 0.0054387160000000006,
+          "cumulative_s": 12.366438849000001
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_distance.py",
+          "line": 86,
+          "function": "nearest_center",
+          "primitive_calls": 3165,
+          "calls": 3165,
+          "self_s": 0.084177914,
+          "cumulative_s": 10.504914755000001
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 213,
+          "function": "_transform",
+          "primitive_calls": 1089,
+          "calls": 1089,
+          "self_s": 0.066765566,
+          "cumulative_s": 9.484123568000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method torch._ops.tabicl_prior_exact.nearest_vector_cpu>",
+          "primitive_calls": 2270,
+          "calls": 2270,
+          "self_s": 7.743960439,
+          "cumulative_s": 7.743960439
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_multi_function.py",
+          "line": 42,
+          "function": "_transform",
+          "primitive_calls": 650,
+          "calls": 650,
+          "self_s": 0.0032512350000000003,
+          "cumulative_s": 7.266574981000001
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_converter.py",
+          "line": 31,
+          "function": "__call__",
+          "primitive_calls": 9580,
+          "calls": 13222,
+          "self_s": 0.012762975000000001,
+          "cumulative_s": 5.515654224
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_function.py",
+          "line": 74,
+          "function": "_transform",
+          "primitive_calls": 1906,
+          "calls": 1906,
+          "self_s": 0.002011817,
+          "cumulative_s": 5.196604272
+        },
+        {
+          "file": "/tmp/tabicl-filter-cpu-20261102/src/tabicl/prior/graph_lib/_converter.py",
+          "line": 177,
+          "function": "_transform",
+          "primitive_calls": 3642,
+          "calls": 3642,
+          "self_s": 0.006813902,
+          "cumulative_s": 4.957704222
+        }
+      ]
+    }
+  },
+  "caveats": [
+    "CPU ABBA includes accepted tasks, retries and process startup; compare both arms within one seed/length.",
+    "Worker graph_s/filter_s are interval wall sums; cpu_s is separately measured process CPU time.",
+    "cProfile cumulative entries overlap and profiling timings are not throughput timings.",
+    "Training uses ready ordering, so finite-window shapes and timing remain variable.",
+    "Shared compiler caches preclude controlled launch-wall claims.",
+    "Equality on recorded tasks supports this execution-only change, not overall prior optimality or downstream convergence."
+  ]
+}

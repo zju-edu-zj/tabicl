@@ -78,7 +78,7 @@ def test_step_seeded_prior_rejects_out_of_order_loading():
         trainer.configure_prior()
 
 
-def test_stage1_prior_pipeline_defaults_match_128_core_node(tmp_path):
+def test_stage1_defaults_adapt_workers_to_node_and_support_16_ranks(tmp_path):
     root = Path(__file__).resolve().parents[1]
     env = dict(
         os.environ, DRY_RUN="1", NUM_GPUS="16",
@@ -90,3 +90,120 @@ def test_stage1_prior_pipeline_defaults_match_128_core_node(tmp_path):
     assert args.n_jobs == 8
     assert args.prior_prefetch_factor == 8
     assert args.prior_in_order is False
+    assert args.prior_backend == "node_pool"
+    assert args.prior_pool_workers == 56
+    assert args.prior_schedule == "ready_micro"  # readiness still bypasses slow source cohorts
+    assert args.max_seq_len == 2048
+    assert args.compile_frontend == "all" and args.compile_warmup
+    assert args.icl_partition == "content_tree"
+
+
+@pytest.mark.parametrize("stage,previous", [(2, "STAGE1_CKPT"), (3, "STAGE2_CKPT")])
+def test_classifier_long_stage_defaults_are_fast_and_content_tree(tmp_path, stage, previous):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", NUM_GPUS="8", CKPT_DIR=str(tmp_path),
+               **{previous: str(tmp_path / "input.ckpt")})
+    script = root / f"scripts/train_v2_clf_stage{stage}.sh"
+    text = subprocess.check_output(["bash", str(script)], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert args.prior_backend == "node_pool"
+    assert args.prior_schedule == "balanced"
+    assert args.prior_pool_transport == "numpy"
+    assert args.prior_pool_kernel_threads == 8
+    assert args.prior_pool_workers == 56
+    assert args.compile_frontend == "all" and args.compile_warmup
+    assert args.icl_partition == "content_tree"
+    assert args.micro_batch_size == 1
+
+
+@pytest.mark.parametrize("dtype,backend,schedule", [
+    ("float32", "node_pool", "ready_micro"), ("bfloat16", "node_pool", "ready_micro"),
+])
+def test_stage1_default_backend_follows_long_run_measurement(tmp_path, dtype, backend, schedule):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", NUM_GPUS="8", TRAIN_DTYPE=dtype,
+               CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
+    for key in ("PRIOR_BACKEND", "PRIOR_SCHEDULE"):
+        env.pop(key, None)
+    text = subprocess.check_output(["bash", str(root / "scripts/train_v2_clf_stage1.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert (args.prior_backend, args.prior_schedule) == (backend, schedule)
+
+
+@pytest.mark.parametrize("ranks,dtype,expected", [
+    (8, "float32", "ready_micro"), (8, "bfloat16", "ready_micro"),
+    (16, "float32", "ready_micro"), (32, "float32", "none"),
+])
+def test_stage1_schedule_default_accounts_for_supply_and_micro_granularity(tmp_path, ranks, dtype, expected):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", NUM_GPUS=str(ranks), TRAIN_DTYPE=dtype,
+               CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path), PRIOR_BACKEND="node_pool")
+    env.pop("PRIOR_SCHEDULE", None)
+    text = subprocess.check_output(["bash", str(root / "scripts/train_v2_clf_stage1.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert args.prior_schedule == expected
+
+
+@pytest.mark.parametrize('dtype,ranks,window,override,expected', [
+    ('bfloat16', 8, 128, None, 8), ('bfloat16', 16, 128, None, 7),
+    ('float32', 8, 128, None, 2), ('float32', 16, 128, None, 2),
+    ('bfloat16', 8, 16, None, 1), ('bfloat16', 8, 8, None, 0),
+    ('float32', 8, 8, None, 0), ('bfloat16', 8, 128, '3', 3),
+])
+def test_stage1_fairness_default_fits_window_and_respects_override(
+        tmp_path, dtype, ranks, window, override, expected):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN='1', NUM_GPUS=str(ranks), TRAIN_DTYPE=dtype,
+        BATCH_SIZE='64', MICRO_BATCH_SIZE='4', PRIOR_BACKEND='node_pool',
+        PRIOR_SCHEDULE='ready_micro', PRIOR_POOL_WINDOW=str(window),
+        CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
+    env.pop('PRIOR_READY_MAX_DELAY', None)
+    if override is not None:
+        env['PRIOR_READY_MAX_DELAY'] = override
+    text = subprocess.check_output(['bash', str(root/'scripts/train_v2_clf_stage1.sh')],
+        env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index('--wandb_log'):])
+    assert args.prior_ready_max_delay == expected
+
+
+@pytest.mark.parametrize("task", ["clf", "reg"])
+@pytest.mark.parametrize("stage", [1, 2, 3])
+def test_all_curriculum_scripts_support_shared_pool_and_override(tmp_path, task, stage):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", PRIOR_BACKEND="node_pool", PRIOR_POOL_WORKERS="12",
+               PRIOR_POOL_WINDOW="7", PRIOR_POOL_MB="128", PRIOR_SCHEDULE="window_bucketed",
+               PRIOR_FILTER_MODE="progressive",
+               PRIOR_POOL_KERNEL_THREADS="8",
+               PRIOR_POOL_TRANSPORT="mmap", PRIOR_BUCKET_STEPS="3",
+               CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
+    text = subprocess.check_output(["bash", str(root / f"scripts/train_v2_{task}_stage{stage}.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert args.prior_pool_workers == 12
+    assert args.prior_pool_window == 7
+    assert args.prior_pool_mb == 128
+    assert args.prior_backend == "node_pool"
+    assert args.prior_schedule == "window_bucketed"
+    assert args.prior_pool_transport == "mmap" and args.prior_bucket_steps == 3
+    assert args.prior_pool_kernel_threads == 8
+    assert args.dataset_filter_mode == "progressive"
+
+
+@pytest.mark.parametrize("stage", [1, 2, 3])
+@pytest.mark.parametrize("dtype", ["float32", "bfloat16"])
+def test_precision_recipe_and_dataloader_escape_hatch(tmp_path, stage, dtype):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, DRY_RUN="1", TRAIN_DTYPE=dtype, PRIOR_BACKEND="dataloader",
+               CKPT_DIR=str(tmp_path), LOG_DIR=str(tmp_path))
+    env.pop("PRIOR_SCHEDULE", None)
+    env.pop("USE_FLASH_ATTN3", None)
+    text = subprocess.check_output(["bash", str(root / f"scripts/train_v2_clf_stage{stage}.sh")], env=env, text=True)
+    tokens = shlex.split(text)
+    args = build_parser().parse_args(tokens[tokens.index("--wandb_log"):])
+    assert args.dtype == dtype and args.attention_backend == "auto"
+    assert args.prior_backend == "dataloader" and args.prior_schedule == "none"
+    assert not args.use_flash_attn3  # Compiled frontends use native SDPA.

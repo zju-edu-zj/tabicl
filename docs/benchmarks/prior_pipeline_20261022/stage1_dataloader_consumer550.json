@@ -1,0 +1,83 @@
+{
+  "backend": "dataloader",
+  "stage": 1,
+  "regression": false,
+  "batch_size": 4,
+  "pool_workers": 8,
+  "pool_window": 32,
+  "pool_mb": 512,
+  "min_seq_len": null,
+  "max_seq_len": null,
+  "workers": 4,
+  "start_method": "spawn",
+  "prefetch": 8,
+  "in_order": false,
+  "warmup": 16,
+  "steps": 100,
+  "consumer_ms": 550.0,
+  "corrected_cat_meta_sampling": false,
+  "output": "/home/zj/table_foundation/sparse/tabicl/docs/benchmarks/prior_pipeline_20261022/stage1_dataloader_consumer550.json",
+  "world_size": 2,
+  "workers_per_node": 8,
+  "wall_s": 55.58715365314856,
+  "startup_and_warmup_s": 11.397636848967522,
+  "startup_warmup_and_measurement_s": 66.98479050211608,
+  "sum_rank_peak_rss_mb": 7098.984375,
+  "datasets_per_s": 14.391814428776504,
+  "pool_stats": null,
+  "mean_payload_mb": 1.59375,
+  "length_mean": 1024.0,
+  "features_mean": 46.1875,
+  "padding_and_validation": {
+    "mean_ms": 1.1045153788290918,
+    "p50_ms": 1.0481270728632808,
+    "p90_ms": 1.814757054671646,
+    "p95_ms": 1.9664163817651568,
+    "p99_ms": 2.0595878339372597,
+    "max_ms": 2.523090923205018,
+    "blocked_100ms": 0.0,
+    "blocked_1s": 0.0
+  },
+  "all_rank_wait": {
+    "mean_ms": 3.6246559815481305,
+    "p50_ms": 3.534212941303849,
+    "p90_ms": 4.357101442292333,
+    "p95_ms": 5.240327317733318,
+    "p99_ms": 6.775559205561869,
+    "max_ms": 9.293491020798683,
+    "blocked_100ms": 0.0,
+    "blocked_1s": 0.0
+  },
+  "max_rank_wait": {
+    "mean_ms": 4.004777718801051,
+    "p50_ms": 3.7413975223898888,
+    "p90_ms": 5.241120676510037,
+    "p95_ms": 5.810987483710051,
+    "p99_ms": 7.592587766703227,
+    "max_ms": 9.293491020798683,
+    "blocked_100ms": 0.0,
+    "blocked_1s": 0.0
+  },
+  "per_rank": [
+    {
+      "mean_ms": 3.6264853249303997,
+      "p50_ms": 3.5354970023036003,
+      "p90_ms": 4.441774403676391,
+      "p95_ms": 5.666936514899135,
+      "p99_ms": 6.792740046512348,
+      "max_ms": 9.293491020798683,
+      "blocked_100ms": 0.0,
+      "blocked_1s": 0.0
+    },
+    {
+      "mean_ms": 3.6228266381658614,
+      "p50_ms": 3.5314479609951377,
+      "p90_ms": 4.285360267385841,
+      "p95_ms": 4.8518406110815695,
+      "p99_ms": 5.979945813305685,
+      "max_ms": 7.575406925752759,
+      "blocked_100ms": 0.0,
+      "blocked_1s": 0.0
+    }
+  ]
+}

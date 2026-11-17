@@ -5,19 +5,43 @@ set -euo pipefail
 #
 # Stage 2: 40K steps on datasets with 400-10,240 samples (log-uniform), 79-81% of
 # samples for training, max LR 1e-4, gradient clipping 10. Continues from the Stage 1
-# checkpoint (weights only). FlashAttention-3 is enabled (--use_flash_attn3 True)
-# for stages 2 & 3 only.
+# checkpoint (weights only). Compiled frontends default to native SDPA;
+# compatible external FlashAttention-3 builds can opt in via USE_FLASH_ATTN3=True.
 #
 # Adjust the placeholder paths and --nproc_per_node / --n_jobs for your hardware.
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
-source "$REPO_ROOT/scripts/icl_recipe.sh"
 
-NUM_GPUS=${NUM_GPUS:-4}                                   # the paper used 4 GPUs for pre-training
-CKPT_DIR=${CKPT_DIR:-/path/to/checkpoints/tabiclv2-clf/stage2}
+NUM_GPUS=${NUM_GPUS:-8}                                   # override for 16-GPU runs
+
+# Fast default: overlap graph generation with training and balance accumulated
+# micro-batches across ranks by predicted model cost. Every value remains overridable
+# from the environment for ablations and smaller machines.
+TRAIN_DTYPE=${TRAIN_DTYPE:-bfloat16}
+COMPILE_FRONTEND=${COMPILE_FRONTEND:-all}
+COMPILE_WARMUP=${COMPILE_WARMUP:-True}
+ICL_PARTITION=${ICL_PARTITION:-content_tree}
+PRIOR_BACKEND=${PRIOR_BACKEND:-node_pool}
+if [[ -z "${PRIOR_SCHEDULE:-}" ]]; then
+    if [[ "$PRIOR_BACKEND" == node_pool ]]; then
+        PRIOR_SCHEDULE=balanced
+    else
+        PRIOR_SCHEDULE=none
+    fi
+fi
+PRIOR_POOL_TRANSPORT=${PRIOR_POOL_TRANSPORT:-numpy}
+PRIOR_POOL_KERNEL_THREADS=${PRIOR_POOL_KERNEL_THREADS:-8}
+PRIOR_POOL_WORKERS=${PRIOR_POOL_WORKERS:-56}
+PRIOR_POOL_WINDOW=${PRIOR_POOL_WINDOW:-128}
+PRIOR_POOL_MB=${PRIOR_POOL_MB:-2048}
+
+source "$REPO_ROOT/scripts/icl_recipe.sh"
+source "$REPO_ROOT/scripts/prior_recipe.sh"
+
+CKPT_DIR=${CKPT_DIR:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage2}
 LOG_DIR=${LOG_DIR:-$CKPT_DIR/logs}
-STAGE1_CKPT=${STAGE1_CKPT:-/path/to/checkpoints/tabiclv2-clf/stage1/step-500000.ckpt}
+STAGE1_CKPT=${STAGE1_CKPT:-/ossfs/workspace/tabicl/checkpoints/tabiclv2-clf/stage1/step-500000.ckpt}
 WANDB_LOG=${WANDB_LOG:-False}
 TENSORBOARD_LOG=${TENSORBOARD_LOG:-False}
 
@@ -57,7 +81,7 @@ run_pretrain torchrun --standalone --nproc_per_node=$NUM_GPUS -m tabicl.train \
             --gradient_clipping 10.0 \
             --prior_type graph_scm \
             --prior_device cpu \
-            --n_jobs 16 \
+            "${PRIOR_ARGS[@]}" \
             --batch_size_per_gp 1 \
             --min_features 1 \
             --max_features 100 \

@@ -1,0 +1,71 @@
+{
+  "environment": {
+    "gpus": 8,
+    "cpu_quota": 69,
+    "node_pool_workers": 56,
+    "kernel_threads": 8,
+    "trace_steps": 30,
+    "trace_skip": 10
+  },
+  "profile_step_mean": {
+    "stage2_bfloat16_cropped_fast": {
+      "step_wall_s": 1.5702235912,
+      "gpu_activity_s": 0.9023933239,
+      "gpu_kernel_s": 0.6507910896,
+      "cpu_generation_core_s": 54.4344595687,
+      "cpu_stall_s": 0.0,
+      "cpu_generation_span_s": 5.6227468376
+    },
+    "stage3_bfloat16_cropped_reference": {
+      "step_wall_s": 4.3593005265,
+      "gpu_activity_s": 2.0299960533,
+      "gpu_kernel_s": 1.7346143448,
+      "gpu_communication_s": 0.5036449209,
+      "cpu_generation_core_s": 158.1769659947,
+      "cpu_stall_s": 1.7143922554,
+      "cpu_generation_span_s": 25.1291503569
+    },
+    "stage3_bfloat16_cropped_fast": {
+      "step_wall_s": 4.2351338984,
+      "gpu_activity_s": 2.1894911150,
+      "gpu_kernel_s": 1.5907814813,
+      "gpu_communication_s": 0.7238804919,
+      "cpu_generation_core_s": 176.1484976948,
+      "cpu_stall_s": 1.5455689695,
+      "cpu_generation_span_s": 28.3977667200
+    },
+    "stage3_bfloat16_uncropped_fast": {
+      "step_wall_s": 5.5425974006,
+      "gpu_activity_s": 2.5909556201,
+      "gpu_kernel_s": 1.9114901820,
+      "gpu_communication_s": 0.7870779086,
+      "cpu_generation_core_s": 210.3625923135,
+      "cpu_stall_s": 2.4001444286,
+      "cpu_generation_span_s": 33.7203798354
+    }
+  },
+  "unprofiled_step_mean_ms": {
+    "stage2_bfloat16_seed42_fast": 1346.3939660,
+    "stage2_bfloat16_seed42_reference": 1359.8015254,
+    "stage2_float32_seed42_fast": 1617.7079613,
+    "stage2_float32_seed42_reference": 1570.8412348,
+    "stage3_bfloat16_seed42_fast": 3430.8360456,
+    "stage3_bfloat16_seed42_reference": 3437.0006470,
+    "stage3_bfloat16_seed43_fast": 3191.2068063,
+    "stage3_bfloat16_seed43_reference": 3564.2970527
+  },
+  "focused_tests": {
+    "passed": 202,
+    "warnings": 2,
+    "command_scope": [
+      "tests/test_centroid_topk.py",
+      "tests/test_prior_cpu_budget.py",
+      "tests/test_node_prior_pool.py",
+      "tests/test_pipeline_profile.py",
+      "tests/test_prior_pipeline.py"
+    ]
+  },
+  "step_data_csv": "cpu_budget_topk_20261031_steps.csv",
+  "step_data_rows": 110,
+  "fixed_shape_60k_profile": "not_run: node_pool prior rejected the fixed range (low >= high)"
+}
