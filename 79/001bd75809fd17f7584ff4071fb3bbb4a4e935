@@ -1,0 +1,30 @@
+tests/test_adaptive_resolution_attention.py
+  s_504f60b6bc311e::t_2c36f2af59a8d6 249-250,262,265-266,272-273,275-281
+scripts/screen_content_tree_v2.sh
+  s_504f60b6bc311e::t_ccc4e92a575fed 18-19
+scripts/screen_icl_attention.py
+  s_504f60b6bc311e::t_ccc4e92a575fed 41-42,51-56,228
+tests/test_icl_training_diagnostics.py
+  s_504f60b6bc311e::t_c500ce23b29ab0 127-186
+  s_504f60b6bc311e::t_33ecab21d02d89 126
+tests/test_icl_screening.py
+  s_504f60b6bc311e::t_ccc4e92a575fed 70-72
+src/tabicl/train/_run.py
+  s_504f60b6bc311e::t_ace2c9c0eb4b85 926-929,1150-1167,1241-1244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "79001bd75809fd17f7584ff4071fb3bbb4a4e935",
+  "prompts": {},
+  "sessions": {
+    "s_504f60b6bc311e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e966-8bcc-7bc3-bf7d-0235b5778702",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
