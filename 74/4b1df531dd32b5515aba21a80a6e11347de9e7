@@ -1,0 +1,21 @@
+src/tabicl/prior/_scheduling.py
+  s_3d6845861c5da5::t_e0f260e95e1c2e 86-94,102-103
+tests/test_prior_scheduling.py
+  s_3d6845861c5da5::t_3dad23dd5d4c8e 64-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "744b1df531dd32b5515aba21a80a6e11347de9e7",
+  "prompts": {},
+  "sessions": {
+    "s_3d6845861c5da5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1eade-2f1f-7c33-92f0-cd3ae0f38a45",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
