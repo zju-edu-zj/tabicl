@@ -1,0 +1,53 @@
+src/tabicl/train/_train_config.py
+  s_1b3169379f960a::t_aa8d15c6ab58a1 149-154,394-399
+src/tabicl/_model/icl_attention.py
+  s_1b3169379f960a::t_c9af8bdceecde5 84-90,129,137,140-160,181-183,188-239,322-331,363,413,415-420,423-452
+  s_1b3169379f960a::t_5fac25574b494e 458
+  s_1b3169379f960a::t_27922d284440c1 8,40,54-55,68,83,453-457,459-463
+src/tabicl/_model/encoders.py
+  s_1b3169379f960a::t_98e1f2234d307d 100,153
+tests/test_icl_training_diagnostics.py
+  s_1b3169379f960a::t_0524fcdad05453 191-201,203-211,213-216,218,221
+  s_1b3169379f960a::t_6860c4ac494b55 202,212,217,219-220
+src/tabicl/_model/tabicl.py
+  s_1b3169379f960a::t_98e1f2234d307d 171-174,248,310-312,373
+scripts/train_v2_clf_stage2_sparse_fusion_v1.sh
+  s_1b3169379f960a::t_f7c49512281f70 1-24
+src/tabicl/train/_run.py
+  s_1b3169379f960a::t_5fac25574b494e 675-678
+  s_1b3169379f960a::t_c9af8bdceecde5 682,685
+  s_1b3169379f960a::t_aa8d15c6ab58a1 331,631,641-642,651-657,668-674,679-681,683-684,686-690
+scripts/icl_recipe.sh
+  s_1b3169379f960a::t_aa8d15c6ab58a1 11,35
+tests/test_icl_attention.py
+  s_1b3169379f960a::t_c9af8bdceecde5 274
+  s_1b3169379f960a::t_0524fcdad05453 261-273,275-300
+src/tabicl/_model/layers.py
+  s_1b3169379f960a::t_98e1f2234d307d 598,630
+src/tabicl/train/_optimizer.py
+  s_1b3169379f960a::t_c9af8bdceecde5 42-43
+  s_1b3169379f960a::t_62b24959b592b4 33-41,44-49
+src/tabicl/_model/_routing_triton.py
+  s_1b3169379f960a::t_c9af8bdceecde5 3-4
+  s_1b3169379f960a::t_21a5ba1d13fec7 152-268
+scripts/train_v2_clf_stage2.sh
+  s_1b3169379f960a::t_f7c49512281f70 47-48,63,70,75,119-120,124
+tests/test_centroid_topk.py
+  s_1b3169379f960a::t_5fac25574b494e 106-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8fbf3f3f5d4e24e65e20028831d1ad9cdd05cc05",
+  "prompts": {},
+  "sessions": {
+    "s_1b3169379f960a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e5de-ef51-7e10-9d98-ea6fd203f0bf",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

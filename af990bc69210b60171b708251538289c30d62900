@@ -1,0 +1,27 @@
+tests/test_adaptive_resolution_attention.py
+  s_9acb7393662811::t_5e8c1e33be191d 17,20-21,151,154-155
+tests/test_hierarchical_frontier.py
+  s_9acb7393662811::t_5e8c1e33be191d 8,10,69-101
+src/tabicl/_model/_hierarchical_frontier.py
+  s_9acb7393662811::t_849901dbbb0c70 47-79,135,138,148,162-163,165,174
+src/tabicl/_model/_adaptive_frontier.py
+  s_9acb7393662811::t_849901dbbb0c70 12,39-43,55,58,63,70,114,127,133,214-216,219,229,235,243
+src/tabicl/_model/_hierarchical_frontier_triton.py
+  s_9acb7393662811::t_8585efd4cb2a04 72-73,76,90-92,117,126,128-142,298,306,321,330,338,371,376,387-388,390
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "af990bc69210b60171b708251538289c30d62900",
+  "prompts": {},
+  "sessions": {
+    "s_9acb7393662811": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ea73-f531-7a92-875d-ff6c0c5c945a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

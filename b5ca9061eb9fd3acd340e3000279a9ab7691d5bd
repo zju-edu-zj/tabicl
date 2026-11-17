@@ -1,0 +1,19 @@
+tests/test_icl_screening.py
+  s_504f60b6bc311e::t_7dae2f23ca835d 441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b5ca9061eb9fd3acd340e3000279a9ab7691d5bd",
+  "prompts": {},
+  "sessions": {
+    "s_504f60b6bc311e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e966-8bcc-7bc3-bf7d-0235b5778702",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

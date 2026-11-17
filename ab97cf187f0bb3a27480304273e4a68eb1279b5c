@@ -1,0 +1,21 @@
+scripts/screen_icl_attention.py
+  s_4be667207dc3df::t_d6bae49107d605 169,526,547
+tests/test_icl_screening.py
+  s_4be667207dc3df::t_3ebad927df2a1a 70-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ab97cf187f0bb3a27480304273e4a68eb1279b5c",
+  "prompts": {},
+  "sessions": {
+    "s_4be667207dc3df": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e8d3-4364-7841-8f4c-ebcf72b18579",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

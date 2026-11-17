@@ -1,0 +1,19 @@
+scripts/benchmark_stage1_training.py
+  s_9acb7393662811::t_f7186902920a0f 21-23,33-43,66,72-73,75-76,81-89,91-94,111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ed073b306d53bce9b72f1fd4ac8e73af80243b10",
+  "prompts": {},
+  "sessions": {
+    "s_9acb7393662811": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ea73-f531-7a92-875d-ff6c0c5c945a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

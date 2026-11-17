@@ -1,0 +1,31 @@
+tests/test_adaptive_attention_kernels.py
+  s_fca65a5dd13b4f::t_d6de22612029e4 1-149
+src/tabicl/_model/_block_pool.py
+  s_4be667207dc3df::t_78ce0179d5d503 1-142
+src/tabicl/_model/_sparse_triton.py
+  s_4be667207dc3df::t_da8c8bf20aefe9 67,80,104-105,151,167,196-198,205-244,248,275,279,289-294,300-304,309,311,318-319,325-329
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c33bb87136db3e60126909c813329b5f55727eb7",
+  "prompts": {},
+  "sessions": {
+    "s_4be667207dc3df": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e8d3-4364-7841-8f4c-ebcf72b18579",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    },
+    "s_fca65a5dd13b4f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e8e6-b346-7080-95dc-0374514bdbe6",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

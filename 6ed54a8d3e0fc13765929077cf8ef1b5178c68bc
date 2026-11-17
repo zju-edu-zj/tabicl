@@ -1,0 +1,21 @@
+scripts/screen_content_tree_v2.sh
+  s_4be667207dc3df::t_2d833f69016e38 1-31
+scripts/screen_icl_attention.py
+  s_4be667207dc3df::t_2d833f69016e38 44-47,85-87,169,220-222,225,247-251,526,547
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6ed54a8d3e0fc13765929077cf8ef1b5178c68bc",
+  "prompts": {},
+  "sessions": {
+    "s_4be667207dc3df": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e8d3-4364-7841-8f4c-ebcf72b18579",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
