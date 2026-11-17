@@ -1,0 +1,19 @@
+tests/test_block_pool.py
+  s_931d3d610df12b::t_f59b923e9e5d63 90,122-126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a801731edc1ffb589f374ce6690c7c59d0860e13",
+  "prompts": {},
+  "sessions": {
+    "s_931d3d610df12b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1eafa-02f1-7790-9b18-56d58f36a9c1",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
