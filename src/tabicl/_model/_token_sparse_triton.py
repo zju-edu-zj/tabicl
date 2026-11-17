@@ -31,7 +31,7 @@ def _forward(Q, K, V, I, O, LSE, N, S, H: tl.constexpr, D: tl.constexpr,
 
 
 @triton.jit(do_not_specialize=["N", "S"])
-def _backward_q(Q, K, V, I, O, LSE, DO, DQ, N, S, H: tl.constexpr,
+def _backward_q(Q, K, V, I, O, LSE, DO, DQ, DELTA, N, S, H: tl.constexpr,
                 D: tl.constexpr, KSEL: tl.constexpr, KR: tl.constexpr,
                 SCALE: tl.constexpr):
     t, h, b = tl.program_id(0), tl.program_id(1), tl.program_id(2)
@@ -53,6 +53,7 @@ def _backward_q(Q, K, V, I, O, LSE, DO, DQ, N, S, H: tl.constexpr,
     delta = tl.sum(output * dout, axis=0)
     ds = probability * (dp - delta) * SCALE
     tl.store(DQ + qoff, tl.sum(ds[:, None] * key, axis=0))
+    tl.store(DELTA + (b * H + h) * N + t, delta)
 
 
 @triton.jit(do_not_specialize=["EDGES", "N", "S"])
@@ -79,7 +80,7 @@ def _edge_scatter(I, STARTS, CURSOR, REVERSE, EDGES, N, S,
 
 
 @triton.jit(do_not_specialize=["N", "S"])
-def _backward_kv(Q, K, V, O, LSE, DO, STARTS, REVERSE, DK, DV, N, S,
+def _backward_kv(Q, K, V, LSE, DO, DELTA, STARTS, REVERSE, DK, DV, N, S,
                  H: tl.constexpr, D: tl.constexpr, KSEL: tl.constexpr,
                  SCALE: tl.constexpr, BQ: tl.constexpr):
     token, h, b = tl.program_id(0), tl.program_id(1), tl.program_id(2)
@@ -98,12 +99,11 @@ def _backward_kv(Q, K, V, O, LSE, DO, STARTS, REVERSE, DK, DV, N, S,
         qoff = ((b * H + h) * N + query[:, None]) * D + d[None, :]
         q = tl.load(Q + qoff, valid[:, None], other=0).to(tl.float32)
         dout = tl.load(DO + qoff, valid[:, None], other=0).to(tl.float32)
-        output = tl.load(O + qoff, valid[:, None], other=0).to(tl.float32)
         lse = tl.load(LSE + (b * H + h) * N + query, valid, other=0)
+        delta = tl.load(DELTA + (b * H + h) * N + query, valid, other=0)
         score = tl.sum(q * key[None, :], axis=1) * SCALE
         probability = tl.where(valid, tl.exp(score - lse), 0.0)
         dp = tl.sum(dout * value[None, :], axis=1)
-        delta = tl.sum(dout * output, axis=1)
         ds = probability * (dp - delta) * SCALE
         dk += tl.sum(ds[:, None] * q, axis=0)
         dv += tl.sum(probability[:, None] * dout, axis=0)
@@ -138,8 +138,9 @@ class _TokenSparseAttention(torch.autograd.Function):
         support = k.shape[2]
         dout = dout.contiguous()
         dq = torch.empty_like(q)
+        delta = torch.empty((b, h, n), device=q.device, dtype=torch.float32)
         _backward_q[(n, h, b)](
-            q, k, v, indices, output, lse, dout, dq, n, support, h, d,
+            q, k, v, indices, output, lse, dout, dq, delta, n, support, h, d,
             selected, rounded, scale, num_warps=8,
         )
 
@@ -157,7 +158,7 @@ class _TokenSparseAttention(torch.autograd.Function):
         )
         dk, dv = torch.empty_like(k), torch.empty_like(v)
         _backward_kv[(support, h, b)](
-            q, k, v, output, lse, dout, starts, reverse, dk, dv, n, support,
+            q, k, v, lse, dout, delta, starts, reverse, dk, dv, n, support,
             h, d, selected, scale, 32, num_warps=4,
         )
         return dq, dk, dv, None

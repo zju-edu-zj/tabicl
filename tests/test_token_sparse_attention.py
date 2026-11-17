@@ -96,6 +96,36 @@ def test_index_loss_updates_only_indexer_and_is_label_permutation_invariant():
     torch.testing.assert_close(index_loss, permuted_loss)
 
 
+def test_index_query_projection_backpropagates_only_sampled_rows():
+    torch.manual_seed(607)
+    module = _module()
+    query = torch.randn(2, 13, 32)
+    support = torch.randn(2, 9, 32)
+    targets = torch.randint(0, 4, (2, 13))
+    positions = torch.tensor([9, 11, 12])
+    calls = []
+
+    def record_rows(_module, inputs, _output):
+        calls.append((inputs[0].shape[1], torch.is_grad_enabled()))
+
+    handle = module.index_q_proj.register_forward_hook(record_rows)
+    try:
+        _, loss = module(
+            query,
+            support,
+            support,
+            index_targets=targets,
+            index_query_indices=positions,
+            return_index_loss=True,
+        )
+    finally:
+        handle.remove()
+    loss.backward()
+    assert calls == [(query.shape[1], False), (positions.numel(), True)]
+    assert module.index_q_proj.weight.grad is not None
+    assert torch.isfinite(module.index_q_proj.weight.grad).all()
+
+
 def test_regression_index_loss_handles_constant_support_targets():
     torch.manual_seed(602)
     module = _module(regression=True)

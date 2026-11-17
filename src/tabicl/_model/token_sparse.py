@@ -88,7 +88,7 @@ class TokenSparseAttention(SupportAttention):
         for start in range(0, q_index.shape[1], chunk):
             scores = q_index[:, start : start + chunk].to(route_dtype) @ keys
             pieces.append(scores.topk(budget, dim=-1, sorted=False).indices.to(torch.int32))
-        indices = torch.cat(pieces, dim=1)
+        indices = pieces[0] if len(pieces) == 1 else torch.cat(pieces, dim=1)
         if self._route_record is not None:
             self._route_record.append(indices)
         return indices
@@ -143,14 +143,13 @@ class TokenSparseAttention(SupportAttention):
         target = target_logits.softmax(-1)
         return -(target * scores.log_softmax(-1)).sum(-1).mean()
 
-    def _index_loss(self, q_index, k_index, support, targets, positions):
+    def _index_loss(self, sampled_q, k_index, support, targets, positions):
         if targets is None or positions is None:
             raise ValueError("index targets and sampled query positions are required")
         if positions.ndim != 1 or positions.numel() > self.index_query_samples:
             raise ValueError("invalid token index query positions")
         if positions.numel() == 0:
             raise ValueError("token index supervision needs at least one test query")
-        sampled_q = q_index.index_select(1, positions)
         scale = self.index_logit_scale.exp().clamp(max=100.0)
         scores = scale * (sampled_q @ k_index.transpose(-1, -2))
         support_targets = targets[:, :support]
@@ -206,25 +205,39 @@ class TokenSparseAttention(SupportAttention):
     ):
         if not k.shape[-2]:
             raise ValueError("Token sparse ICL attention needs at least one support row")
-        q_index = F.normalize(
-            self.index_q_proj(self._merge_heads(q).detach()).float(), dim=-1
-        )
+        merged_q = self._merge_heads(q).detach()
+        with torch.no_grad():
+            q_index = F.normalize(self.index_q_proj(merged_q).float(), dim=-1)
         computed_k_index = None
         if prepared is not None and "index_k" in prepared:
             k_index = prepared["index_k"]
-        else:
+        elif return_index_loss:
             computed_k_index = F.normalize(
                 self.index_k_proj(self._merge_heads(k).detach()).float(), dim=-1
             )
             k_index = computed_k_index
+        else:
+            with torch.no_grad():
+                k_index = F.normalize(
+                    self.index_k_proj(self._merge_heads(k).detach()).float(), dim=-1
+                )
         index_loss = None
         if return_index_loss:
             if computed_k_index is None:
                 computed_k_index = F.normalize(
                     self.index_k_proj(self._merge_heads(k).detach()).float(), dim=-1
                 )
+            if index_query_indices is None:
+                raise ValueError("index targets and sampled query positions are required")
+            sampled_values = q_index.index_select(1, index_query_indices)
+            sampled_grad = F.normalize(
+                self.index_q_proj(merged_q.index_select(1, index_query_indices)).float(), dim=-1
+            )
+            # Preserve the full-projection forward values while restricting the
+            # index-query backward graph to the supervised rows.
+            sampled_q = sampled_values + sampled_grad - sampled_grad.detach()
             index_loss = self._index_loss(
-                q_index, computed_k_index, k.shape[-2], index_targets, index_query_indices
+                sampled_q, computed_k_index, k.shape[-2], index_targets, index_query_indices
             )
         if k.shape[-2] <= self.topk:
             attention_q = self.qk_norm.scale_query(q, k.shape[-2]) if self.qk_norm is not None else q

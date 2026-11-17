@@ -186,7 +186,9 @@ def test_public_choices_and_removed_flags():
 def test_attention_backend_choices_and_auto_context():
     parser = build_parser()
     action = next(a for a in parser._actions if a.dest == "attention_backend")
-    assert tuple(action.choices) == ("auto", "math", "flash", "efficient")
+    assert tuple(action.choices) == (
+        "auto", "native", "math", "flash", "efficient", "fp32_math", "fp32_row_math"
+    )
     trainer = Trainer.__new__(Trainer)
     trainer.config = parser.parse_args(["--attention_backend", "auto"])
     trainer._disable_cudnn_sdp = True

@@ -61,6 +61,7 @@ def main():
         "--icl_index_loss_weight", "0.05", "--icl_index_loss_warmup_steps", "5000",
         "--icl_index_lr", "0.0003",
     ])
+    trainer.config.icl_attention = args.attention
     trainer.ddp = False
     trainer.master_process = True
     trainer.curr_step = 0

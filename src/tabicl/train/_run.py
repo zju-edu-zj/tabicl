@@ -561,6 +561,8 @@ class Trainer:
     def _sdpa_ctx(self):
         """Apply the resolved training SDPA policy."""
         backend = getattr(self, "attention_backend", getattr(self.config, "attention_backend", "native"))
+        if backend == "auto":
+            return nullcontext()
 
         from torch.nn.attention import sdpa_kernel, SDPBackend
 
