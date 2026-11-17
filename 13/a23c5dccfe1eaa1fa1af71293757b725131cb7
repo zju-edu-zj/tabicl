@@ -1,0 +1,25 @@
+src/tabicl/_model/token_sparse.py
+  s_c464e329ae3a5a::t_5614ed9420ec88 121,125,131-136
+  s_c464e329ae3a5a::t_9911720c13ab78 43-45,209-219,222-225
+tests/test_token_sparse_attention.py
+  s_c464e329ae3a5a::t_5614ed9420ec88 2,11,117-152
+  s_c464e329ae3a5a::t_b980de334c30f9 153-154
+scripts/pretrain_m3_pilot.py
+  s_c464e329ae3a5a::t_f93b817be0f0fd 98-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "13a23c5dccfe1eaa1fa1af71293757b725131cb7",
+  "prompts": {},
+  "sessions": {
+    "s_c464e329ae3a5a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ea5c-eb77-7e20-b923-c783f9c08926",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
