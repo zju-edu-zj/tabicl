@@ -1,0 +1,19 @@
+src/tabicl/_model/_frontier_triton.py
+  s_504f60b6bc311e::t_9266155fa0584b 85,128,134,247,251,269,277
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7af510fc62107431454bf9591b31bc5048ea97d7",
+  "prompts": {},
+  "sessions": {
+    "s_504f60b6bc311e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e966-8bcc-7bc3-bf7d-0235b5778702",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
