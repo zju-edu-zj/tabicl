@@ -68,7 +68,8 @@ def main():
         embed_dim=128, col_num_blocks=3, col_nhead=8, col_num_inds=128,
         col_feature_group="same", col_target_aware=True, col_ssmax="qassmax-mlp-elementwise",
         row_num_blocks=3, row_nhead=8, row_num_cls=4, row_rope_interleaved=False,
-        icl_num_blocks=12, icl_nhead=8, icl_attention=args.attention, icl_ssmax=False,
+        icl_num_blocks=12, icl_nhead=8, icl_attention=args.attention,
+        icl_attention_impl_version=5 if args.attention == "token_sparse" else 4, icl_ssmax=False,
         icl_qk_norm=True, icl_token_topk=args.token_topk, icl_index_dim=args.index_dim,
         icl_index_query_samples=32, zero_init=False, recompute=args.recompute,
     ).cuda().train()
