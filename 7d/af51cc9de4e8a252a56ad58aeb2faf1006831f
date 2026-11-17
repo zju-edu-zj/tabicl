@@ -1,0 +1,21 @@
+scripts/train_content_tree_v2_pilot.sh
+  s_4be667207dc3df::t_2f6486aa8e5773 13-17,25
+src/tabicl/_model/_frontier_triton.py
+  s_4be667207dc3df::t_947202f13b5c5c 137,141-142,157-192,267-269,273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7daf51cc9de4e8a252a56ad58aeb2faf1006831f",
+  "prompts": {},
+  "sessions": {
+    "s_4be667207dc3df": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e8d3-4364-7841-8f4c-ebcf72b18579",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
