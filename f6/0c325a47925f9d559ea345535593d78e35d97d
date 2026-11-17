@@ -1,0 +1,24 @@
+src/tabicl/_model/_hierarchical_frontier.py
+  s_9acb7393662811::t_5422e6ae515685 103-163
+  s_9acb7393662811::t_39efc84a87425a 8-9
+src/tabicl/_model/_hierarchical_frontier_triton.py
+  s_9acb7393662811::t_74a6e19565d8e9 70-169,324,330-333,349,357,362-365,394-397,402,414
+src/tabicl/_model/_adaptive_frontier.py
+  s_9acb7393662811::t_39efc84a87425a 8-12,34-35,64-68,121-125,223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f60c325a47925f9d559ea345535593d78e35d97d",
+  "prompts": {},
+  "sessions": {
+    "s_9acb7393662811": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ea73-f531-7a92-875d-ff6c0c5c945a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
