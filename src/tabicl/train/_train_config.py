@@ -79,6 +79,11 @@ def build_parser():
              "Preserves checkpoint keys; first use incurs compilation latency and rounding may differ.",
     )
     parser.add_argument(
+        "--attention_backend", choices=["auto", "math", "flash", "efficient"], default="auto",
+        help="PyTorch SDPA backend policy. 'auto' leaves dispatch unrestricted and includes math fallback. "
+             "This does not control the custom token-sparse Triton kernels or FlashAttention-3.",
+    )
+    parser.add_argument(
         "--compile_optimizer", type=str2bool, default=False,
         help="Compile Muon Newton-Schulz matrix buckets with PyTorch >= 2.8; "
              "incurs initial compilation and can change floating point rounding.",

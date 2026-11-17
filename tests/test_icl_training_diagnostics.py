@@ -183,6 +183,16 @@ def test_public_choices_and_removed_flags():
             parser.parse_args([option, "1"])
 
 
+def test_attention_backend_choices_and_auto_context():
+    parser = build_parser()
+    action = next(a for a in parser._actions if a.dest == "attention_backend")
+    assert tuple(action.choices) == ("auto", "math", "flash", "efficient")
+    trainer = Trainer.__new__(Trainer)
+    trainer.config = parser.parse_args(["--attention_backend", "auto"])
+    trainer._disable_cudnn_sdp = True
+    assert isinstance(trainer._sdpa_ctx(), nullcontext)
+
+
 def test_dense_default_preserves_official_parameter_layout():
     from tabicl._model.encoders import Encoder
 

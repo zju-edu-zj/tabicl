@@ -505,11 +505,28 @@ class Trainer:
             self.amp_ctx = nullcontext()
 
     def _sdpa_ctx(self):
-        """Context manager that disables cuDNN SDPA for the training forward."""
-        if self._disable_cudnn_sdp:
-            from torch.nn.attention import sdpa_kernel, SDPBackend
+        """Apply the configured PyTorch SDPA dispatch policy."""
+        backend = getattr(self.config, "attention_backend", None)
+        if backend == "auto":
+            return nullcontext()
 
-            return sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH])
+        from torch.nn.attention import sdpa_kernel, SDPBackend
+
+        choices = {
+            "math": SDPBackend.MATH,
+            "flash": SDPBackend.FLASH_ATTENTION,
+            "efficient": SDPBackend.EFFICIENT_ATTENTION,
+        }
+        if backend in choices:
+            return sdpa_kernel(choices[backend])
+        # Compatibility for tests and callers that construct Trainer manually
+        # without parsing the current command-line configuration.
+        if backend is None and self._disable_cudnn_sdp:
+            return sdpa_kernel([
+                SDPBackend.FLASH_ATTENTION,
+                SDPBackend.EFFICIENT_ATTENTION,
+                SDPBackend.MATH,
+            ])
         return nullcontext()
 
     def get_latest_checkpoint(self):

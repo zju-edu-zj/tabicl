@@ -27,6 +27,12 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dtype", choices=["float32", "bfloat16"], default="bfloat16")
     parser.add_argument("--mode", choices=["none", "row", "all"], default="all")
+    parser.add_argument("--attention", choices=["dense", "global_sparse", "token_sparse"],
+                        default="token_sparse")
+    parser.add_argument("--attention-backend", choices=["auto", "math", "flash", "efficient"],
+                        default="auto")
+    parser.add_argument("--token-topk", type=int, default=128)
+    parser.add_argument("--index-dim", type=int, default=16)
     parser.add_argument("--rows", type=int, nargs="+", default=[1024])
     parser.add_argument("--features", type=int, default=100)
     parser.add_argument("--batch", type=int, default=1)
@@ -49,6 +55,9 @@ def main():
         "--warmup_steps", "5000", "--max_steps", "500000",
         "--icl_diagnostics_every", str(args.diagnostics), "--fail_fast", "True",
         "--ignore_d", "True", "--use_flash_attn3", "False",
+        "--attention_backend", args.attention_backend,
+        "--icl_index_loss_weight", "0.05", "--icl_index_loss_warmup_steps", "5000",
+        "--icl_index_lr", "0.0003",
     ])
     trainer.ddp = False
     trainer.master_process = True
@@ -59,8 +68,9 @@ def main():
         embed_dim=128, col_num_blocks=3, col_nhead=8, col_num_inds=128,
         col_feature_group="same", col_target_aware=True, col_ssmax="qassmax-mlp-elementwise",
         row_num_blocks=3, row_nhead=8, row_num_cls=4, row_rope_interleaved=False,
-        icl_num_blocks=12, icl_nhead=8, icl_attention="global_sparse", icl_ssmax=False,
-        icl_qk_norm=True, zero_init=False, recompute=args.recompute,
+        icl_num_blocks=12, icl_nhead=8, icl_attention=args.attention, icl_ssmax=False,
+        icl_qk_norm=True, icl_token_topk=args.token_topk, icl_index_dim=args.index_dim,
+        icl_index_query_samples=32, zero_init=False, recompute=args.recompute,
     ).cuda().train()
     trainer.model.compile_frontend(args.mode)
     trainer.configure_optimizer()

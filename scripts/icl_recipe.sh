@@ -29,9 +29,11 @@ TRAIN_DTYPE=${TRAIN_DTYPE:-bfloat16}
 RECOMPUTE=${RECOMPUTE:-False}
 COMPILE_FRONTEND=${COMPILE_FRONTEND:-none}
 COMPILE_OPTIMIZER=${COMPILE_OPTIMIZER:-False}
+ATTENTION_BACKEND=${ATTENTION_BACKEND:-auto}
 ICL_ARGS=(
     --compile_frontend "$COMPILE_FRONTEND"
     --compile_optimizer "$COMPILE_OPTIMIZER"
+    --attention_backend "$ATTENTION_BACKEND"
     --icl_attention "$ICL_ATTENTION"
     --icl_router "$ICL_ROUTER"
     --icl_router_beam "$ICL_ROUTER_BEAM"
