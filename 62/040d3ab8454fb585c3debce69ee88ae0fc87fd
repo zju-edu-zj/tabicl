@@ -1,0 +1,60 @@
+src/tabicl/_model/_token_sparse_triton.py
+  s_c464e329ae3a5a::t_1ff116f8f2e0a4 1-175
+src/tabicl/_model/layers.py
+  s_c464e329ae3a5a::t_a55df82e161211 604,636,638,672-674,764-766,769-771,787-789,792-794,802-803,819-821,823,830-839
+  s_c464e329ae3a5a::t_c38f05cece93bc 600-603,605,627-635,637
+scripts/train_v2_clf_stage1_token_sparse.sh
+  s_c464e329ae3a5a::t_98328fddccdb44 1-17
+scripts/icl_recipe.sh
+  s_c464e329ae3a5a::t_1afd005e27c295 8-14,45-51
+src/tabicl/_model/icl_attention.py
+  s_c464e329ae3a5a::t_c38f05cece93bc 20
+src/tabicl/_model/token_sparse.py
+  s_c464e329ae3a5a::t_1ff116f8f2e0a4 142-143
+  s_c464e329ae3a5a::t_a55df82e161211 25-119
+  s_c464e329ae3a5a::t_108b86a65c89f5 18,137-141,152,180,188-270
+  s_c464e329ae3a5a::t_c78d904e28fa3e 1-17,19-24,120-136,144-151,153-179,181-187
+src/tabicl/_model/encoders.py
+  s_c464e329ae3a5a::t_d196d1fe0a1697 205-206
+  s_c464e329ae3a5a::t_108b86a65c89f5 6,183,208-214,219-227,229
+  s_c464e329ae3a5a::t_a55df82e161211 108,166
+  s_c464e329ae3a5a::t_c38f05cece93bc 104-107,109,162-165,167,178-182,184,204,231-234
+src/tabicl/train/_run.py
+  s_c464e329ae3a5a::t_d196d1fe0a1697 1039,1056,1058,1062
+  s_c464e329ae3a5a::t_1afd005e27c295 569-574,580-582,595-599,606-616,655-659
+  s_c464e329ae3a5a::t_7567223226e58d 315,322-325,1002-1008,1012-1020,1027-1035,1040-1045,1061,1063-1066
+src/tabicl/_model/tabicl.py
+  s_c464e329ae3a5a::t_f6524211c28fe3 248-251,298-302,312-315,379-382,384,455-463,516-522,676-684
+  s_c464e329ae3a5a::t_0f94004c9d1137 617-619
+  s_c464e329ae3a5a::t_a55df82e161211 383
+src/tabicl/_model/learning.py
+  s_c464e329ae3a5a::t_0f94004c9d1137 550-552
+  s_c464e329ae3a5a::t_a55df82e161211 103,138
+  s_c464e329ae3a5a::t_f6524211c28fe3 99-102,104,134-137,139,275-282,318-327,332,597-608
+src/tabicl/train/_train_config.py
+  s_c464e329ae3a5a::t_7567223226e58d 359-372
+src/tabicl/train/_screening.py
+  s_c464e329ae3a5a::t_117f938387ad9c 4,64-66,87-101
+scripts/benchmark_icl_attention.py
+  s_c464e329ae3a5a::t_b93a0454007cad 20,28-31,52-54,88-89,178-179,185-192,194-215,232,241-242
+src/tabicl/train/_optimizer.py
+  s_c464e329ae3a5a::t_e542924bb7bb7e 24-46,68-72,75-78
+tests/test_token_sparse_attention.py
+  s_c464e329ae3a5a::t_b5f7202446c22c 1-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "62040d3ab8454fb585c3debce69ee88ae0fc87fd",
+  "prompts": {},
+  "sessions": {
+    "s_c464e329ae3a5a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ea5c-eb77-7e20-b923-c783f9c08926",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
