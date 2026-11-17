@@ -83,6 +83,15 @@ def micro_cost(params, results, indices, model):
         routing_keys = (leaves if model.get("icl_router", "centroid") == "centroid" else
                         model.get("icl_router_beam", 16) * math.ceil(math.log2(max(2, leaves))))
         retrieval += rows * dim * routing_keys
+    token_budget = min(support, model.get("icl_token_topk", 128))
+    index_dim = model.get("icl_index_dim", 16)
+    index_samples = min(rows - support, model.get("icl_index_query_samples", 32))
+    token_sparse = (
+        2 * rows * dim * token_budget
+        + 2 * rows * support * index_dim
+        + 2 * (rows + support) * dim * index_dim
+        + 2 * index_samples * support * index_dim
+    )
     hybrids = {"global_full": "fused_full", "global_sparse": "fused_sparse",
                "global_sparse_alternating": "sparse"}
     icl = 0.
@@ -90,7 +99,8 @@ def micro_cost(params, results, indices, model):
         kind = (hybrids[attention] if (layer+1) % model.get("icl_sparse_every", 3) == 0 else "global") if attention in hybrids else attention
         pair_work = {"dense": 2*rows*support*dim, "global": global_work,
                      "sparse": retrieval, "fused_sparse": global_work+retrieval,
-                     "fused_full": global_work+2*rows*support*dim}[kind]
+                     "fused_full": global_work+2*rows*support*dim,
+                     "token_sparse": token_sparse}[kind]
         icl += (2*rows + 2*support + 2*ff*rows)*dim*dim + pair_work
     return float(len(indices) * (col + row + icl))
 

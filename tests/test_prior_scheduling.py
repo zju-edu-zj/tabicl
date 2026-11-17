@@ -61,6 +61,20 @@ def test_cost_proxy_respects_hybrid_layers_and_centroid_routing():
                                                               icl_num_selected_blocks=2)
 
 
+def test_cost_proxy_supports_pure_token_sparse_attention():
+    params = [dict(seq_len=2048, train_size=1228)]
+    results = [(None, None, 40)]
+    base = dict(col_num_blocks=0, row_num_blocks=0, icl_num_blocks=12)
+
+    def cost(**kwargs):
+        return micro_cost(params, results, [0], {**base, **kwargs})
+
+    token = cost(icl_attention="token_sparse", icl_token_topk=128, icl_index_dim=16)
+    assert 0 < token < cost(icl_attention="dense")
+    assert cost(icl_attention="token_sparse", icl_token_topk=256, icl_index_dim=16) > token
+    assert cost(icl_attention="token_sparse", icl_token_topk=128, icl_index_dim=32) > token
+
+
 @pytest.mark.parametrize("micro", [1, 4])
 def test_cohort_preserves_micro_boundaries_and_gradient_weights(micro):
     ranks, local = 16, 4
