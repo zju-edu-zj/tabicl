@@ -597,6 +597,12 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         qk_norm: bool = False,
         global_type: str = "elu",
         num_induced_slots: int = 128,
+        token_topk: int = 128,
+        token_index_dim: int = 16,
+        token_index_query_samples: int = 32,
+        token_index_regression: bool = False,
+        token_index_num_classes: int = 10,
+        token_index_regression_temperature: float = 0.2,
     ):
         super().__init__(
             d_model, nhead, dim_feedforward, dropout, activation=activation, norm_first=norm_first, batch_first=True
@@ -617,6 +623,18 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
                 qk_norm=qk_norm,
                 qk_length_scale=global_type != "elu",
                 global_type=global_type, num_induced_slots=num_induced_slots,
+            )
+        elif attention_type == "token_sparse":
+            from .token_sparse import TokenSparseAttention
+
+            self.attn = TokenSparseAttention(
+                d_model, nhead, dropout, False, qk_norm=qk_norm,
+                topk=token_topk, index_dim=token_index_dim,
+                query_chunk_size=query_chunk_size,
+                index_query_samples=token_index_query_samples,
+                index_regression=token_index_regression,
+                index_num_classes=token_index_num_classes,
+                index_regression_temperature=token_index_regression_temperature,
             )
         elif attention_type in ("sparse", "fused_sparse", "fused_full"):
             from .icl_attention import SetRetrievalAttention
@@ -651,6 +669,9 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         train_size: Optional[int] = None,
         rope: Optional[RotaryEmbedding] = None,
         need_kv: bool = False,
+        index_targets: Optional[Tensor] = None,
+        index_query_indices: Optional[Tensor] = None,
+        return_index_loss: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor, Tensor]]:
         """Process input through attention.
 
@@ -740,9 +761,14 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
                     attn_mask=attn_mask,
                     rope=rope,
                     need_kv=need_kv,
+                    index_targets=index_targets,
+                    index_query_indices=index_query_indices,
+                    return_index_loss=return_index_loss,
                 )
 
-                if need_kv and isinstance(attn_result, tuple):
+                if return_index_loss:
+                    attn, index_loss = attn_result
+                elif need_kv and isinstance(attn_result, tuple):
                     attn, k_proj, v_proj = attn_result
                 else:
                     attn = attn_result
@@ -758,9 +784,14 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
             else:
                 attn_result = self._attn_block(
                     q, k, v, key_padding_mask=key_padding_mask, attn_mask=attn_mask, rope=rope, need_kv=need_kv,
+                    index_targets=index_targets,
+                    index_query_indices=index_query_indices,
+                    return_index_loss=return_index_loss,
                 )
 
-                if need_kv and isinstance(attn_result, tuple):
+                if return_index_loss:
+                    attn, index_loss = attn_result
+                elif need_kv and isinstance(attn_result, tuple):
                     attn, k_proj, v_proj = attn_result
                 else:
                     attn = attn_result
@@ -768,6 +799,8 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
             x = self.norm1(q + attn)
             x = self.norm2(x + self._ff_block(x))
 
+        if return_index_loss:
+            return x, index_loss
         if need_kv and k_proj is not None:
             return x, k_proj, v_proj
 
@@ -783,17 +816,27 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         attn_mask: Optional[Tensor] = None,
         rope: Optional[RotaryEmbedding] = None,
         need_kv: bool = False,
+        index_targets: Optional[Tensor] = None,
+        index_query_indices: Optional[Tensor] = None,
+        return_index_loss: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor, Tensor]]:
-        result = self.attn(
-            q,
-            k,
-            v,
+        kwargs = dict(
             cached_kv=cached_kv,
             key_padding_mask=key_padding_mask,
             attn_mask=attn_mask,
             rope=rope,
             need_kv=need_kv,
         )
+        if return_index_loss:
+            kwargs.update(
+                index_targets=index_targets,
+                index_query_indices=index_query_indices,
+                return_index_loss=True,
+            )
+        result = self.attn(q, k, v, **kwargs)
+        if return_index_loss:
+            attn, index_loss = result
+            return self.dropout1(attn), index_loss
         if need_kv and isinstance(result, tuple):
             attn, k_proj, v_proj = result
             return self.dropout1(attn), k_proj, v_proj

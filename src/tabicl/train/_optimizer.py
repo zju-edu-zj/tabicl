@@ -21,10 +21,29 @@ def build_optimizer(model, config):
     if not trainable:
         raise ValueError("No trainable parameters")
     if not config.muon:
-        return torch.optim.AdamW(
-            [p for _, p in trainable], lr=config.lr,
-            betas=(config.beta1, config.beta2), weight_decay=config.weight_decay,
-        )
+        index_lr = getattr(config, "icl_index_lr", 3e-4)
+        indexer = [(name, p) for name, p in trainable if ".index_" in name]
+        if not indexer:
+            return torch.optim.AdamW(
+                [p for _, p in trainable], lr=config.lr,
+                betas=(config.beta1, config.beta2), weight_decay=config.weight_decay,
+            )
+        index_ids = {id(p) for _, p in indexer}
+        groups = [dict(
+            params=[p for _, p in trainable if id(p) not in index_ids],
+            param_names=[name for name, p in trainable if id(p) not in index_ids],
+            group_name="adamw", lr=config.lr, weight_decay=config.weight_decay,
+        )]
+        for decay in (True, False):
+            selected = [(name, p) for name, p in indexer if (p.ndim >= 2) == decay]
+            if selected:
+                groups.append(dict(
+                    params=[p for _, p in selected],
+                    param_names=[name for name, _ in selected],
+                    group_name="indexer_decay" if decay else "indexer_no_decay",
+                    lr=index_lr, weight_decay=config.weight_decay if decay else 0.0,
+                ))
+        return torch.optim.AdamW(groups, betas=(config.beta1, config.beta2))
 
     adamw_lr = getattr(config, "adamw_lr", None)
     adamw_lr = config.lr / 4 if adamw_lr is None else adamw_lr
@@ -46,9 +65,17 @@ def build_optimizer(model, config):
                             lr=adamw_lr, weight_decay=config.weight_decay),
         "adamw_no_decay": dict(params=[], param_names=[], use_muon=False,
                                lr=adamw_lr, weight_decay=0.0),
+        "indexer_decay": dict(params=[], param_names=[], use_muon=False,
+                              lr=getattr(config, "icl_index_lr", 3e-4),
+                              weight_decay=config.weight_decay),
+        "indexer_no_decay": dict(params=[], param_names=[], use_muon=False,
+                                 lr=getattr(config, "icl_index_lr", 3e-4), weight_decay=0.0),
     }
     for name, p in trainable:
-        key = "muon" if id(p) in muon_ids else "adamw_no_decay" if p.ndim < 2 else "adamw_decay"
+        if ".index_" in name:
+            key = "indexer_decay" if p.ndim >= 2 else "indexer_no_decay"
+        else:
+            key = "muon" if id(p) in muon_ids else "adamw_no_decay" if p.ndim < 2 else "adamw_decay"
         groups[key]["params"].append(p)
         groups[key]["param_names"].append(name)
     routed = [dict(group, group_name=name) for name, group in groups.items() if group["params"]]

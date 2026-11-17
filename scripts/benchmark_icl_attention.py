@@ -17,6 +17,7 @@ import torch
 from tabicl._model.encoders import Encoder
 from tabicl._model.attention import HAS_FLASH_ATTN3
 from tabicl._model.icl_attention import ICL_ATTENTION_TYPES, SetRetrievalAttention
+from tabicl._model.token_sparse import TokenSparseAttention
 from tabicl._model.kv_cache import KVCache
 from tabicl._model.tabicl import TabICL
 from tabicl.train._optimizer import build_optimizer
@@ -24,7 +25,10 @@ from tabicl.train._optimizer import build_optimizer
 
 def compiled_variants():
     """Diagnostic only: counts cached Triton variants in this benchmark process."""
-    from tabicl._model import _routing_triton, _sparse_triton, _sparse_grouped, _norm_triton, _elu_kernel
+    from tabicl._model import (
+        _routing_triton, _sparse_triton, _sparse_grouped, _norm_triton,
+        _elu_kernel, _token_sparse_triton,
+    )
 
     names = {
         _routing_triton: (
@@ -45,6 +49,9 @@ def compiled_variants():
         _sparse_grouped: ("_count", "_scatter", "_leaf_tiles", "_merge"),
         _norm_triton: ("_norm", "_norm_backward"),
         _elu_kernel: ("_elu_state", "_elu_apply", "_elu_backward_query", "_elu_backward_support"),
+        _token_sparse_triton: (
+            "_forward", "_backward_q", "_edge_count", "_edge_scatter", "_backward_kv",
+        ),
     }
     counts = {}
     for module, kernels in names.items():
@@ -78,6 +85,8 @@ def main():
     p.add_argument("--induced-slots", type=int, default=128)
     p.add_argument("--block-size", type=int, default=128)
     p.add_argument("--selected-blocks", type=int, default=4)
+    p.add_argument("--token-topk", type=int, default=128)
+    p.add_argument("--index-dim", type=int, default=16)
     p.add_argument("--sparse-every", type=int, default=3)
     p.add_argument("--repeat", type=int, default=7)
     p.add_argument("--warmup", type=int, default=3)
@@ -166,30 +175,44 @@ def main():
             partition=args.partition,
             global_type=args.global_type,
             num_induced_slots=args.induced_slots,
+            token_topk=args.token_topk,
+            token_index_dim=args.index_dim,
             qk_norm=True,
             recompute=args.recompute,
             zero_init=False,
         )
         if args.scope == "routing":
-            model = SetRetrievalAttention(
-                512,
-                args.nhead,
-                block_size=args.block_size,
-                num_selected_blocks=args.selected_blocks,
-                router=args.router,
-                router_beam=args.router_beam,
-                partition=args.partition,
-                qk_norm=True,
-            ).cuda()
-            q = torch.randn(
-                args.batch_size, args.nhead, args.rows, 512 // args.nhead, device="cuda", dtype=dtype
-            )
-            k = torch.randn(
-                args.batch_size, args.nhead, s, 512 // args.nhead, device="cuda", dtype=dtype
-            )
+            if args.attention == "token_sparse":
+                model = TokenSparseAttention(
+                    512, args.nhead, topk=args.token_topk,
+                    index_dim=args.index_dim, qk_norm=True,
+                ).cuda()
+                q = torch.randn(args.batch_size, args.rows, args.index_dim, device="cuda")
+                k = torch.randn(args.batch_size, s, args.index_dim, device="cuda")
+                q, k = torch.nn.functional.normalize(q, dim=-1), torch.nn.functional.normalize(k, dim=-1)
 
-            def forward():
-                return model.route(q, k)[1]
+                def forward():
+                    return model.route(q, k)
+            else:
+                model = SetRetrievalAttention(
+                    512,
+                    args.nhead,
+                    block_size=args.block_size,
+                    num_selected_blocks=args.selected_blocks,
+                    router=args.router,
+                    router_beam=args.router_beam,
+                    partition=args.partition,
+                    qk_norm=True,
+                ).cuda()
+                q = torch.randn(
+                    args.batch_size, args.nhead, args.rows, 512 // args.nhead, device="cuda", dtype=dtype
+                )
+                k = torch.randn(
+                    args.batch_size, args.nhead, s, 512 // args.nhead, device="cuda", dtype=dtype
+                )
+
+                def forward():
+                    return model.route(q, k)[1]
 
         elif args.scope == "tabicl":
             if args.phase != "train":
@@ -206,6 +229,7 @@ def main():
                 icl_nhead=args.nhead,
                 icl_ssmax=False,
                 icl_attention=args.attention,
+                icl_attention_impl_version=5 if args.attention == "token_sparse" else 4,
                 icl_sparse_every=args.sparse_every,
                 icl_block_size=args.block_size,
                 icl_num_selected_blocks=args.selected_blocks,
@@ -214,6 +238,8 @@ def main():
                 icl_partition=args.partition,
                 icl_global_type=args.global_type,
                 icl_num_induced_slots=args.induced_slots,
+                icl_token_topk=args.token_topk,
+                icl_index_dim=args.index_dim,
                 icl_qk_norm=True,
                 recompute=args.recompute,
                 zero_init=False,

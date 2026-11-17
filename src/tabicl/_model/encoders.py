@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional, Union
 from functools import partial
 
+import torch
 from torch import nn, Tensor
 from torch.utils.checkpoint import checkpoint
 
@@ -100,6 +101,12 @@ class Encoder(nn.Module):
         qk_norm: bool = False,
         global_type: str = "elu",
         num_induced_slots: int = 128,
+        token_topk: int = 128,
+        token_index_dim: int = 16,
+        token_index_query_samples: int = 32,
+        token_index_regression: bool = False,
+        token_index_num_classes: int = 10,
+        token_index_regression_temperature: float = 0.2,
     ):
         super().__init__()
 
@@ -152,6 +159,12 @@ class Encoder(nn.Module):
                     qk_norm=qk_norm,
                     global_type=global_type,
                     num_induced_slots=num_induced_slots,
+                    token_topk=token_topk,
+                    token_index_dim=token_index_dim,
+                    token_index_query_samples=token_index_query_samples,
+                    token_index_regression=token_index_regression,
+                    token_index_num_classes=token_index_num_classes,
+                    token_index_regression_temperature=token_index_regression_temperature,
                 )
                 for layer_attention in self.block_types
             ]
@@ -162,7 +175,13 @@ class Encoder(nn.Module):
         )
         self.recompute = recompute
 
-    def forward(self, src: Tensor, train_size: Optional[int] = None) -> Tensor:
+    def forward(
+        self,
+        src: Tensor,
+        train_size: Optional[int] = None,
+        index_targets: Optional[Tensor] = None,
+        index_query_indices: Optional[Tensor] = None,
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """Process input through the stacked blocks.
 
         Parameters
@@ -182,16 +201,37 @@ class Encoder(nn.Module):
             Output tensor with same shape as ``src``.
         """
         out = src
+        index_losses = []
+        if index_targets is not None and self.attention_type != "token_sparse":
+            raise ValueError("index_targets require token_sparse attention")
         for block in self.blocks:
+            block_kwargs = {"train_size": train_size, "rope": self.rope}
+            if index_targets is not None:
+                block_kwargs.update(
+                    index_targets=index_targets,
+                    index_query_indices=index_query_indices,
+                    return_index_loss=True,
+                )
             if self.recompute:
-                kwargs = {"train_size": train_size, "rope": self.rope}
                 checkpoint_args = {}
                 if hasattr(block.attn, "checkpoint_contexts"):
                     checkpoint_args["context_fn"] = block.attn.checkpoint_contexts
-                out = checkpoint(partial(block, **kwargs), out, use_reentrant=False, **checkpoint_args)
+                result = checkpoint(
+                    partial(block, **block_kwargs), out, use_reentrant=False, **checkpoint_args
+                )
             else:
-                out = block(q=out, train_size=train_size, rope=self.rope)
+                result = block(q=out, **block_kwargs)
 
+            if index_targets is not None:
+                out, index_loss = result
+                index_losses.append(index_loss)
+            else:
+                out = result
+
+        if index_targets is not None:
+            if not index_losses:
+                raise ValueError("index_targets require token_sparse attention")
+            return out, torch.stack(index_losses).mean()
         return out
 
     def forward_with_cache(

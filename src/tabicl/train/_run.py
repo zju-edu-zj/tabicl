@@ -312,13 +312,17 @@ class Trainer:
             "icl_num_blocks": self.config.icl_num_blocks,
             "icl_nhead": self.config.icl_nhead,
             "icl_attention": self.config.icl_attention,
-            "icl_attention_impl_version": 4,
+            "icl_attention_impl_version": 5 if self.config.icl_attention == "token_sparse" else 4,
             "icl_sparse_every": self.config.icl_sparse_every,
             "icl_block_size": self.config.icl_block_size,
             "icl_num_selected_blocks": self.config.icl_num_selected_blocks,
             "icl_query_chunk_size": self.config.icl_query_chunk_size,
             "icl_router": self.config.icl_router,
             "icl_router_beam": self.config.icl_router_beam,
+            "icl_token_topk": self.config.icl_token_topk,
+            "icl_index_dim": self.config.icl_index_dim,
+            "icl_index_query_samples": self.config.icl_index_query_samples,
+            "icl_index_regression_temperature": self.config.icl_index_regression_temperature,
             "icl_partition": self.config.icl_partition,
             "icl_global_type": self.config.icl_global_type,
             "icl_num_induced_slots": self.config.icl_num_induced_slots,
@@ -562,14 +566,20 @@ class Trainer:
         # Reject semantic architecture changes even when parameter shapes match.
         stored = checkpoint.get("config", {})
         mode = self.model_config["icl_attention"]
-        if mode != "dense" and stored.get("icl_attention_impl_version") != 4:
-            raise ValueError("Experimental checkpoint requires ICL implementation version 4; "
-                             "start a new checkpoint directory")
+        expected_impl = 5 if mode == "token_sparse" else 4
+        if mode != "dense" and stored.get("icl_attention_impl_version") != expected_impl:
+            raise ValueError(
+                f"Experimental checkpoint requires ICL implementation version {expected_impl}; "
+                "start a new checkpoint directory"
+            )
         defaults = {"icl_attention": "dense", "icl_sparse_every": 3,
                     "icl_block_size": 128, "icl_num_selected_blocks": 4,
                     "icl_router": "centroid", "icl_router_beam": 16,
                     "icl_partition": "projection",
                     "icl_global_type": "elu", "icl_num_induced_slots": 128,
+                    "icl_token_topk": 128, "icl_index_dim": 16,
+                    "icl_index_query_samples": 32,
+                    "icl_index_regression_temperature": 0.2,
                     "icl_ssmax": False, "icl_qk_norm": False}
         keys = ["icl_attention", "icl_ssmax", "icl_qk_norm"]
         if mode in ("global", "global_full", "global_sparse", "global_sparse_alternating"):
@@ -582,12 +592,28 @@ class Trainer:
             keys.extend(("icl_block_size", "icl_num_selected_blocks", "icl_router", "icl_partition"))
             if self.model_config.get("icl_router") == "hierarchical":
                 keys.append("icl_router_beam")
+        if mode == "token_sparse":
+            keys.extend((
+                "icl_token_topk", "icl_index_dim", "icl_index_query_samples",
+                "icl_index_regression_temperature",
+            ))
         for key in keys:
             previous = stored.get(key, defaults[key])
             requested = self.model_config.get(key, defaults[key])
             if previous != requested:
                 raise ValueError(f"Checkpoint {key}={previous!r}, requested {requested!r}; "
                                  "resume with the same architecture or use a new checkpoint directory")
+        if mode == "token_sparse":
+            stored_recipe = checkpoint.get("token_sparse_recipe")
+            requested_recipe = {
+                "icl_index_loss_weight": self.config.icl_index_loss_weight,
+                "icl_index_loss_warmup_steps": self.config.icl_index_loss_warmup_steps,
+                "icl_index_lr": self.config.icl_index_lr,
+            }
+            if stored_recipe != requested_recipe:
+                raise ValueError(
+                    f"Checkpoint token sparse recipe {stored_recipe!r}, requested {requested_recipe!r}"
+                )
         state_dict = checkpoint["state_dict"]
         if state_dict and all(name.startswith("_orig_mod.") for name in state_dict):
             # Checkpoints written by older compiled runs used the wrapper's
@@ -626,6 +652,11 @@ class Trainer:
             "optimizer_spec": optimizer_spec(self.optimizer),
             "scheduler_state": self.scheduler.state_dict(),
             "curr_step": self.curr_step,
+            "token_sparse_recipe": {
+                "icl_index_loss_weight": self.config.icl_index_loss_weight,
+                "icl_index_loss_warmup_steps": self.config.icl_index_loss_warmup_steps,
+                "icl_index_lr": self.config.icl_index_lr,
+            } if self.config.icl_attention == "token_sparse" else None,
         }
         torch.save(checkpoint, checkpoint_path)
 
@@ -968,20 +999,50 @@ class Trainer:
                     diagnostic_modules.append((name, module))
 
         with self.amp_ctx, self._sdpa_ctx():
+            use_index_loss = self.config.icl_attention == "token_sparse"
+            index_query_indices = None
+            if use_index_loss:
+                sample_count = min(self.config.icl_index_query_samples, seq_len - train_size)
+                index_query_indices = torch.linspace(
+                    train_size, seq_len - 1, sample_count, device=micro_y.device
+                ).round().long()
             if self.regression:
                 # (B, test_size, num_quantiles) predicted quantiles at levels
                 # linspace(0, 1, num_quantiles + 2)[1:-1] (matches inference / QuantileDistribution)
-                pred = self.model(micro_X, y_train, model_d)
+                result = self.model(
+                    micro_X,
+                    y_train,
+                    model_d,
+                    index_targets=micro_y if use_index_loss else None,
+                    index_query_indices=index_query_indices,
+                    return_index_loss=use_index_loss,
+                )
+                pred, index_loss = result if use_index_loss else (result, None)
                 alphas = torch.linspace(
                     0.0, 1.0, self.config.num_quantiles + 2, device=pred.device, dtype=pred.dtype
                 )[1:-1].view(1, 1, -1)
                 errors = y_test.unsqueeze(-1) - pred
                 loss = torch.maximum(alphas * errors, (alphas - 1) * errors).mean()
             else:
-                pred = self.model(micro_X, y_train, model_d)  # (B, test_size, max_classes)
+                result = self.model(
+                    micro_X,
+                    y_train,
+                    model_d,
+                    index_targets=micro_y if use_index_loss else None,
+                    index_query_indices=index_query_indices,
+                    return_index_loss=use_index_loss,
+                )
+                pred, index_loss = result if use_index_loss else (result, None)
                 pred = pred.flatten(end_dim=-2)
                 true = y_test.long().flatten()
                 loss = F.cross_entropy(pred, true)
+            main_loss = loss
+            if use_index_loss:
+                warmup = max(self.config.icl_index_loss_warmup_steps, 1)
+                index_weight = self.config.icl_index_loss_weight * min(
+                    1.0, (self.curr_step + 1) / warmup
+                )
+                loss = loss + index_weight * index_loss
 
         # Scale loss for gradient accumulation and backpropagate
         if getattr(self.config, "fail_fast", False) and not torch.isfinite(loss):
@@ -992,11 +1053,17 @@ class Trainer:
         with torch.no_grad():
             micro_results = {}
             if self.regression:
-                micro_results["pinball"] = scaled_loss.detach()
+                micro_results["pinball"] = main_loss.detach() / num_micro_batches
             else:
-                micro_results["ce"] = scaled_loss.detach()
+                micro_results["ce"] = main_loss.detach() / num_micro_batches
                 accuracy = (pred.argmax(dim=1) == true).sum() / len(true)
                 micro_results["accuracy"] = accuracy.detach() / num_micro_batches
+            if use_index_loss:
+                micro_results["total_loss"] = scaled_loss.detach()
+                micro_results["index_loss"] = index_loss.detach() / num_micro_batches
+                micro_results["index_loss_weight"] = torch.tensor(
+                    index_weight / num_micro_batches, device=index_loss.device
+                )
 
         for name, module in diagnostic_modules:
             for key, value in module.last_diagnostics.items():

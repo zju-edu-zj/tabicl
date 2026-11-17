@@ -356,6 +356,20 @@ def build_parser():
                         help="Selected support leaves per query and head.")
     parser.add_argument("--icl_query_chunk_size", type=int, default=64,
                         help="Query chunk size for the portable gathered-attention fallback.")
+    parser.add_argument("--icl_token_topk", type=int, default=128,
+                        help="Raw support tokens selected per query by token_sparse attention.")
+    parser.add_argument("--icl_index_dim", type=int, default=16,
+                        help="Dimension of the learned shared token index.")
+    parser.add_argument("--icl_index_query_samples", type=int, default=32,
+                        help="Deterministically sampled test queries per table for index supervision.")
+    parser.add_argument("--icl_index_loss_weight", type=float, default=0.05,
+                        help="Final auxiliary index loss weight.")
+    parser.add_argument("--icl_index_loss_warmup_steps", type=int, default=5000,
+                        help="Linear warmup steps for the auxiliary index loss weight.")
+    parser.add_argument("--icl_index_lr", type=float, default=3e-4,
+                        help="AdamW learning rate for token indexer parameters.")
+    parser.add_argument("--icl_index_regression_temperature", type=float, default=0.2,
+                        help="Label-distance temperature for regression index supervision.")
     parser.add_argument("--icl_router", choices=("centroid", "hierarchical"), default="centroid")
     parser.add_argument("--icl_partition", choices=("projection", "content_tree"), default="projection",
                         help="Support-only leaf construction, independently of centroid/beam search.")

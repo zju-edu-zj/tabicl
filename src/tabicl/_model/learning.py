@@ -96,6 +96,12 @@ class ICLearning(nn.Module):
         qk_norm: bool = False,
         global_type: str = "elu",
         num_induced_slots: int = 128,
+        token_topk: int = 128,
+        token_index_dim: int = 16,
+        token_index_query_samples: int = 32,
+        token_index_regression: bool = False,
+        token_index_num_classes: int = 10,
+        token_index_regression_temperature: float = 0.2,
     ):
         super().__init__()
 
@@ -125,6 +131,12 @@ class ICLearning(nn.Module):
             qk_norm=qk_norm,
             global_type=global_type,
             num_induced_slots=num_induced_slots,
+            token_topk=token_topk,
+            token_index_dim=token_index_dim,
+            token_index_query_samples=token_index_query_samples,
+            token_index_regression=token_index_regression,
+            token_index_num_classes=token_index_num_classes,
+            token_index_regression_temperature=token_index_regression_temperature,
         )
         if self.norm_first:
             self.ln = nn.LayerNorm(d_model, bias=not bias_free_ln)
@@ -260,7 +272,14 @@ class ICLearning(nn.Module):
         indices = unique_vals.argsort()
         return indices[torch.searchsorted(unique_vals, y)]
 
-    def _icl_predictions(self, R: Tensor, y_train: Tensor) -> Tensor:
+    def _icl_predictions(
+        self,
+        R: Tensor,
+        y_train: Tensor,
+        index_targets: Optional[Tensor] = None,
+        index_query_indices: Optional[Tensor] = None,
+        return_index_loss: bool = False,
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """In-context learning predictions.
 
         Parameters
@@ -296,12 +315,21 @@ class ICLearning(nn.Module):
             R = R.detach()
         R[:, :train_size] = R[:, :train_size] + Ry_train
 
-        src = self.tf_icl(R, train_size=train_size)
+        result = self.tf_icl(
+            R,
+            train_size=train_size,
+            index_targets=index_targets if return_index_loss else None,
+            index_query_indices=index_query_indices if return_index_loss else None,
+        )
+        if return_index_loss:
+            src, index_loss = result
+        else:
+            src = result
         if self.norm_first:
             src = self.ln(src)
         out = self.decoder(src)
 
-        return out
+        return (out, index_loss) if return_index_loss else out
 
     def _predict_standard(
         self,
@@ -519,6 +547,9 @@ class ICLearning(nn.Module):
         return_logits: bool = True,
         softmax_temperature: float = 0.9,
         mgr_config: MgrConfig = None,
+        index_targets: Optional[Tensor] = None,
+        index_query_indices: Optional[Tensor] = None,
+        return_index_loss: bool = False,
     ) -> Tensor:
         """In-context learning based on learned row representations.
 
@@ -563,8 +594,18 @@ class ICLearning(nn.Module):
 
         if self.training:
             train_size = y_train.shape[1]
-            out = self._icl_predictions(R, y_train)
-            out = out[:, train_size:]
+            result = self._icl_predictions(
+                R,
+                y_train,
+                index_targets=index_targets,
+                index_query_indices=index_query_indices,
+                return_index_loss=return_index_loss,
+            )
+            if return_index_loss:
+                out, index_loss = result
+                out = (out[:, train_size:], index_loss)
+            else:
+                out = result[:, train_size:]
         else:
             out = self._inference_forward(R, y_train, return_logits, softmax_temperature, mgr_config)
 

@@ -1,6 +1,7 @@
 """Controlled initialization, restartable prior streams and fixed validation."""
 
 import hashlib
+import math
 import random
 import types
 from collections import defaultdict
@@ -60,6 +61,9 @@ def load_common_initialization(model, path, model_config, seed):
         ".fusion_gate_bias",
         ".route_direction",
         ".inducing_points",
+        ".index_q_proj.weight",
+        ".index_k_proj.weight",
+        ".index_logit_scale",
     )
     if result.unexpected_keys or any(not name.endswith(allowed) for name in result.missing_keys):
         raise ValueError(f"Incomplete common initialization: {result}")
@@ -80,6 +84,21 @@ def load_common_initialization(model, path, model_config, seed):
             points.normal_(std=0.02, generator=gen).clamp_(-0.04, 0.04)
             with torch.no_grad():
                 module.inducing_points.copy_(points.to(module.inducing_points.device))
+        if hasattr(module, "index_q_proj"):
+            for suffix, projection in (
+                ("index_q_proj", module.index_q_proj),
+                ("index_k_proj", module.index_k_proj),
+            ):
+                value = int.from_bytes(
+                    hashlib.sha256(f"{seed}/{name}/{suffix}".encode()).digest()[:8], "little"
+                )
+                gen = torch.Generator().manual_seed(value % 2**63)
+                weight = torch.empty_like(projection.weight, device="cpu")
+                torch.nn.init.xavier_uniform_(weight, generator=gen)
+                with torch.no_grad():
+                    projection.weight.copy_(weight.to(projection.weight.device))
+            with torch.no_grad():
+                module.index_logit_scale.fill_(math.log(10.0))
 
 
 @contextmanager

@@ -245,6 +245,10 @@ class TabICL(nn.Module):
         icl_global_type: str = "elu",
         icl_num_induced_slots: int = 128,
         icl_attention_impl_version: int = 4,
+        icl_token_topk: int = 128,
+        icl_index_dim: int = 16,
+        icl_index_query_samples: int = 32,
+        icl_index_regression_temperature: float = 0.2,
     ):
         super().__init__()
         icl_dim = embed_dim * row_num_cls  # CLS tokens are concatenated for ICL
@@ -291,8 +295,11 @@ class TabICL(nn.Module):
         self.bias_free_ln = bias_free_ln
         self.zero_init = zero_init
         self.icl_attention = icl_attention
-        if icl_attention != "dense" and icl_attention_impl_version != 4:
-            raise ValueError("ICL experiments require implementation version 4; start a new experimental run")
+        expected_impl = 5 if icl_attention == "token_sparse" else 4
+        if icl_attention != "dense" and icl_attention_impl_version != expected_impl:
+            raise ValueError(
+                f"{icl_attention} requires implementation version {expected_impl}; start a new experimental run"
+            )
         self.icl_sparse_every = icl_sparse_every
         self.icl_block_size = icl_block_size
         self.icl_num_selected_blocks = icl_num_selected_blocks
@@ -302,6 +309,10 @@ class TabICL(nn.Module):
         if icl_partition not in ("projection", "content_tree"):
             raise ValueError("icl_partition must be projection or content_tree")
         self.icl_partition = icl_partition
+        self.icl_token_topk = icl_token_topk
+        self.icl_index_dim = icl_index_dim
+        self.icl_index_query_samples = icl_index_query_samples
+        self.icl_index_regression_temperature = icl_index_regression_temperature
 
         self.col_embedder = ColEmbedding(
             embed_dim=embed_dim,
@@ -365,6 +376,12 @@ class TabICL(nn.Module):
             qk_norm=icl_qk_norm,
             global_type=icl_global_type,
             num_induced_slots=icl_num_induced_slots,
+            token_topk=icl_token_topk,
+            token_index_dim=icl_index_dim,
+            token_index_query_samples=icl_index_query_samples,
+            token_index_regression=max_classes == 0,
+            token_index_num_classes=max_classes,
+            token_index_regression_temperature=icl_index_regression_temperature,
         )
 
         # KV cache for efficient inference
@@ -435,8 +452,15 @@ class TabICL(nn.Module):
         self._frontend_compile_mode = mode
 
     def _train_forward(
-        self, X: Tensor, y_train: Tensor, d: Optional[Tensor] = None, embed_with_test: bool = False
-    ) -> Tensor:
+        self,
+        X: Tensor,
+        y_train: Tensor,
+        d: Optional[Tensor] = None,
+        embed_with_test: bool = False,
+        index_targets: Optional[Tensor] = None,
+        index_query_indices: Optional[Tensor] = None,
+        return_index_loss: bool = False,
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """Column-wise embedding -> row-wise interaction -> dataset-wise in-context learning for training.
 
         Parameters
@@ -489,7 +513,13 @@ class TabICL(nn.Module):
         )
 
         # Dataset-wise in-context learning
-        return self.icl_predictor(representations, y_train=y_train)
+        return self.icl_predictor(
+            representations,
+            y_train=y_train,
+            index_targets=index_targets,
+            index_query_indices=index_query_indices,
+            return_index_loss=return_index_loss,
+        )
 
     def _inference_forward(
         self,
@@ -584,6 +614,9 @@ class TabICL(nn.Module):
         return_logits: bool = True,
         softmax_temperature: float = 0.9,
         inference_config: Optional[InferenceConfig] = None,
+        index_targets: Optional[Tensor] = None,
+        index_query_indices: Optional[Tensor] = None,
+        return_index_loss: bool = False,
     ) -> Tensor:
         """Column-wise embedding -> row-wise interaction -> dataset-wise in-context learning.
 
@@ -640,7 +673,15 @@ class TabICL(nn.Module):
         """
 
         if self.training:
-            out = self._train_forward(X, y_train, d=d, embed_with_test=embed_with_test)
+            out = self._train_forward(
+                X,
+                y_train,
+                d=d,
+                embed_with_test=embed_with_test,
+                index_targets=index_targets,
+                index_query_indices=index_query_indices,
+                return_index_loss=return_index_loss,
+            )
         else:
             out = self._inference_forward(
                 X,
