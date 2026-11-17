@@ -78,11 +78,13 @@ def micro_cost(params, results, indices, model):
                    else dim / nhead)
     global_work = 2 * (rows + support) * dim * global_keys
     retrieval = 2 * rows * dim * min(support, budget)
+    leaves = math.ceil(support / model.get("icl_block_size", 128))
     if support > budget:
-        leaves = math.ceil(support / model.get("icl_block_size", 128))
         routing_keys = (leaves if model.get("icl_router", "centroid") == "centroid" else
                         model.get("icl_router_beam", 16) * math.ceil(math.log2(max(2, leaves))))
         retrieval += rows * dim * routing_keys
+    summary_slots = model.get("icl_summary_slots", 1)
+    frontier = retrieval + 2 * rows * dim * max(0, leaves - model.get("icl_num_selected_blocks", 4)) * summary_slots
     hybrids = {"global_full": "fused_full", "global_sparse": "fused_sparse",
                "global_sparse_alternating": "sparse"}
     icl = 0.
@@ -90,8 +92,13 @@ def micro_cost(params, results, indices, model):
         kind = (hybrids[attention] if (layer+1) % model.get("icl_sparse_every", 3) == 0 else "global") if attention in hybrids else attention
         pair_work = {"dense": 2*rows*support*dim, "global": global_work,
                      "sparse": retrieval, "fused_sparse": global_work+retrieval,
-                     "fused_full": global_work+2*rows*support*dim}[kind]
-        icl += (2*rows + 2*support + 2*ff*rows)*dim*dim + pair_work
+                     "fused_full": global_work+2*rows*support*dim,
+                     "dual_path": global_work+retrieval,
+                     "adaptive_frontier": frontier}[kind]
+        projection_work = (2*rows + 2*support + 2*ff*rows)*dim*dim
+        if kind == "dual_path":
+            projection_work += 2 * (rows + support) * dim * dim
+        icl += projection_work + pair_work
     return float(len(indices) * (col + row + icl))
 
 

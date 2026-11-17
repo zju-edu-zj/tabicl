@@ -57,6 +57,8 @@ def test_cost_proxy_respects_hybrid_layers_and_centroid_routing():
         return micro_cost(params, results, [0], {**base, **kw})
     assert cost(icl_attention="dense") > cost(icl_attention="global_sparse") > cost(icl_attention="global")
     assert cost(icl_attention="global_sparse", icl_sparse_every=1) > cost(icl_attention="global_sparse", icl_sparse_every=3)
+    assert cost(icl_attention="dual_path") > cost(icl_attention="global_sparse")
+    assert cost(icl_attention="adaptive_frontier") < cost(icl_attention="dense")
     assert cost(icl_attention="sparse", icl_block_size=64) > cost(icl_attention="sparse", icl_block_size=128,
                                                               icl_num_selected_blocks=2)
 

@@ -11,7 +11,11 @@ import torch
 from torch.nn import functional as F
 from torch.utils.data import IterableDataset, get_worker_info
 
-from tabicl._model.icl_attention import SetRetrievalAttention
+from tabicl._model.icl_attention import (
+    AdaptiveResolutionAttention,
+    DualPathRetrievalAttention,
+    SetRetrievalAttention,
+)
 
 
 EVAL_ATTENTION_POLICIES = ("native", "global_only", "sparse_only")
@@ -60,9 +64,35 @@ def load_common_initialization(model, path, model_config, seed):
         ".fusion_gate_bias",
         ".route_direction",
         ".inducing_points",
+        ".global_in_proj_weight",
+        ".global_in_proj_bias",
+        ".global_out_proj.weight",
+        ".global_gate_query_weight",
+        ".sparse_gate_query_weight",
+        ".global_gate_route_weight",
+        ".sparse_gate_route_weight",
+        ".global_gate_bias",
+        ".sparse_gate_bias",
+        ".global_qk_norm.q_weight",
+        ".global_qk_norm.k_weight",
+        ".global_qk_norm.base_log_scale",
+        ".global_qk_norm.log_slope_logit",
+        ".summary_bias",
+        ".summary_log_count_scale",
     )
     if result.unexpected_keys or any(not name.endswith(allowed) for name in result.missing_keys):
         raise ValueError(f"Incomplete common initialization: {result}")
+    with torch.no_grad():
+        for module in model.modules():
+            if isinstance(module, DualPathRetrievalAttention):
+                module.global_in_proj_weight.copy_(module.in_proj_weight)
+                module.global_in_proj_bias.copy_(module.in_proj_bias)
+                module.global_out_proj.weight.copy_(module.out_proj.weight)
+                if module.global_qk_norm is not None and module.qk_norm is not None:
+                    module.global_qk_norm.load_state_dict(module.qk_norm.state_dict())
+            elif isinstance(module, AdaptiveResolutionAttention):
+                module.summary_bias.zero_()
+                module.summary_log_count_scale.fill_(1)
     # Route buffers must also agree across sparse variants and DDP ranks.
     for name, module in model.named_modules():
         if hasattr(module, "route_direction"):
@@ -93,8 +123,49 @@ def _attention_policy(model, policy):
         return
     saved = []
     for module in modules:
-        had_override = "_hybrid_attention" in module.__dict__
-        saved.append((module, had_override, module.__dict__.get("_hybrid_attention")))
+        if isinstance(module, AdaptiveResolutionAttention):
+            raise ValueError(
+                "adaptive_frontier only defines the native unified frontier; "
+                "use eval_attention_policies=native"
+            )
+        method_name = (
+            "_dual_attention" if isinstance(module, DualPathRetrievalAttention)
+            else "_hybrid_attention"
+        )
+        had_override = method_name in module.__dict__
+        saved.append((module, method_name, had_override, module.__dict__.get(method_name)))
+
+        if isinstance(module, DualPathRetrievalAttention):
+            def dual_intervention(
+                self, sparse_q, sparse_k, sparse_v, global_q, global_k, global_v,
+                prepared=None, selected_policy=policy,
+            ):
+                if selected_policy == "global_only":
+                    state = None if prepared is None else prepared.get("global")
+                    heads = self._global_attention(global_q, global_k, global_v, state)
+                    flat = heads.transpose(-3, -2).contiguous().view(
+                        *global_q.shape[:-3], global_q.shape[-2], self.embed_dim
+                    )
+                    return F.linear(flat, self.global_out_proj.weight)
+                if sparse_k.shape[-2] <= self.block_size * self.num_selected_blocks:
+                    attention_q = (
+                        self.qk_norm.scale_query(sparse_q, sparse_k.shape[-2])
+                        if self.qk_norm is not None else sparse_q
+                    )
+                    heads = F.scaled_dot_product_attention(attention_q, sparse_k, sparse_v)
+                else:
+                    route = None if prepared is None else prepared.get("route")
+                    heads = self._sparse_attention(
+                        sparse_q, sparse_k, sparse_v,
+                        {"route": route} if route is not None else None,
+                    )
+                flat = heads.transpose(-3, -2).contiguous().view(
+                    *sparse_q.shape[:-3], sparse_q.shape[-2], self.embed_dim
+                )
+                return F.linear(flat, self.out_proj.weight, self.out_proj.bias)
+
+            module._dual_attention = types.MethodType(dual_intervention, module)
+            continue
 
         def intervention(self, q, k, v, selected_policy=policy):
             diagnose = self.diagnostics_enabled
@@ -124,11 +195,11 @@ def _attention_policy(model, policy):
     try:
         yield
     finally:
-        for module, had_override, previous in saved:
+        for module, method_name, had_override, previous in saved:
             if had_override:
-                module._hybrid_attention = previous
+                setattr(module, method_name, previous)
             else:
-                del module._hybrid_attention
+                delattr(module, method_name)
 
 
 @torch.no_grad()

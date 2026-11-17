@@ -24,7 +24,10 @@ from tabicl.train._optimizer import build_optimizer
 
 def compiled_variants():
     """Diagnostic only: counts cached Triton variants in this benchmark process."""
-    from tabicl._model import _routing_triton, _sparse_triton, _sparse_grouped, _norm_triton, _elu_kernel
+    from tabicl._model import (
+        _block_pool_triton, _elu_kernel, _frontier_triton, _norm_triton,
+        _routing_triton, _sparse_grouped, _sparse_triton,
+    )
 
     names = {
         _routing_triton: (
@@ -45,6 +48,11 @@ def compiled_variants():
         _sparse_grouped: ("_count", "_scatter", "_leaf_tiles", "_merge"),
         _norm_triton: ("_norm", "_norm_backward"),
         _elu_kernel: ("_elu_state", "_elu_apply", "_elu_backward_query", "_elu_backward_support"),
+        _block_pool_triton: ("_block_mean_forward", "_block_mean_backward"),
+        _frontier_triton: (
+            "_summary_forward", "_merge_forward", "_summary_backward_query",
+            "_summary_backward_support",
+        ),
     }
     counts = {}
     for module, kernels in names.items():
@@ -82,6 +90,7 @@ def main():
     p.add_argument("--induced-slots", type=int, default=128)
     p.add_argument("--block-size", type=int, default=128)
     p.add_argument("--selected-blocks", type=int, default=4)
+    p.add_argument("--summary-slots", type=int, default=1)
     p.add_argument("--sparse-every", type=int, default=3)
     p.add_argument("--repeat", type=int, default=7)
     p.add_argument("--warmup", type=int, default=3)
@@ -93,6 +102,9 @@ def main():
         "--optimizer-step",
         action="store_true",
         help="Include a hybrid Muon/AdamW update in train timings.",
+    )
+    p.add_argument(
+        "--muon-route-mode", choices=("attention", "all_matrix"), default="all_matrix"
     )
     p.add_argument("--compile", action="store_true", help="Compile the model with dynamic shapes.")
     p.add_argument(
@@ -175,6 +187,7 @@ def main():
             sparse_every=args.sparse_every,
             block_size=args.block_size,
             num_selected_blocks=args.selected_blocks,
+            summary_slots=args.summary_slots,
             router=args.router,
             router_beam=args.router_beam,
             partition=args.partition,
@@ -223,12 +236,16 @@ def main():
                 icl_sparse_every=args.sparse_every,
                 icl_block_size=args.block_size,
                 icl_num_selected_blocks=args.selected_blocks,
+                icl_summary_slots=args.summary_slots,
                 icl_router=args.router,
                 icl_router_beam=args.router_beam,
                 icl_partition=args.partition,
                 icl_global_type=args.global_type,
                 icl_num_induced_slots=args.induced_slots,
                 icl_qk_norm=True,
+                icl_attention_impl_version=(
+                    5 if args.attention in ("dual_path", "adaptive_frontier") else 4
+                ),
                 recompute=args.recompute,
                 zero_init=False,
             ).cuda()
@@ -287,6 +304,7 @@ def main():
                 SimpleNamespace(
                     muon=True, lr=4e-4, adamw_lr=1e-4, weight_decay=0.01,
                     beta1=0.9, beta2=0.999, use_cautious_wd=True,
+                    muon_route_mode=args.muon_route_mode,
                 ),
             )
         if args.compile and args.scope != "routing":

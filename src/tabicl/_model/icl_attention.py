@@ -13,6 +13,7 @@ from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint
 
 from .layers import GlobalLinearAttention
+from .qk_norm import ICLQKNorm
 
 ICL_ATTENTION_TYPES = (
     "dense",
@@ -21,6 +22,8 @@ ICL_ATTENTION_TYPES = (
     "global_full",
     "global_sparse_alternating",
     "global_sparse",
+    "dual_path",
+    "adaptive_frontier",
 )
 
 
@@ -511,4 +514,475 @@ class SetRetrievalAttention(GlobalLinearAttention):
             if diagnose:
                 self.last_diagnostics["fusion_sparse_gate_mean"] = gate.detach().float().mean()
         combined = heads.transpose(-3, -2).contiguous().view(*q.shape[:-3], q.shape[-2], self.embed_dim)
+        return self.out_proj(combined)
+
+
+class DualPathRetrievalAttention(SetRetrievalAttention):
+    """Independent global and routed-softmax channels with unconstrained gates."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("mode", None)
+        kwargs.pop("fusion", None)
+        super().__init__(*args, mode="sparse", fusion="legacy", **kwargs)
+        if self.partition != "content_tree":
+            raise ValueError("dual_path requires partition=content_tree")
+        if self.global_type != "elu":
+            raise ValueError("dual_path currently requires global_type=elu")
+        self.global_in_proj_weight = nn.Parameter(
+            torch.empty(3 * self.embed_dim, self.embed_dim)
+        )
+        self.global_in_proj_bias = nn.Parameter(torch.zeros(3 * self.embed_dim))
+        nn.init.xavier_uniform_(self.global_in_proj_weight)
+        self.global_qk_norm = (
+            ICLQKNorm(
+                self.head_dim,
+                self.num_heads,
+                trainable_length_scale=self.global_type != "elu",
+            )
+            if self.qk_norm is not None
+            else None
+        )
+        # ``out_proj`` belongs exclusively to the routed exact-softmax path.
+        self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
+        self.global_out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False)
+        nn.init.xavier_uniform_(self.out_proj.weight)
+        nn.init.xavier_uniform_(self.global_out_proj.weight)
+        nn.init.zeros_(self.out_proj.bias)
+        self.global_gate_query_weight = nn.Parameter(
+            torch.zeros(self.num_heads, self.head_dim)
+        )
+        self.sparse_gate_query_weight = nn.Parameter(
+            torch.zeros(self.num_heads, self.head_dim)
+        )
+        self.global_gate_route_weight = nn.Parameter(torch.zeros(self.num_heads, 6))
+        self.sparse_gate_route_weight = nn.Parameter(torch.zeros(self.num_heads, 6))
+        self.global_gate_bias = nn.Parameter(torch.zeros(self.num_heads))
+        self.sparse_gate_bias = nn.Parameter(torch.zeros(self.num_heads))
+
+    def zero_init_output(self):
+        nn.init.zeros_(self.out_proj.weight)
+        nn.init.zeros_(self.out_proj.bias)
+        nn.init.zeros_(self.global_out_proj.weight)
+
+    def _project_global(self, query, key, value, rope):
+        bshape = query.shape[:-2]
+        tgt_len, src_len = query.shape[-2], key.shape[-2]
+        q, k, v = F._in_projection_packed(
+            query, key, value, self.global_in_proj_weight, self.global_in_proj_bias
+        )
+        q = q.view(*bshape, tgt_len, self.num_heads, self.head_dim).transpose(-3, -2)
+        k = k.view(*bshape, src_len, self.num_heads, self.head_dim).transpose(-3, -2)
+        v = v.view(*bshape, src_len, self.num_heads, self.head_dim).transpose(-3, -2)
+        if rope is not None:
+            q = rope.rotate_queries_or_keys(q)
+            k = rope.rotate_queries_or_keys(k)
+        if self.global_qk_norm is not None:
+            q = self.global_qk_norm.normalize_q(q)
+            k = self.global_qk_norm.normalize_k(k)
+        return q, k, v
+
+    def _project_cached_query(self, query, weight, bias, norm, rope):
+        bshape, length = query.shape[:-2], query.shape[-2]
+        q = F.linear(query, weight[: self.embed_dim], bias[: self.embed_dim])
+        q = q.view(*bshape, length, self.num_heads, self.head_dim).transpose(-3, -2)
+        if rope is not None:
+            q = rope.rotate_queries_or_keys(q)
+        return norm.normalize_q(q) if norm is not None else q
+
+    def _prepare_dual_support(self, sparse_k, sparse_v, global_k, global_v):
+        prepared = {
+            "global": GlobalLinearAttention._prepare_support(self, global_k, global_v)
+        }
+        if sparse_k.shape[-2] > self.block_size * self.num_selected_blocks:
+            prepared["route"] = self._prepare_route(sparse_k)
+        return prepared
+
+    @staticmethod
+    def _gate_route_features(route_quality):
+        return torch.stack(
+            (
+                route_quality[..., 0],
+                route_quality[..., 1],
+                route_quality[..., 2],
+                route_quality[..., 3] / 8,
+                route_quality[..., 4] / 8,
+                route_quality[..., 5],
+            ),
+            dim=-1,
+        )
+
+    def forward(
+        self,
+        query,
+        key=None,
+        value=None,
+        cached_kv=None,
+        key_padding_mask=None,
+        attn_mask=None,
+        rope=None,
+        need_kv=False,
+    ):
+        if key_padding_mask is not None or attn_mask is not None:
+            raise NotImplementedError("Dual-path attention requires an explicit support prefix")
+        if cached_kv is not None:
+            if cached_kv.key.shape[-3] != 2 * self.num_heads:
+                raise ValueError("Dual-path cache must contain sparse and global K/V heads")
+            sparse_k, global_k = cached_kv.key.split(self.num_heads, dim=-3)
+            sparse_v, global_v = cached_kv.value.split(self.num_heads, dim=-3)
+            sparse_q = self._project_cached_query(
+                query, self.in_proj_weight, self.in_proj_bias, self.qk_norm, rope
+            )
+            global_q = self._project_cached_query(
+                query, self.global_in_proj_weight, self.global_in_proj_bias,
+                self.global_qk_norm, rope,
+            )
+            prepared = None
+            if (
+                not self.training
+                and not torch.is_grad_enabled()
+                and not self.diagnostics_enabled
+            ):
+                signature = (
+                    id(self), id(cached_kv.key), self._tensor_version(cached_kv.key),
+                    id(cached_kv.value), self._tensor_version(cached_kv.value),
+                    tuple(p._version for p in self.parameters()), self.block_size,
+                    tuple(self._tensor_version(b) for b in self.buffers()),
+                    self.partition, self.use_triton, self.global_type,
+                )
+                if cached_kv._derived.get("signature") != signature:
+                    cached_kv._derived.clear()
+                    cached_kv._derived.update(
+                        signature=signature,
+                        state=self._prepare_dual_support(
+                            sparse_k, sparse_v, global_k, global_v
+                        ),
+                    )
+                prepared = cached_kv._derived["state"]
+            return self._dual_attention(
+                sparse_q, sparse_k, sparse_v, global_q, global_k, global_v, prepared
+            )
+
+        key = query if key is None else key
+        value = key if value is None else value
+        sparse_q, sparse_k, sparse_v = super()._project(query, key, value, rope)
+        global_q, global_k, global_v = self._project_global(query, key, value, rope)
+        output = self._dual_attention(
+            sparse_q, sparse_k, sparse_v, global_q, global_k, global_v
+        )
+        if need_kv:
+            return (
+                output,
+                torch.cat((sparse_k, global_k), dim=-3),
+                torch.cat((sparse_v, global_v), dim=-3),
+            )
+        return output
+
+    @torch.compiler.disable
+    def _dual_attention(
+        self, sparse_q, sparse_k, sparse_v, global_q, global_k, global_v,
+        prepared=None,
+    ):
+        if not sparse_k.shape[-2]:
+            raise ValueError("ICL retrieval needs at least one support row")
+        diagnose = self.diagnostics_enabled
+        if diagnose:
+            self.last_diagnostics = {}
+        global_prepared = None if prepared is None else prepared.get("global")
+        global_heads = self._global_attention(
+            global_q, global_k, global_v, global_prepared
+        )
+        self.diagnostics_enabled = diagnose
+        if sparse_k.shape[-2] <= self.block_size * self.num_selected_blocks:
+            attention_q = (
+                self.qk_norm.scale_query(sparse_q, sparse_k.shape[-2])
+                if self.qk_norm is not None else sparse_q
+            )
+            sparse_heads = F.scaled_dot_product_attention(
+                attention_q, sparse_k, sparse_v
+            )
+            route_quality = self._full_route_quality(sparse_q, sparse_k.shape[-2])
+            if diagnose:
+                self._diagnose(attention_q, sparse_k, sparse_v)
+        else:
+            route_prepared = None if prepared is None else prepared.get("route")
+            sparse_heads, route_quality = self._sparse_attention(
+                sparse_q, sparse_k, sparse_v,
+                {"route": route_prepared} if route_prepared is not None else None,
+                return_quality=True,
+            )
+        with torch.autocast(device_type=sparse_q.device.type, enabled=False):
+            gate_features = self._gate_route_features(route_quality.float())
+            global_logit = (
+                torch.einsum(
+                    "bhtd,hd->bht", global_q.float(),
+                    self.global_gate_query_weight.float(),
+                )
+                + torch.einsum(
+                    "bhtf,hf->bht", gate_features,
+                    self.global_gate_route_weight.float(),
+                )
+                + self.global_gate_bias.float()[None, :, None]
+            )
+            sparse_logit = (
+                torch.einsum(
+                    "bhtd,hd->bht", sparse_q.float(),
+                    self.sparse_gate_query_weight.float(),
+                )
+                + torch.einsum(
+                    "bhtf,hf->bht", gate_features,
+                    self.sparse_gate_route_weight.float(),
+                )
+                + self.sparse_gate_bias.float()[None, :, None]
+            )
+            global_gate = torch.sigmoid(global_logit)[..., None]
+            sparse_gate = torch.sigmoid(sparse_logit)[..., None]
+            global_scaled = (global_heads.float() * global_gate).to(sparse_q.dtype)
+            sparse_scaled = (sparse_heads.float() * sparse_gate).to(sparse_q.dtype)
+        global_flat = global_scaled.transpose(-3, -2).contiguous().view(
+            *sparse_q.shape[:-3], sparse_q.shape[-2], self.embed_dim
+        )
+        sparse_flat = sparse_scaled.transpose(-3, -2).contiguous().view_as(global_flat)
+        output = F.linear(global_flat, self.global_out_proj.weight)
+        sparse_contribution = F.linear(sparse_flat, self.out_proj.weight, self.out_proj.bias)
+        output = output + sparse_contribution
+        if diagnose:
+            self.last_diagnostics.update({
+                "fusion_global_gate_mean": global_gate.detach().mean(),
+                "fusion_sparse_gate_mean": sparse_gate.detach().mean(),
+                "fusion_gate_sum_mean": (global_gate + sparse_gate).detach().mean(),
+                "global_branch_rms": global_heads.detach().float().square().mean().sqrt(),
+                "sparse_branch_rms": sparse_heads.detach().float().square().mean().sqrt(),
+                "global_contribution_rms": output.detach().sub(sparse_contribution.detach()).float().square().mean().sqrt(),
+                "sparse_contribution_rms": sparse_contribution.detach().float().square().mean().sqrt(),
+                "fusion_global_gate_p10": torch.quantile(global_gate.detach().float(), 0.1),
+                "fusion_global_gate_p90": torch.quantile(global_gate.detach().float(), 0.9),
+                "fusion_sparse_gate_p10": torch.quantile(sparse_gate.detach().float(), 0.1),
+                "fusion_sparse_gate_p90": torch.quantile(sparse_gate.detach().float(), 0.9),
+                "fusion_gate_saturation_fraction": (
+                    ((global_gate.detach() < 0.05) | (global_gate.detach() > 0.95)).float().mean()
+                    + ((sparse_gate.detach() < 0.05) | (sparse_gate.detach() > 0.95)).float().mean()
+                ) / 2,
+                "route_candidate_fraction": route_quality[..., 1].mean(),
+                "route_selected_mass_proxy": route_quality[..., 2].mean(),
+                "route_top_score_z": route_quality[..., 3].mean(),
+                "route_boundary_margin": route_quality[..., 4].mean(),
+                "route_entropy": route_quality[..., 5].mean(),
+            })
+        return output
+
+
+class AdaptiveResolutionAttention(SetRetrievalAttention):
+    """Query-adaptive exact leaves plus summaries under one softmax."""
+
+    def __init__(self, *args, summary_slots=1, **kwargs):
+        if summary_slots != 1:
+            raise ValueError("adaptive_frontier v1 requires summary_slots=1")
+        kwargs.pop("mode", None)
+        kwargs.pop("fusion", None)
+        super().__init__(*args, mode="sparse", fusion="legacy", **kwargs)
+        if self.partition != "content_tree":
+            raise ValueError("adaptive_frontier requires partition=content_tree")
+        self.summary_slots = summary_slots
+        self.summary_bias = nn.Parameter(torch.zeros(self.num_heads))
+        self.register_buffer("summary_log_count_scale", torch.ones(self.num_heads))
+
+    def _leaf_summaries(self, k, v, order, lengths):
+        from ._block_pool import block_mean
+
+        return (
+            block_mean(k, order, self.block_size).unsqueeze(3),
+            block_mean(v, order, self.block_size).unsqueeze(3),
+        )
+
+    def _prepare_support(self, k, v):
+        if k.shape[-2] <= self.block_size * self.num_selected_blocks:
+            return {}
+        route = self._prepare_route(k)
+        order, _, lengths = route
+        summaries = self._leaf_summaries(k, v, order, lengths)
+        return {"route": route, "summaries": summaries}
+
+    def _frontier_reference(
+        self, q, k, v, order, selected, summary_k, summary_v, lengths
+    ):
+        outputs = []
+        b, h, _, d = q.shape
+        leaves = summary_k.shape[2]
+        for start in range(0, q.shape[-2], self.query_chunk_size):
+            query = q[:, :, start : start + self.query_chunk_size]
+            chosen = selected[:, :, start : start + self.query_chunk_size]
+            n = query.shape[2]
+            pos = (
+                chosen.long()[..., None] * self.block_size
+                + torch.arange(self.block_size, device=q.device)
+            ).flatten(-2)
+            valid_exact = pos < k.shape[-2]
+            sorted_pos = pos.clamp_max(k.shape[-2] - 1)
+            original = order.long()[:, :, None].expand(-1, -1, n, -1).gather(
+                3, sorted_pos
+            )
+            exact_index = original[..., None].expand(-1, -1, -1, -1, d)
+            exact_k = k[:, :, None].expand(-1, -1, n, -1, -1).gather(
+                3, exact_index
+            )
+            exact_v = v[:, :, None].expand(-1, -1, n, -1, -1).gather(
+                3, exact_index
+            )
+            slots = summary_k.shape[3]
+            flat_k = summary_k.flatten(2, 3)
+            flat_v = summary_v.flatten(2, 3)
+            summary_leaf = torch.arange(leaves, device=q.device).repeat_interleave(slots)
+            visible_summary = ~(chosen[..., None] == summary_leaf).any(-2)
+            exact_logits = torch.einsum("bhnd,bhncd->bhnc", query.float(), exact_k.float())
+            exact_logits = exact_logits / math.sqrt(d)
+            exact_logits = exact_logits.masked_fill(~valid_exact, -float("inf"))
+            summary_logits = torch.einsum("bhnd,bhpd->bhnp", query.float(), flat_k.float())
+            summary_logits = summary_logits / math.sqrt(d)
+            prior = (lengths.float().log() - math.log(slots)).repeat_interleave(slots)
+            summary_logits = (
+                summary_logits
+                + self.summary_bias.float()[None, :, None, None]
+                + self.summary_log_count_scale.float()[None, :, None, None]
+                * prior[None, None, None]
+            ).masked_fill(~visible_summary, -float("inf"))
+            logits = torch.cat((exact_logits, summary_logits), dim=-1)
+            values = torch.cat(
+                (exact_v, flat_v[:, :, None].expand(-1, -1, n, -1, -1)), dim=-2
+            )
+            outputs.append(
+                torch.einsum("bhnc,bhncd->bhnd", logits.softmax(-1).to(values.dtype), values)
+            )
+        return torch.cat(outputs, dim=2)
+
+    @torch.no_grad()
+    def _diagnose_frontier(
+        self, q, k, v, order, selected, summary_k, summary_v, lengths
+    ):
+        first = min(max(self.diagnostic_query_start, 0), q.shape[-2] - 1)
+        sample = torch.linspace(
+            first, q.shape[-2] - 1,
+            min(self.diagnostic_queries, q.shape[-2] - first),
+            device=q.device,
+        ).long()
+        query = q[:1, :, sample]
+        chosen = selected[:1, :, sample]
+        frontier = self._frontier_reference(
+            query, k[:1], v[:1], order[:1], chosen,
+            summary_k[:1], summary_v[:1], lengths,
+        )
+        dense = F.scaled_dot_product_attention(query, k[:1], v[:1])
+        d = q.shape[-1]
+        positions = (
+            chosen.long()[..., None] * self.block_size
+            + torch.arange(self.block_size, device=q.device)
+        ).flatten(-2)
+        valid = positions < k.shape[-2]
+        sorted_pos = positions.clamp_max(k.shape[-2] - 1)
+        original = order[:1, :, None].long().expand(-1, -1, query.shape[2], -1).gather(
+            3, sorted_pos
+        )
+        exact_k = k[:1, :, None].expand(-1, -1, query.shape[2], -1, -1).gather(
+            3, original[..., None].expand(-1, -1, -1, -1, d)
+        )
+        exact_logits = torch.einsum(
+            "bhnd,bhncd->bhnc", query.float(), exact_k.float()
+        ) / math.sqrt(d)
+        exact_lse = torch.logsumexp(
+            exact_logits.masked_fill(~valid, -float("inf")), dim=-1
+        )
+        flat_summary = summary_k[:1].flatten(2, 3)
+        summary_logits = torch.einsum(
+            "bhnd,bhpd->bhnp", query.float(), flat_summary.float()
+        ) / math.sqrt(d)
+        summary_leaf = torch.arange(summary_k.shape[2], device=q.device)
+        visible = ~(chosen[..., None] == summary_leaf).any(-2)
+        summary_logits = (
+            summary_logits
+            + self.summary_bias.float()[None, :, None, None]
+            + lengths.float().log()[None, None, None]
+        ).masked_fill(~visible, -float("inf"))
+        summary_lse = torch.logsumexp(summary_logits, dim=-1)
+        total_lse = torch.logaddexp(exact_lse, summary_lse)
+        exact_mass = torch.exp(exact_lse - total_lse)
+        exact_only_error = self.last_diagnostics.pop(
+            "dense_output_relative_error", torch.tensor(float("nan"), device=q.device)
+        )
+        self.last_diagnostics.update({
+            "frontier_exact_only_relative_error": exact_only_error,
+            "dense_output_relative_error": (
+                (frontier.float() - dense.float()).square().mean().sqrt()
+                / dense.float().square().mean().sqrt().clamp_min(1e-6)
+            ),
+            "frontier_exact_softmax_mass": exact_mass.mean(),
+            "frontier_summary_softmax_mass": (1 - exact_mass).mean(),
+        })
+
+    @torch.compiler.disable
+    def _hybrid_attention(self, q, k, v, prepared=None):
+        if not k.shape[-2]:
+            raise ValueError("ICL retrieval needs at least one support row")
+        diagnose = self.diagnostics_enabled
+        if diagnose:
+            self.last_diagnostics = {}
+        leaves = (k.shape[-2] + self.block_size - 1) // self.block_size
+        attention_q = self.qk_norm.scale_query(q, k.shape[-2]) if self.qk_norm is not None else q
+        if leaves <= self.num_selected_blocks:
+            heads = F.scaled_dot_product_attention(attention_q, k, v)
+            if diagnose:
+                self._diagnose(attention_q, k, v)
+        else:
+            route_prepared = None if prepared is None else prepared["route"]
+            order, selected = self.route(attention_q, k, route_prepared)
+            if prepared is None:
+                lengths = (
+                    k.shape[-2]
+                    - torch.arange(leaves, device=k.device) * self.block_size
+                ).clamp(1, self.block_size)
+                summary_k, summary_v = self._leaf_summaries(k, v, order, lengths)
+            else:
+                lengths = route_prepared[2]
+                summary_k, summary_v = prepared["summaries"]
+            if (
+                q.is_cuda and self.use_triton and q.shape[-1] in (16, 32, 64, 128)
+                and self.block_size % 32 == 0
+                and leaves * self.summary_slots <= 512
+            ):
+                from ._frontier_triton import frontier_attention
+
+                heads = frontier_attention(
+                    attention_q, k, v, order, selected, summary_k, summary_v,
+                    lengths, self.summary_bias, self.summary_log_count_scale,
+                    self.block_size,
+                )
+            else:
+                heads = self._frontier_reference(
+                    attention_q, k, v, order, selected,
+                    summary_k, summary_v, lengths,
+                )
+            if diagnose:
+                self._diagnose(attention_q, k.gather(2, order.long()[..., None].expand_as(k)),
+                               v.gather(2, order.long()[..., None].expand_as(v)), selected)
+                self._diagnose_frontier(
+                    attention_q, k, v, order, selected,
+                    summary_k, summary_v, lengths,
+                )
+                self.last_diagnostics.update({
+                    "frontier_exact_fraction": lengths[selected.long()].sum(-1).float().mean()
+                    / k.shape[-2],
+                    "frontier_summary_tokens": torch.tensor(
+                        (leaves - self.num_selected_blocks) * self.summary_slots,
+                        device=q.device,
+                        dtype=torch.float32,
+                    ),
+                    "frontier_candidate_tokens": torch.tensor(
+                        self.num_selected_blocks * self.block_size
+                        + (leaves - self.num_selected_blocks) * self.summary_slots,
+                        device=q.device,
+                        dtype=torch.float32,
+                    ),
+                    "frontier_log_count_scale": self.summary_log_count_scale.detach().mean(),
+                })
+        combined = heads.transpose(-3, -2).contiguous().view(
+            *q.shape[:-3], q.shape[-2], self.embed_dim
+        )
         return self.out_proj(combined)

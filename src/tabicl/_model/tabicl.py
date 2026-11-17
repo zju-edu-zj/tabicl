@@ -151,7 +151,7 @@ class TabICL(nn.Module):
 
     icl_attention : str, default="dense"
         One of dense, global, sparse, global_full, global_sparse_alternating,
-        global_sparse.
+        global_sparse, dual_path, or adaptive_frontier.
         Non-dense recipes require icl_ssmax=False and dropout=0. See docs/icl_attention.md.
 
     icl_sparse_every : int, default=3
@@ -171,6 +171,10 @@ class TabICL(nn.Module):
     icl_fusion : {"legacy", "independent_v1"}, default="legacy"
         Hybrid global/local fusion. ``independent_v1`` keeps separate output
         projections and independently gated additive channels with route-quality inputs.
+
+    icl_summary_slots : int, default=1
+        Summary tokens retained for each unselected content-tree leaf by
+        adaptive_frontier. One uses the optimized block-mean path.
 
     icl_qk_norm : bool, default=False
         Apply head-wise Q/K RMS normalization and bounded per-head length scaling
@@ -246,6 +250,7 @@ class TabICL(nn.Module):
         icl_router_beam: int = 16,
         icl_partition: str = "projection",
         icl_fusion: str = "legacy",
+        icl_summary_slots: int = 1,
         icl_qk_norm: bool = False,
         icl_global_type: str = "elu",
         icl_num_induced_slots: int = 128,
@@ -296,8 +301,12 @@ class TabICL(nn.Module):
         self.bias_free_ln = bias_free_ln
         self.zero_init = zero_init
         self.icl_attention = icl_attention
-        if icl_attention != "dense" and icl_attention_impl_version != 4:
-            raise ValueError("ICL experiments require implementation version 4; start a new experimental run")
+        expected_impl = 5 if icl_attention in ("dual_path", "adaptive_frontier") else 4
+        if icl_attention != "dense" and icl_attention_impl_version != expected_impl:
+            raise ValueError(
+                f"ICL attention {icl_attention!r} requires implementation version "
+                f"{expected_impl}; start a new experimental run"
+            )
         self.icl_sparse_every = icl_sparse_every
         self.icl_block_size = icl_block_size
         self.icl_num_selected_blocks = icl_num_selected_blocks
@@ -310,6 +319,11 @@ class TabICL(nn.Module):
         if icl_fusion not in ("legacy", "independent_v1"):
             raise ValueError("icl_fusion must be legacy or independent_v1")
         self.icl_fusion = icl_fusion
+        if icl_attention == "adaptive_frontier" and icl_summary_slots != 1:
+            raise ValueError("adaptive_frontier v1 requires icl_summary_slots=1")
+        if icl_summary_slots < 1:
+            raise ValueError("icl_summary_slots must be positive")
+        self.icl_summary_slots = icl_summary_slots
 
         self.col_embedder = ColEmbedding(
             embed_dim=embed_dim,
@@ -371,6 +385,7 @@ class TabICL(nn.Module):
             router_beam=icl_router_beam,
             partition=icl_partition,
             fusion=icl_fusion,
+            summary_slots=icl_summary_slots,
             qk_norm=icl_qk_norm,
             global_type=icl_global_type,
             num_induced_slots=icl_num_induced_slots,

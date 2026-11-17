@@ -320,7 +320,9 @@ class Trainer:
             "icl_num_blocks": self.config.icl_num_blocks,
             "icl_nhead": self.config.icl_nhead,
             "icl_attention": self.config.icl_attention,
-            "icl_attention_impl_version": 4,
+            "icl_attention_impl_version": (
+                5 if self.config.icl_attention in ("dual_path", "adaptive_frontier") else 4
+            ),
             "icl_sparse_every": self.config.icl_sparse_every,
             "icl_block_size": self.config.icl_block_size,
             "icl_num_selected_blocks": self.config.icl_num_selected_blocks,
@@ -329,6 +331,7 @@ class Trainer:
             "icl_router_beam": self.config.icl_router_beam,
             "icl_partition": self.config.icl_partition,
             "icl_fusion": self.config.icl_fusion,
+            "icl_summary_slots": self.config.icl_summary_slots,
             "icl_global_type": self.config.icl_global_type,
             "icl_num_induced_slots": self.config.icl_num_induced_slots,
             "icl_ssmax": self.config.icl_ssmax_type if self.config.icl_ssmax else False,
@@ -621,18 +624,25 @@ class Trainer:
         # Reject semantic architecture changes even when parameter shapes match.
         stored = checkpoint.get("config", {})
         mode = self.model_config["icl_attention"]
-        if mode != "dense" and stored.get("icl_attention_impl_version") != 4:
-            raise ValueError("Experimental checkpoint requires ICL implementation version 4; "
-                             "start a new checkpoint directory")
+        expected_impl = 5 if mode in ("dual_path", "adaptive_frontier") else 4
+        if mode != "dense" and stored.get("icl_attention_impl_version") != expected_impl:
+            raise ValueError(
+                f"Experimental checkpoint requires ICL implementation version {expected_impl}; "
+                "start a new checkpoint directory"
+            )
         defaults = {"icl_attention": "dense", "icl_sparse_every": 3,
                     "icl_block_size": 128, "icl_num_selected_blocks": 4,
                     "icl_router": "centroid", "icl_router_beam": 16,
                     "icl_partition": "projection",
                     "icl_fusion": "legacy",
+                    "icl_summary_slots": 1,
                     "icl_global_type": "elu", "icl_num_induced_slots": 128,
                     "icl_ssmax": False, "icl_qk_norm": False}
         keys = ["icl_attention", "icl_ssmax", "icl_qk_norm"]
-        if mode in ("global", "global_full", "global_sparse", "global_sparse_alternating"):
+        if mode in (
+            "global", "global_full", "global_sparse", "global_sparse_alternating",
+            "dual_path",
+        ):
             keys.append("icl_global_type")
             if self.model_config.get("icl_global_type") == "induced":
                 keys.append("icl_num_induced_slots")
@@ -640,7 +650,12 @@ class Trainer:
             keys.append("icl_sparse_every")
         if mode in ("global_full", "global_sparse"):
             keys.append("icl_fusion")
-        if mode in ("sparse", "global_sparse", "global_sparse_alternating"):
+        if mode == "adaptive_frontier":
+            keys.append("icl_summary_slots")
+        if mode in (
+            "sparse", "global_sparse", "global_sparse_alternating",
+            "dual_path", "adaptive_frontier",
+        ):
             keys.extend(("icl_block_size", "icl_num_selected_blocks", "icl_router", "icl_partition"))
             if self.model_config.get("icl_router") == "hierarchical":
                 keys.append("icl_router_beam")

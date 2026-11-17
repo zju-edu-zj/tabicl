@@ -121,6 +121,7 @@ run_pretrain "${PYTHON:-python}" -m torch.distributed.run --standalone --nproc_p
             --lr "$LR" \
             --adamw_lr "$ADAMW_LR" \
             --muon "$MUON" \
+            --muon_route_mode "${MUON_ROUTE_MODE:-attention}" \
             --beta1 0.9 \
             --weight_decay 0.01 \
             --use_cautious_wd False \

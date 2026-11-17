@@ -121,6 +121,8 @@ def test_nonfinite_content_scores_never_turn_padding_into_key_indices(device):
 def test_multilayer_visibility_cache_and_permutations(mode, partition, norm_first, router, device, monkeypatch):
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")
+    if mode in ("dual_path", "adaptive_frontier") and partition != "content_tree":
+        pytest.skip("new content-tree architectures require content_tree")
     # This FP32 reference contract must not silently run FA3 in FP16 when the
     # optional extension happens to be installed on the test machine.
     import tabicl._model.attention as attention
@@ -174,6 +176,8 @@ def test_hierarchy_exhaustive_beam_is_exact_centroid_topk():
 @pytest.mark.parametrize("mode", ICL_ATTENTION_TYPES)
 @pytest.mark.parametrize("partition", ["projection", "content_tree"])
 def test_checkpoint_replay_matches_uncheckpointed(mode, partition):
+    if mode in ("dual_path", "adaptive_frontier") and partition != "content_tree":
+        pytest.skip("new content-tree architectures require content_tree")
     torch.manual_seed(92)
     m = Encoder(3, 32, 2, 64, attention_type=mode, block_size=32, num_selected_blocks=2,
                 zero_init=False, partition=partition)

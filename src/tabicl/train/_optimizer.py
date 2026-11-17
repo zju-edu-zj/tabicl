@@ -39,6 +39,10 @@ def build_optimizer(model, config):
             if isinstance(module, MultiheadAttentionBlock):
                 projections = [module.attn.in_proj_weight, module.attn.out_proj.weight,
                                module.linear1.weight, module.linear2.weight]
+                for name in ("global_in_proj_weight", "global_out_proj"):
+                    value = getattr(module.attn, name, None)
+                    if value is not None:
+                        projections.append(value.weight if hasattr(value, "weight") else value)
                 if hasattr(module.attn, "local_out_delta"):
                     projections.append(module.attn.local_out_delta.weight)
                 for p in projections:

@@ -345,6 +345,10 @@ class SupportAttention(nn.Module):
             k = self.qk_norm.normalize_k(k)
         return q, k, v
 
+    @staticmethod
+    def _tensor_version(tensor: Tensor):
+        return None if torch.is_inference(tensor) else tensor._version
+
     def forward(
         self,
         query: Tensor,
@@ -374,10 +378,9 @@ class SupportAttention(nn.Module):
             # versions invalidate derived states after in-place cache edits.
             if (not self.training and not torch.is_grad_enabled()
                     and not getattr(self, "diagnostics_enabled", False)
-                    and not torch.is_inference(cached_kv.key)
-                    and not torch.is_inference(cached_kv.value)):
-                signature = (id(self), id(cached_kv.key), cached_kv.key._version,
-                             id(cached_kv.value), cached_kv.value._version,
+            ):
+                signature = (id(self), id(cached_kv.key), self._tensor_version(cached_kv.key),
+                             id(cached_kv.value), self._tensor_version(cached_kv.value),
                              tuple(p._version for p in self.parameters()),
                              tuple(b._version for b in self.buffers()),
                              getattr(self, "block_size", None), getattr(self, "partition", None),
@@ -596,6 +599,7 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         router_beam: int = 16,
         partition: str = "projection",
         fusion: str = "legacy",
+        summary_slots: int = 1,
         qk_norm: bool = False,
         global_type: str = "elu",
         num_induced_slots: int = 128,
@@ -620,15 +624,26 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
                 qk_length_scale=global_type != "elu",
                 global_type=global_type, num_induced_slots=num_induced_slots,
             )
-        elif attention_type in ("sparse", "fused_sparse", "fused_full"):
-            from .icl_attention import SetRetrievalAttention
+        elif attention_type in (
+            "sparse", "fused_sparse", "fused_full", "dual_path", "adaptive_frontier"
+        ):
+            from .icl_attention import (
+                AdaptiveResolutionAttention,
+                DualPathRetrievalAttention,
+                SetRetrievalAttention,
+            )
 
-            self.attn = SetRetrievalAttention(
+            attention_class = {
+                "dual_path": DualPathRetrievalAttention,
+                "adaptive_frontier": AdaptiveResolutionAttention,
+            }.get(attention_type, SetRetrievalAttention)
+            extra = {"summary_slots": summary_slots} if attention_type == "adaptive_frontier" else {}
+            self.attn = attention_class(
                 d_model, nhead, dropout, False, mode=attention_type, qk_norm=qk_norm,
                 block_size=block_size, num_selected_blocks=num_selected_blocks,
                 query_chunk_size=query_chunk_size, router=router, router_beam=router_beam,
                 partition=partition, fusion=fusion, global_type=global_type,
-                num_induced_slots=num_induced_slots,
+                num_induced_slots=num_induced_slots, **extra,
             )
         else:
             raise ValueError(f"Unknown attention_type: {attention_type}")
@@ -637,8 +652,12 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
 
     def init_weights(self):
         """Initialize projection layers to zero for stable training."""
-        nn.init.zeros_(self.attn.out_proj.weight)
-        nn.init.zeros_(self.attn.out_proj.bias)
+        if hasattr(self.attn, "zero_init_output"):
+            self.attn.zero_init_output()
+        else:
+            nn.init.zeros_(self.attn.out_proj.weight)
+            if self.attn.out_proj.bias is not None:
+                nn.init.zeros_(self.attn.out_proj.bias)
         nn.init.zeros_(self.linear2.weight)
         nn.init.zeros_(self.linear2.bias)
 

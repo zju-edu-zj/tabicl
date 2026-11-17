@@ -397,6 +397,8 @@ def build_parser():
         default="legacy",
         help="Global/local fusion geometry for hybrid ICL retrieval layers.",
     )
+    parser.add_argument("--icl_summary_slots", type=int, default=1,
+                        help="Summary tokens per unselected content-tree leaf in adaptive_frontier.")
     parser.add_argument("--icl_global_type", choices=("elu", "induced"), default="elu",
                         help="Global support memory used alone and inside hybrid retrieval layers.")
     parser.add_argument("--icl_num_induced_slots", type=int, default=128,
