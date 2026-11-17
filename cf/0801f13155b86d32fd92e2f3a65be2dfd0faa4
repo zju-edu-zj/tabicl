@@ -1,0 +1,103 @@
+scripts/benchmark_content_tree_v2.sh
+  s_4be667207dc3df::t_318d74979b7497 1-31
+scripts/train_v2_clf_stage1_adaptive_frontier.sh
+  s_4be667207dc3df::t_ed9bacc930eaf9 17
+  s_4be667207dc3df::t_318d74979b7497 1-16,18-23
+scripts/train_v2_clf_stage2_adaptive_frontier.sh
+  s_4be667207dc3df::t_ed9bacc930eaf9 17
+  s_4be667207dc3df::t_318d74979b7497 1-16,18-24
+scripts/train_v2_clf_stage2_dual_path.sh
+  s_4be667207dc3df::t_318d74979b7497 1-16,18-24
+  s_4be667207dc3df::t_ed9bacc930eaf9 17
+src/tabicl/train/_train_config.py
+  s_f8da1ee40a504e::t_ce2ad70f6c8ec2 400-401
+tests/test_new_attention_optimizer.py
+  s_4be667207dc3df::t_9caafdc7b67dce 1-65
+scripts/benchmark_icl_attention.py
+  s_4be667207dc3df::t_7a912f1a78c8dd 28-30,51
+  s_4be667207dc3df::t_7760f9f3966c8c 106-108,190,239,246-248,307
+  s_4be667207dc3df::t_31f8a7548d80ef 27,52-55,93
+scripts/icl_recipe.sh
+  s_4be667207dc3df::t_f895d09d95e1b0 12,37
+tests/test_icl_attention.py
+  s_4be667207dc3df::t_192eb88c1b3f55 124-125,179-180
+src/tabicl/prior/_scheduling.py
+  s_4be667207dc3df::t_5ed2c0818df0fb 81,86-87,95-101
+scripts/train_v2_clf_stage1.sh
+  s_4be667207dc3df::t_5ed2c0818df0fb 124
+tests/test_block_pool.py
+  s_4be667207dc3df::t_844babd2474d02 7-30,32-62
+  s_4be667207dc3df::t_928fd6f6c27a18 1-6,31
+src/tabicl/_model/icl_attention.py
+  s_4be667207dc3df::t_174369e5d12da3 646-647
+  s_4be667207dc3df::t_6cb763983828b5 778-779,787-790,792-794,948
+  s_4be667207dc3df::t_7760f9f3966c8c 529-530
+  s_4be667207dc3df::t_b17a9af0fa0926 524,780
+  s_4be667207dc3df::t_d9f8e2b5dd28ca 527-528,533,544,548-612,671,693,707-754,783-784,791,795,798-947,973-982,987
+  s_4be667207dc3df::t_94fc39ec23256b 16,25-26,518-523,525-526,531-532,534-543,545-547,613-645,648-670,672-692,694-706,755-777,781-782,785-786,796-797,949-972,983-986,988
+src/tabicl/_model/_block_pool.py
+  s_4be667207dc3df::t_928fd6f6c27a18 2-3,5,18-20,26
+  s_4be667207dc3df::t_7a912f1a78c8dd 1,6,34-38
+  s_4be667207dc3df::t_ea183a82e3d1b5 4,7-17,21-25,27-33
+scripts/train_v2_clf_stage1_dual_path.sh
+  s_4be667207dc3df::t_ed9bacc930eaf9 17
+  s_4be667207dc3df::t_318d74979b7497 1-16,18-23
+src/tabicl/_model/tabicl.py
+  s_f8da1ee40a504e::t_ce2ad70f6c8ec2 253,304-309,324-326,388
+  s_4be667207dc3df::t_7760f9f3966c8c 154,175-177
+  s_4be667207dc3df::t_6cb763983828b5 322-323
+  s_4be667207dc3df::t_354cb5a189d9b0 178
+tests/test_adaptive_resolution_attention.py
+  s_4be667207dc3df::t_7760f9f3966c8c 168
+  s_4be667207dc3df::t_6cb763983828b5 93-122,195,208
+  s_4be667207dc3df::t_f5174e3c3f31fb 1-92,123-167,169-194,196-207,209-230
+src/tabicl/_model/layers.py
+  s_f8da1ee40a504e::t_ce2ad70f6c8ec2 602,627-634,636-641,646,655-660
+  s_4be667207dc3df::t_174369e5d12da3 348-351,381-383
+src/tabicl/train/_run.py
+  s_4be667207dc3df::t_f895d09d95e1b0 323-325,334,627-632,638,653-654
+  s_4be667207dc3df::t_7760f9f3966c8c 642-645
+  s_4be667207dc3df::t_d9f8e2b5dd28ca 655-658
+src/tabicl/_model/_block_pool_triton.py
+  s_4be667207dc3df::t_7a912f1a78c8dd 1-82
+src/tabicl/_model/_frontier_triton.py
+  s_4be667207dc3df::t_10c82bd2110271 22-265
+  s_4be667207dc3df::t_6cb763983828b5 286-287
+  s_4be667207dc3df::t_70923e38cfaa82 1-21,266-285,288-291
+scripts/train_content_tree_v2_pilot.sh
+  s_4be667207dc3df::t_ed9bacc930eaf9 1-26
+src/tabicl/_model/learning.py
+  s_f8da1ee40a504e::t_ce2ad70f6c8ec2 97,128
+src/tabicl/_model/encoders.py
+  s_f8da1ee40a504e::t_ce2ad70f6c8ec2 101,155
+src/tabicl/train/_optimizer.py
+  s_4be667207dc3df::t_b17a9af0fa0926 42-45
+src/tabicl/train/_screening.py
+  s_4be667207dc3df::t_53bf89e87c3969 14-18,67-81,85-95,126-168,198,200,202
+tests/test_prior_scheduling.py
+  s_4be667207dc3df::t_80ea828de95580 60-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cf0801f13155b86d32fd92e2f3a65be2dfd0faa4",
+  "prompts": {},
+  "sessions": {
+    "s_4be667207dc3df": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e8d3-4364-7841-8f4c-ebcf72b18579",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    },
+    "s_f8da1ee40a504e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e8e6-b2db-7da3-861e-506b04877ee3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
