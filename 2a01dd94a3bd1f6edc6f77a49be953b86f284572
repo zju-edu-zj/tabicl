@@ -1,0 +1,461 @@
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-3-window_bucketed/logs/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-32
+tests/test_prior_runtime.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-185
+src/tabicl/prior/graph_lib/_distance.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-164
+scripts/analyze_prior_trace.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-122
+scripts/run_prior_filter_training.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-55
+docs/performance/prior_sufficient_cpu_20261102.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-177
+docs/benchmarks/prior_pipeline_20261022/stage1_node_pool_throughput.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-100
+scripts/diagnose_prior_distances.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-58
+docs/benchmarks/prior_window_20261031/tabicl-window-replay-2-node_pool-mmap.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-241
+scripts/run_prior_runtime_experiments.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-46
+scripts/summarize_prior_filter_cpu.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-63
+docs/benchmarks/prior_pipeline_20261022/stage2_node_pool_throughput.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-100
+scripts/audit_prior_execution.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-153
+docs/benchmarks/prior_window_20261031/tabicl-window-distance-budget-8.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-352
+docs/benchmarks/prior_window_20261031/tabicl-window-replay-3-dataloader-numpy.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-151
+docs/benchmarks/prior_window_20261031/train-3-balanced-numpy/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-2-window_bucketed/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+docs/benchmarks/prior_window_20261031/tabicl-window-generation-profile-3.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-1555
+docs/benchmarks/prior_window_20261031/train-3-balanced-numpy/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+scripts/summarize_training_schedule.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-50
+docs/benchmarks/prior_window_20261031/tabicl-window-replay-2-dataloader-numpy.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-151
+src/tabicl/prior/_node_pool.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-649
+scripts/train_v2_reg_stage2.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 16,63
+src/tabicl/prior/_filter_forest.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-172
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel8-3-window_bucketed-mmap/logs/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel8-2-window_bucketed-mmap/logs/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+docs/benchmarks/prior_window_20261031/train-2-balanced-numpy/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+docs/benchmarks/prior_window_20261031/tabicl-window-payload-2048-node_pool-numpy.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-241
+docs/performance/prior_sufficient_cpu_20261102.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-2634
+scripts/audit_prior_graph_cpu.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-162
+docs/benchmarks/prior_window_20261031/tabicl-window-generation-profile-2.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-1555
+src/tabicl/prior/_dataset.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 43,182-183,212-213,218,220,223,225,227,234-235,265,267-269,351-355,938,970-974,983-984,988-989,992-1001,1004-1005,1007-1010,1012-1014,1016-1018,1022-1029,1062,1079,1121-1154,1594-1639,1651-1654,1659-1664,1676-1682,1684,1690-1714,1726,1777
+src/tabicl/prior/graph_lib/_forest_cpu.h
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-214
+scripts/audit_prior_quality.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-117
+docs/benchmarks/prior_window_20261031/train-3-window_fifo-mmap/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+scripts/benchmark_forest_training.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-42
+src/tabicl/prior/graph_lib/_graph_function.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 32-39,49-54
+tests/test_prior_em_fused.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-141
+tests/test_prior_execution.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-73
+tests/test_prior_trace_analysis.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-75
+scripts/audit_prior_categorical.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-118
+tests/test_prior_cpu_budget.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-98
+tests/test_prior_window.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-166
+docs/benchmarks/prior_window_20261031/train-2-window_bucketed-mmap/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+docs/benchmarks/prior_window_20261031/train-3-window_bucketed-mmap/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-226
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel8-2-window_bucketed-mmap/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-228
+docs/cpu_budget_topk_20261031.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-135
+scripts/train_v2_clf_stage1.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 10,35,44-47,56,58,60-94,106,136
+tests/test_prior_filter_forest.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-200
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel8-3-balanced-numpy/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-228
+docs/benchmarks/prior_pipeline_20261022/rows60000_node_pool.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-100
+docs/benchmarks/prior_window_20261031/tabicl-window-replay-2-node_pool-numpy.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-241
+docs/benchmarks/prior_window_20261031/train-2-balanced-numpy/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-2-window_bucketed/logs/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-32
+docs/prior_pipeline_optimization.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 3-14
+docs/benchmarks/prior_pipeline_20261022/rows60000_dataloader.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-83
+scripts/audit_prior_sufficient_filter.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-129
+docs/benchmarks/prior_window_20261031/tabicl-window-distance-1.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-348
+docs/performance/prior_graph_cpu_20261102.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-1617
+scripts/benchmark_centroid_topk.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-77
+scripts/profile_prior_graph_cpu.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-56
+scripts/summarize_pipeline_profile.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-141
+docs/benchmarks/prior_window_20261031/tabicl-window-payload-16384-node_pool-mmap.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-241
+docs/benchmarks/prior_window_20261031/tabicl-window-payload-2048-dataloader-numpy.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-151
+requirements-prior-performance.txt
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-17
+scripts/benchmark_prior_pipeline.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 15,17,19,22,25,28,30,32,34,54-100,103-122,124,130,145-146,149,151-155,162,165-208,211-215,217-223,230,232-246,249-253,255-261,269-271,274-284,294-304
+scripts/train_v2_reg_stage1.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 37,73
+src/tabicl/prior/_scheduling.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-150
+src/tabicl/prior/graph_lib/_cpu_budget.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-92
+docs/benchmarks/prior_window_20261031/train-2-window_fifo-numpy/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+docs/shape_cohort_profile_20261031.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-549
+src/tabicl/_model/_routing_triton.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 49,52-53,62-146
+  s_3d6845861c5da5::t_e0021ace1283d8 147-149
+docs/performance/prior_graph_cpu_20261102.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-218
+docs/performance_results/shape_cohort_target_20261031.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-7288
+scripts/check_prior_forest_api.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-73
+src/tabicl/prior/_graph_scm.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 91,104,140
+scripts/summarize_prior_sufficient_experiments.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-88
+tests/test_prior_native_forest.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-213
+tests/test_prior_filter_sufficient.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-138
+tests/test_training_performance.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 16-18
+src/tabicl/train/_performance.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-113
+scripts/audit_prior_hotspot_replay.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-113
+tests/test_prior_ready_micro.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-230
+scripts/benchmark_training_schedule.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-104
+tests/test_training_recipe.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-124
+scripts/profile_graph_generation.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-234
+docs/performance/prior_exact_20261101.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-293
+docs/benchmarks/prior_window_20261031/train-3-window_bucketed-mmap/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+docs/training_performance.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-66
+scripts/run_prior_sufficient_experiments.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-76
+scripts/summarize_prior_graph_cpu.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-93
+src/tabicl/_model/attention.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 56,110-115,179,334
+docs/benchmarks/prior_window_20261031/tabicl-window-payload-16384-node_pool-numpy.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-241
+docs/performance_results/shape_cohort_cpu_20261031.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-765
+tests/test_centroid_topk.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-105
+tests/test_icl_attention.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 121,124-127
+tests/test_prior_cpu_statistics.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-120
+tests/test_prior_generation_trace.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-108
+scripts/inspect_prior_pool.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-36
+docs/benchmarks/training_schedule_20261030.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-557
+scripts/prior_recipe.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-57
+docs/performance/prior_fast_v2_20261101.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-74
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel8-3-balanced-numpy/logs/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+tests/test_prior_filter_cascade.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-110
+tests/test_prior_graph_optimized.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-223
+docs/performance/prior_graph_cpu_recovery_20261102.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-1837
+docs/performance/prior_native_forest_20261103.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-1398
+docs/benchmarks/prior_pipeline_20261022/stage3_node_pool_throughput.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-100
+docs/performance/prior_fast_v2_cpu_20261101.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-157
+scripts/benchmark_prior_matrix.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-49
+tests/test_prior_exact.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-230
+tests/test_prior_scheduling.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-148
+docs/benchmarks/prior_pipeline_20261022/stage1_dataloader_consumer550.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-83
+docs/benchmarks/prior_window_20261031/train-3-window_fifo-numpy/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+docs/benchmarks/prior_window_20261031/train-2-window_bucketed-mmap/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+src/tabicl/_model/icl_attention.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 65-66,69-70,127-131
+docs/performance/prior_ready_redesign_20261102.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-222
+src/tabicl/_model/layers.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 289
+scripts/benchmark_prior_cpu_statistics.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-56
+docs/benchmarks/prior_window_20261031/tabicl-window-generation-tail-3.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-787
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-2-window_fifo/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+docs/benchmarks/prior_window_20261031/tabicl-window-generation-tail-budget-3.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-15614
+scripts/train_v2_clf_stage3.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 10-11,17-40,42,44,46,86
+scripts/check_prior_schedule_ddp.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-98
+docs/benchmarks/prior_generation_20261022.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-281
+src/tabicl/prior/_generation_trace.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-122
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel8-2-balanced-numpy/logs/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+src/tabicl/prior/_pool_transport.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-75
+docs/benchmarks/prior_window_20261031/tabicl-window-distance-8.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-348
+docs/performance/prior_algorithmic_design_20261101.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-262
+docs/benchmarks/prior_window_20261031/train-3-window_fifo-mmap/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-226
+docs/benchmarks/prior_window_20261031/tabicl-window-training-summary.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-338
+docs/performance/prior_fast_default_20261103.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-246
+scripts/benchmark_prior_exact.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-224
+scripts/performance_recipe.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-11
+scripts/run_prior_training_matrix.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-80
+src/tabicl/prior/_ready_micro.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-88
+docs/benchmarks/prior_pipeline_20261022/stage1_dataloader_throughput.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-83
+scripts/run_prior_filter_cpu_experiments.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-60
+scripts/train_shape_prior.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-32
+src/tabicl/prior/graph_lib/_activation.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 178-191,229
+docs/benchmarks/prior_window_20261031/tabicl-window-replay-drain-3.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-152
+docs/prior_node_pool_20261022.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-215
+docs/benchmarks/prior_window_20261031/train-2-window_fifo-numpy/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+docs/performance/prior_ready_redesign_20261102.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-5396
+src/tabicl/prior/graph_lib/_nearest_cpu.cpp
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-408
+tests/test_prior_pipeline.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 81,93-209
+docs/performance/prior_redesign_20261101.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-1110
+scripts/run_prior_ready_experiments.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-70
+src/tabicl/prior/_task_plan.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-109
+scripts/benchmark_prior_operators.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-151
+docs/benchmarks/prior_window_20261031/train-2-window_fifo-mmap/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+tests/test_pipeline_profile.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-274
+scripts/benchmark_prior_em.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-75
+scripts/train_v2_clf_stage1_token_sparse.sh
+  s_3d6845861c5da5::t_a0359919814d2a 17
+docs/performance/prior_fast_v2_evaluation_20261101.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-274
+scripts/benchmark_prior_generation.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-83
+scripts/run_prior_graph_followups.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-69
+docs/benchmarks/prior_pipeline_20261022/stage3_dataloader_throughput.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-83
+docs/benchmarks/prior_window_20261031/tabicl-window-generation-tail-baseline-3.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-15422
+docs/benchmarks/prior_window_20261031/train-3-window_fifo-numpy/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+docs/benchmarks/prior_operators_20261022.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-386
+scripts/sample_training_resources.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-87
+scripts/summarize_kineto_trace.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-148
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel-summary.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-170
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel8-2-balanced-numpy/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-228
+README.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 313-317
+src/tabicl/train/_train_config.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 83-84,241-261
+  s_3d6845861c5da5::t_a0359919814d2a 76-82
+docs/benchmarks/prior_window_20261031/tabicl-window-metadata-headroom.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-86
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-2-window_fifo/logs/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-32
+scripts/run_cohort_audit.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-111
+scripts/summarize_prior_ready_experiments.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-169
+src/tabicl/prior/graph_lib/_config.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 24-31,59-62,86-93
+docs/benchmarks/prior_window_20261031/tabicl-window-replay-3-node_pool-mmap.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-241
+docs/performance/prior_native_forest_20261103.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-147
+docs/performance/prior_filter_cpu_20261102.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-3681
+docs/performance/prior_fast_v2_ddp_20261101.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-170
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-3-window_bucketed/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-3-window_fifo/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-225
+docs/prior_window_20261031.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-379
+scripts/benchmark_prior_matrix.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-49
+docs/benchmarks/prior_window_20261031/tabicl-window-payload-2048-node_pool-mmap.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-241
+scripts/prepare_prior_runtime.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-122
+scripts/audit_prior_windows.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-92
+docs/benchmarks/prior_pipeline_20261022/stage2_dataloader_throughput.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-83
+src/tabicl/train/_run.py
+  s_3d6845861c5da5::t_a0359919814d2a 562-563,569,575
+  s_3d6845861c5da5::t_1b11261f6d1a5a 35-36,41,79-80,155-157,373-386,399-401,436-438,442-466,785-787,792,799-816,854-857,1060,1175-1178,1305-1306
+  s_3d6845861c5da5::t_80c3a3a4caf8a3 467
+docs/benchmarks/prior_window_20261031/tabicl-window-kernel8-3-window_bucketed-mmap/run.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-228
+docs/benchmarks/prior_window_20261031/tabicl-window-payload-16384-dataloader-numpy.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-151
+scripts/train_v2_clf_stage1_fast.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-32
+scripts/build_prior_exact.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-18
+scripts/summarize_prior_runtime_experiments.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-101
+src/tabicl/prior/graph_lib/_base.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 107-118
+docs/benchmarks/prior_pipeline_20261022/stage1_node_pool_consumer550.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-100
+src/tabicl/prior/graph_lib/_function.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 2,11,157-167,214-217,286-292,297-303,323-324,327-335
+tests/test_node_prior_pool.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-272
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-summary.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-170
+tests/test_shape_cohort.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-193
+scripts/train_reference_centroid_topk.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-28
+docs/performance_results/cpu_budget_topk_20261031_steps.csv
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-111
+scripts/profile_training_pipeline.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-254
+docs/benchmarks/prior_window_20261031/tabicl-window-replay-3-node_pool-numpy.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-241
+docs/performance_results/cpu_budget_topk_20261031.json
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-71
+scripts/run_prior_graph_cpu_experiments.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-39
+docs/performance/prior_filter_cpu_20261102.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-156
+docs/training_schedule_20261030.md
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-259
+docs/benchmarks/prior_window_20261031/tabicl-window-worker-stack-tail.txt
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-33
+scripts/benchmark_icl_attention.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 18,71-74,141-149,164,335-341,402-408
+scripts/train_v2_clf_stage2.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 8-9,15-38,40,42,44,84
+docs/benchmarks/prior_window_20261031/tabicl-window-shapes-3-window_fifo/logs/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-32
+scripts/train_v2_reg_stage3.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 17,64
+scripts/icl_recipe.sh
+  s_3d6845861c5da5::t_1b11261f6d1a5a 32,34,67-69
+src/tabicl/prior/graph_lib/_converter.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 10,78,81,92-97,101,104,107-113,122-123,150-151,153-155,189
+scripts/audit_prior_filter_cascade.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-147
+tests/test_hybrid_optimizer.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 131-137,160-164
+tests/test_prior_categorical.py
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-60
+docs/benchmarks/prior_window_20261031/train-2-window_fifo-mmap/metrics.jsonl
+  s_3d6845861c5da5::t_1b11261f6d1a5a 1-24
+docs/benchmarks/prior_window_20261031/tabicl-window-cpu-full-tests.log
+  s_3d6845861c5da5::t_986faa99caf832 1-148
+docs/benchmarks/prior_window_20261031/tabicl-window-cpu-queue.log
+  s_3d6845861c5da5::t_148764633344b9 1-9
+docs/benchmarks/prior_window_20261031/tabicl-window-cpu-unit.log
+  s_3d6845861c5da5::t_a161c237359df1 1-14
+docs/benchmarks/prior_window_20261031/tabicl-window-ddp16-budget.log
+  s_3d6845861c5da5::t_bc8bf974af3f78 1-654
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2a01dd94a3bd1f6edc6f77a49be953b86f284572",
+  "prompts": {},
+  "sessions": {
+    "s_3d6845861c5da5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1eade-2f1f-7c33-92f0-cd3ae0f38a45",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
