@@ -1,4 +1,5 @@
 import copy
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -7,6 +8,7 @@ from torch.nn import functional as F
 from tabicl._model.encoders import Encoder
 from tabicl._model.kv_cache import KVCache
 from tabicl._model.token_sparse import TokenSparseAttention
+from tabicl.train._optimizer import build_optimizer
 
 
 def _module(device="cpu", regression=False):
@@ -110,6 +112,44 @@ def test_regression_index_loss_handles_constant_support_targets():
     loss.backward()
     assert torch.isfinite(loss)
     assert torch.isfinite(module.index_q_proj.weight.grad).all()
+
+
+def test_classification_index_loss_skips_queries_whose_class_is_absent_from_support():
+    torch.manual_seed(606)
+    module = _module()
+    query = torch.randn(1, 13, 32)
+    targets = torch.tensor([[0, 1, 0, 1, 0, 1, 0, 1, 0, 3, 3, 3, 3]])
+    _, loss = module(
+        query,
+        query[:, :9],
+        query[:, :9],
+        index_targets=targets,
+        index_query_indices=torch.tensor([9, 11, 12]),
+        return_index_loss=True,
+    )
+    loss.backward()
+    assert loss == 0
+    assert torch.isfinite(module.index_q_proj.weight.grad).all()
+
+
+def test_indexer_has_dedicated_adamw_optimizer_groups():
+    model = Encoder(
+        1, 32, 2, 64, attention_type="token_sparse", token_topk=8,
+        token_index_dim=4, qk_norm=True, zero_init=False,
+    )
+    config = SimpleNamespace(
+        muon=True, lr=8e-4, adamw_lr=1e-4, icl_index_lr=3e-4,
+        weight_decay=0.01, beta1=0.9, beta2=0.999,
+        use_cautious_wd=False, compile_optimizer=False,
+    )
+    optimizer = build_optimizer(model, config)
+    groups = {group["group_name"]: group for group in optimizer.param_groups}
+    assert groups["indexer_decay"]["lr"] == 3e-4
+    assert groups["indexer_no_decay"]["lr"] == 3e-4
+    assert all(".index_" in name for name in groups["indexer_decay"]["param_names"])
+    assert all(".index_" in name for name in groups["indexer_no_decay"]["param_names"])
+    assert any(name.endswith("index_logit_scale")
+               for name in groups["indexer_no_decay"]["param_names"])
 
 
 @pytest.mark.parametrize("recompute", [False, True])

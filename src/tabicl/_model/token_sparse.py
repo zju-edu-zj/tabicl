@@ -40,7 +40,9 @@ class TokenSparseAttention(SupportAttention):
         self.index_regression = index_regression
         self.index_num_classes = index_num_classes
         self.index_regression_temperature = index_regression_temperature
-        self.route_score_chunk_elements = 8 * 1024**2
+        # A 32M-element score workspace keeps GEMM/top-k launches efficient at
+        # long context while remaining small relative to model activations.
+        self.route_score_chunk_elements = 32 * 1024**2
         self.index_q_proj = nn.Linear(self.embed_dim, index_dim, bias=False)
         self.index_k_proj = nn.Linear(self.embed_dim, index_dim, bias=False)
         nn.init.xavier_uniform_(self.index_q_proj.weight)
@@ -116,15 +118,22 @@ class TokenSparseAttention(SupportAttention):
 
     def _classification_index_loss(self, scores, support_targets, query_targets):
         class_logits = []
+        class_counts = []
         for class_id in range(self.index_num_classes):
             mask = support_targets == class_id
             count = mask.sum(-1).clamp_min(1)
+            class_counts.append(mask.sum(-1))
             selected = scores.masked_fill(~mask[:, None], -float("inf"))
             value = selected.logsumexp(-1) - count[:, None].float().log()
             value = value.masked_fill(~mask.any(-1)[:, None], -float("inf"))
             class_logits.append(value)
         logits = torch.stack(class_logits, dim=-1)
-        return F.cross_entropy(logits.flatten(0, 1), query_targets.long().flatten())
+        counts = torch.stack(class_counts, dim=-1)
+        targets = query_targets.long()
+        valid = counts.gather(1, targets).gt(0)
+        if not valid.any():
+            return scores.sum() * 0.0
+        return F.cross_entropy(logits[valid], targets[valid])
 
     def _regression_index_loss(self, scores, support_targets, query_targets):
         center = support_targets.median(-1).values
@@ -197,10 +206,23 @@ class TokenSparseAttention(SupportAttention):
     ):
         if not k.shape[-2]:
             raise ValueError("Token sparse ICL attention needs at least one support row")
-        q_index, computed_k_index = self._index_embeddings(q, k)
-        k_index = prepared["index_k"] if prepared is not None and "index_k" in prepared else computed_k_index
+        q_index = F.normalize(
+            self.index_q_proj(self._merge_heads(q).detach()).float(), dim=-1
+        )
+        computed_k_index = None
+        if prepared is not None and "index_k" in prepared:
+            k_index = prepared["index_k"]
+        else:
+            computed_k_index = F.normalize(
+                self.index_k_proj(self._merge_heads(k).detach()).float(), dim=-1
+            )
+            k_index = computed_k_index
         index_loss = None
         if return_index_loss:
+            if computed_k_index is None:
+                computed_k_index = F.normalize(
+                    self.index_k_proj(self._merge_heads(k).detach()).float(), dim=-1
+                )
             index_loss = self._index_loss(
                 q_index, computed_k_index, k.shape[-2], index_targets, index_query_indices
             )

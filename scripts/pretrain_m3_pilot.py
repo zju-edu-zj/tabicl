@@ -95,7 +95,9 @@ def main():
     (run / "pilot.json").write_text(json.dumps(vars(args), default=str, indent=2))
     (run / "source.diff").write_text(subprocess.check_output(["git", "diff", "HEAD"], cwd=repo, text=True))
     (run / "launcher.py").write_text(Path(__file__).read_text())
-    (run / "environment.txt").write_text(subprocess.check_output(["/home/zj/miniconda3/envs/stdplm/bin/python", "-m", "pip", "freeze"], text=True))
+    (run / "environment.txt").write_text(
+        subprocess.check_output([sys.executable, "-m", "pip", "freeze"], text=True)
+    )
     trainer = Trainer(config)
     writer = None
     if args.tensorboard_log:
