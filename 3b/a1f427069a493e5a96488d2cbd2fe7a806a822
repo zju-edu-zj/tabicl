@@ -1,0 +1,42 @@
+tests/test_hierarchical_frontier.py
+  s_9acb7393662811::t_e91cd0f43dfd95 1-66
+scripts/benchmark_stage1_training.py
+  s_9acb7393662811::t_f41611a8ecaefa 90-92
+src/tabicl/train/_run.py
+  s_9acb7393662811::t_f41611a8ecaefa 324-326,629
+src/tabicl/_model/_adaptive_frontier.py
+  s_9acb7393662811::t_53951cab32157c 1-233
+scripts/benchmark_icl_attention.py
+  s_9acb7393662811::t_3e2ef8e0d9a38d 247-249
+tests/test_icl_training_diagnostics.py
+  s_9acb7393662811::t_db3c23c1658585 139,167,192-193
+tests/test_adaptive_resolution_attention.py
+  s_9acb7393662811::t_db3c23c1658585 17-18,20,128-129,150-151,153,272
+src/tabicl/_model/_hierarchical_frontier_triton.py
+  s_9acb7393662811::t_d0e3a09f933cbc 1-302
+src/tabicl/_model/icl_attention.py
+  s_9acb7393662811::t_f41611a8ecaefa 910,1195-1201
+tests/test_new_attention_optimizer.py
+  s_9acb7393662811::t_db3c23c1658585 23,54
+src/tabicl/_model/_hierarchical_frontier.py
+  s_9acb7393662811::t_e91cd0f43dfd95 104-105,113-115
+  s_9acb7393662811::t_bd9d081b08f662 1-103,106-112,116-117
+src/tabicl/_model/tabicl.py
+  s_9acb7393662811::t_f41611a8ecaefa 304,323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3ba1f427069a493e5a96488d2cbd2fe7a806a822",
+  "prompts": {},
+  "sessions": {
+    "s_9acb7393662811": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ea73-f531-7a92-875d-ff6c0c5c945a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
