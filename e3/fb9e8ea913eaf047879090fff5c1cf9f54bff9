@@ -1,0 +1,14 @@
+scripts/benchmark_stage1_training.py
+  h_cc1ebc7ba386b0 92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e3fb9e8ea913eaf047879090fff5c1cf9f54bff9",
+  "prompts": {},
+  "humans": {
+    "h_cc1ebc7ba386b0": {
+      "author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
