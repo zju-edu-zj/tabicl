@@ -1,0 +1,21 @@
+scripts/benchmark_task_page_flash.py
+  s_7a77f2f9293773::t_a41ae25d28693d 87-108
+src/tabicl/_model/_task_page_flash.py
+  s_7a77f2f9293773::t_a41ae25d28693d 12,331,341-366,457,475
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8d0a54f8d2c410ab6017088efcafb8d0ec43d8f3",
+  "prompts": {},
+  "sessions": {
+    "s_7a77f2f9293773": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f438-6ea5-7993-802d-35119ca862b8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
