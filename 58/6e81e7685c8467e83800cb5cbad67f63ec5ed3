@@ -1,0 +1,37 @@
+scripts/icl_recipe.sh
+  s_487333fb26ff2f::t_357816251b9d3e 32,38
+src/tabicl/_model/_task_sparse_triton.py
+  s_487333fb26ff2f::t_cd0d161ef70a63 13-15,23-44,49-52,61,63-86,95,185,189-190,192-194,200-201,211-214,216-218,223-225
+src/tabicl/train/_train_config.py
+  s_487333fb26ff2f::t_357816251b9d3e 244-249
+src/tabicl/train/_run.py
+  s_487333fb26ff2f::t_defded9f08495d 1322
+  s_487333fb26ff2f::t_357816251b9d3e 1319-1321,1323,1325-1327,1334-1338
+src/tabicl/_model/_token_sparse_triton.py
+  s_487333fb26ff2f::t_cd0d161ef70a63 63,73
+tests/test_prior_scheduling.py
+  s_487333fb26ff2f::t_357816251b9d3e 12,79-88
+  s_487333fb26ff2f::t_16c16e33777bc7 89-90
+tests/test_task_sparse_triton.py
+  s_487333fb26ff2f::t_defded9f08495d 60-77
+scripts/benchmark_stage1_training.py
+  s_487333fb26ff2f::t_defded9f08495d 31-32,41-45,51,67-69,84-85,111,113-115,121,129-135
+src/tabicl/prior/_task_plan.py
+  s_487333fb26ff2f::t_357816251b9d3e 80-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "586e81e7685c8467e83800cb5cbad67f63ec5ed3",
+  "prompts": {},
+  "sessions": {
+    "s_487333fb26ff2f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f382-9a6b-7211-a4d7-ea4993699e56",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
