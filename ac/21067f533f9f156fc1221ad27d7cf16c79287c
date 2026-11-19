@@ -1,0 +1,23 @@
+src/tabicl/_model/_task_sparse_triton.py
+  s_92bccbe7041b7d::t_74302814a79c34 43,45,69-72,80-120,203,205-206,218-227
+  s_92bccbe7041b7d::t_0083602f658347 79,202
+  s_92bccbe7041b7d::t_2adc1204bb84c8 196-201
+scripts/train_v2_clf_stage1_task_token_sparse.sh
+  s_92bccbe7041b7d::t_3eff09606c8d89 10-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ac21067f533f9f156fc1221ad27d7cf16c79287c",
+  "prompts": {},
+  "sessions": {
+    "s_92bccbe7041b7d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f2eb-6738-7b62-a177-2350b3f9ac7e",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
