@@ -1,0 +1,19 @@
+src/tabicl/_model/_hierarchical_frontier.py
+  s_1ae36494e2f247::t_78bb0654dfa624 201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b74c4b6f805185774610a6e16f078632f7ce6739",
+  "prompts": {},
+  "sessions": {
+    "s_1ae36494e2f247": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ec9a-b467-7241-b6e2-e35dbe059798",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
