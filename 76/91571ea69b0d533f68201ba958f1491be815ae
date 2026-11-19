@@ -1,0 +1,21 @@
+src/tabicl/prior/_node_pool.py
+  s_cf50df110c1dd3::t_6da94faceeb5d4 574,631-634
+tests/test_shape_cohort.py
+  s_cf50df110c1dd3::t_6da94faceeb5d4 151-153,155,157-162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7691571ea69b0d533f68201ba958f1491be815ae",
+  "prompts": {},
+  "sessions": {
+    "s_cf50df110c1dd3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f299-7a62-79a1-a2ea-a7eefac51f68",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
