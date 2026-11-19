@@ -1,0 +1,47 @@
+scripts/benchmark_stage1_training.py
+  s_7a77f2f9293773::t_e25adcfba3752d 85
+scripts/check_mixed_support_step.py
+  s_7a77f2f9293773::t_e25adcfba3752d 25
+scripts/benchmark_task_page_flash.py
+  s_7a77f2f9293773::t_e25adcfba3752d 42,60,74
+  s_7a77f2f9293773::t_1aa218cd3d8d31 53
+tests/test_task_sparse_triton.py
+  s_7a77f2f9293773::t_e25adcfba3752d 88-90
+src/tabicl/_model/task_token_sparse.py
+  s_7a77f2f9293773::t_176bda844ce01c 79,168-169,176
+scripts/benchmark_icl_attention.py
+  s_7a77f2f9293773::t_e25adcfba3752d 82
+tests/test_eval_task_token_sparse.py
+  s_7a77f2f9293773::t_1aa218cd3d8d31 50
+src/tabicl/prior/_scheduling.py
+  s_7a77f2f9293773::t_e25adcfba3752d 103
+src/tabicl/_model/_task_page_triton.py
+  s_7a77f2f9293773::t_176bda844ce01c 41-42,44,46-49,52,55,60-61,63-64
+src/tabicl/_model/_task_page_flash.py
+  s_7a77f2f9293773::t_176bda844ce01c 398,477,502,505,507,537-539
+tests/test_task_token_sparse.py
+  s_7a77f2f9293773::t_e25adcfba3752d 94,98,141,147-148,150,155
+  s_7a77f2f9293773::t_1aa218cd3d8d31 95
+scripts/train_v2_clf_stage1_task_token_page_flash.sh
+  s_7a77f2f9293773::t_e25adcfba3752d 1-7
+src/tabicl/_model/tabicl.py
+  s_7a77f2f9293773::t_e25adcfba3752d 298
+src/tabicl/train/_run.py
+  s_7a77f2f9293773::t_e25adcfba3752d 324
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6ea8d27c714c79ddde7d40a4e7facc1ae5309b3a",
+  "prompts": {},
+  "sessions": {
+    "s_7a77f2f9293773": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f438-6ea5-7993-802d-35119ca862b8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
