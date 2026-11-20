@@ -1,0 +1,19 @@
+scripts/benchmark_task_page_flash.py
+  s_7a77f2f9293773::t_420a7faff99250 18-21,27-32,40-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e6fc265a9e4d9132c5d93f10cab9a688cb92301a",
+  "prompts": {},
+  "sessions": {
+    "s_7a77f2f9293773": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f438-6ea5-7993-802d-35119ca862b8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

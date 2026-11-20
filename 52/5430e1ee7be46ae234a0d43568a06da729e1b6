@@ -1,0 +1,23 @@
+scripts/benchmark_stage1_training.py
+  s_7a77f2f9293773::t_c5fe2652316bea 53-54,93-98
+src/tabicl/_model/task_token_sparse.py
+  s_7a77f2f9293773::t_0f2eb18e526612 19,27,233
+tests/test_task_token_sparse.py
+  s_7a77f2f9293773::t_c8102c948ee9a8 111-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "525430e1ee7be46ae234a0d43568a06da729e1b6",
+  "prompts": {},
+  "sessions": {
+    "s_7a77f2f9293773": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f438-6ea5-7993-802d-35119ca862b8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

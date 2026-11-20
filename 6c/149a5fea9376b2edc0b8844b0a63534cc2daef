@@ -1,0 +1,14 @@
+tests/test_task_token_sparse.py
+  h_cc1ebc7ba386b0 55-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6c149a5fea9376b2edc0b8844b0a63534cc2daef",
+  "prompts": {},
+  "humans": {
+    "h_cc1ebc7ba386b0": {
+      "author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}

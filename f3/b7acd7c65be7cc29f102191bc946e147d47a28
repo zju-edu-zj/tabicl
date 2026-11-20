@@ -1,0 +1,77 @@
+src/tabicl/_model/task_token_sparse.py
+  s_487333fb26ff2f::t_325a02f694f2f3 54,61-62
+  s_487333fb26ff2f::t_4df3d5b7f78ffd 175-197,229
+src/tabicl/train/_optim.py
+  s_487333fb26ff2f::t_325a02f694f2f3 59,92-113,135-139,147
+src/tabicl/_model/_task_sparse_triton.py
+  s_cf50df110c1dd3::t_c9c4b00f8c111e 46-51,53,76,78,114-115,120-125,127-128,130
+  s_487333fb26ff2f::t_dedc2d063790d7 13-15,20,30,32,38,77,79-83,88,101,111-113,261-271,302-312
+  s_487333fb26ff2f::t_cd0d161ef70a63 43-45,54-74,116-119,131-154,163,258,272-274,280-281,291-294,296-298
+  s_487333fb26ff2f::t_9089824106e074 75,126,129,248-251
+  s_487333fb26ff2f::t_30a1f851c932dd 52
+  s_487333fb26ff2f::t_80656129498c99 256-257
+src/tabicl/prior/_scheduling.py
+  s_487333fb26ff2f::t_37d98d59a669f6 97
+tests/test_task_sparse_triton.py
+  s_487333fb26ff2f::t_d32283bef6b4bd 74-80
+  s_487333fb26ff2f::t_defded9f08495d 60-73,81-82
+tests/test_training_recipe.py
+  s_487333fb26ff2f::t_9089824106e074 63-68,86-87
+  s_487333fb26ff2f::t_d32283bef6b4bd 15,69-85
+src/tabicl/_model/_token_sparse_triton.py
+  s_487333fb26ff2f::t_cd0d161ef70a63 63,73
+tests/test_eval_task_token_sparse.py
+  s_487333fb26ff2f::t_d32283bef6b4bd 65
+scripts/train_v2_clf_stage1_task_token_sparse.sh
+  s_487333fb26ff2f::t_325a02f694f2f3 8-9,14
+src/tabicl/train/_run.py
+  s_487333fb26ff2f::t_357816251b9d3e 1322-1324,1326,1328-1330,1337-1341
+  s_487333fb26ff2f::t_defded9f08495d 1325
+  s_487333fb26ff2f::t_9089824106e074 376-378,381
+tests/test_task_token_sparse.py
+  s_487333fb26ff2f::t_d32283bef6b4bd 37-38,54,94
+  s_487333fb26ff2f::t_4df3d5b7f78ffd 125-140
+scripts/icl_recipe.sh
+  s_487333fb26ff2f::t_357816251b9d3e 33,39
+  s_487333fb26ff2f::t_325a02f694f2f3 14,56
+tests/test_mixed_support.py
+  s_487333fb26ff2f::t_d32283bef6b4bd 10,28-31,61
+scripts/check_mixed_support_step.py
+  s_487333fb26ff2f::t_37d98d59a669f6 38
+src/tabicl/train/_train_config.py
+  s_487333fb26ff2f::t_357816251b9d3e 244-249
+  s_487333fb26ff2f::t_325a02f694f2f3 407-408
+scripts/benchmark_stage1_training.py
+  s_487333fb26ff2f::t_defded9f08495d 32-33,42-46,52,68-70,85-86,122,124-126,132,140-146
+  s_487333fb26ff2f::t_9089824106e074 24,91-100
+src/tabicl/prior/_task_plan.py
+  s_487333fb26ff2f::t_357816251b9d3e 80-99
+  s_487333fb26ff2f::t_325a02f694f2f3 59,61-65,67-68
+tests/test_prior_scheduling.py
+  s_487333fb26ff2f::t_357816251b9d3e 12,79-88
+  s_487333fb26ff2f::t_16c16e33777bc7 89-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f3b7acd7c65be7cc29f102191bc946e147d47a28",
+  "prompts": {},
+  "sessions": {
+    "s_487333fb26ff2f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f382-9a6b-7211-a4d7-ea4993699e56",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": null
+    },
+    "s_cf50df110c1dd3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f299-7a62-79a1-a2ea-a7eefac51f68",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
