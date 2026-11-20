@@ -1,0 +1,39 @@
+scripts/benchmark_icl_attention.py
+  s_42ae064f71efb9::t_66d6ecd5474390 248
+scripts/benchmark_stage1_training.py
+  s_42ae064f71efb9::t_253d339f201b02 91
+scripts/train_v2_clf_stage1_dual_path.sh
+  s_42ae064f71efb9::t_a4cb7e10db60a0 8-11,15,23-25
+src/tabicl/_model/icl_attention.py
+  s_42ae064f71efb9::t_d6c6bd066561b3 536-543,573-578,580-591,742-815,858-859,867,879,910-911,914-919,921-925,928-929,933-944
+src/tabicl/_model/tabicl.py
+  s_42ae064f71efb9::t_e8ed6c88db98bb 304
+src/tabicl/train/_run.py
+  s_42ae064f71efb9::t_72fe573db32424 325,629,929-930,1154-1156,1159-1163,1247-1248
+src/tabicl/train/_screening.py
+  s_42ae064f71efb9::t_f20971d4f6c695 70-74,136-137,146,148-161,163-165
+tests/test_adaptive_resolution_attention.py
+  s_42ae064f71efb9::t_5829d3b8c05664 55-57,84-158
+tests/test_icl_screening.py
+  s_42ae064f71efb9::t_a5e0d0566c5986 458,480
+tests/test_icl_training_diagnostics.py
+  s_42ae064f71efb9::t_794c7e0350e059 133-135,166
+tests/test_new_attention_optimizer.py
+  s_42ae064f71efb9::t_a3cb2548054a39 23,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "66ee032c79f1d8ec8835576521a2d8a8c4fc1f78",
+  "prompts": {},
+  "sessions": {
+    "s_42ae064f71efb9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f824-6306-71a1-b0b1-1b2d259f3c36",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
