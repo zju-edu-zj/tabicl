@@ -1,0 +1,23 @@
+src/tabicl/_model/_adaptive_frontier.py
+  s_374f4f2c9e6112::t_ad2d0e26baea46 72-74,76-79
+tests/test_adaptive_v3_partition.py
+  s_374f4f2c9e6112::t_62145336932167 1-123
+src/tabicl/_model/icl_attention.py
+  s_374f4f2c9e6112::t_ad2d0e26baea46 66,116-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fe3f835ab226de6aada165c174a010fee9f6b58d",
+  "prompts": {},
+  "sessions": {
+    "s_374f4f2c9e6112": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f946-0c52-7742-a9f9-2e42e971cd6f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
