@@ -1,0 +1,21 @@
+tests/test_adaptive_resolution_attention.py
+  s_95fd9299bfe5fb::t_3c15a856811422 189-205
+tests/test_hierarchical_frontier.py
+  s_95fd9299bfe5fb::t_6583de8903598a 199-220,265-291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ed59279e1b3283b13591f5f4690292edffc23f5f",
+  "prompts": {},
+  "sessions": {
+    "s_95fd9299bfe5fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f825-957e-7992-82f5-50d92c40fd1d",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
