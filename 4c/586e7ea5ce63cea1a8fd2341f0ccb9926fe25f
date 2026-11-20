@@ -1,0 +1,37 @@
+tests/test_rectangular_attention.py
+  s_a05f446f8cd89e::t_e515bde429b923 1-6,9-39,90-104,108-114,117-122
+  s_a05f446f8cd89e::t_c2e02b4c11944c 115-116,123
+  s_a05f446f8cd89e::t_731c03669a951a 7-8,40-89,105-107,124-165
+src/tabicl/_model/attention.py
+  s_a05f446f8cd89e::t_8b506585ad0272 57,111-123,193,348-349
+src/tabicl/_model/icl_attention.py
+  s_a05f446f8cd89e::t_731c03669a951a 400-401,424-425
+  s_a05f446f8cd89e::t_ac70428d72b562 383-399,402-423,426-480,514-519
+  s_a05f446f8cd89e::t_a4014617433336 382
+tests/test_icl_attention.py
+  s_a05f446f8cd89e::t_731c03669a951a 273-291
+  s_a05f446f8cd89e::t_e515bde429b923 249-272
+src/tabicl/_model/_rectangular_attention.py
+  s_a05f446f8cd89e::t_ac70428d72b562 164-166,192-199
+  s_a05f446f8cd89e::t_a156a3a9ecf005 169-170,173,176,202-203,213-214,218
+  s_a05f446f8cd89e::t_21ee48e708baf9 204-206,226-230
+  s_a05f446f8cd89e::t_8b506585ad0272 1-163,167-168,171-172,174-175,177-191,200-201,207-212,215-217,219-225,231-262
+src/tabicl/_model/layers.py
+  s_a05f446f8cd89e::t_8b506585ad0272 290,937-940
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4c586e7ea5ce63cea1a8fd2341f0ccb9926fe25f",
+  "prompts": {},
+  "sessions": {
+    "s_a05f446f8cd89e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f8ae-f3de-7923-ad31-976f573a368e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
