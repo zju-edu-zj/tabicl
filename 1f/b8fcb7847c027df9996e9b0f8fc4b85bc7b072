@@ -1,0 +1,37 @@
+src/tabicl/train/_run.py
+  s_3e73ad0f00d4b2::t_74da5ebf2f9dca 390-391,396-403,1133-1137
+scripts/benchmark_stage1_training.py
+  s_3e73ad0f00d4b2::t_5b51fe46d661b7 34-35,71,103-104
+scripts/train_v2_clf_stage1_dual_path.sh
+  s_3e73ad0f00d4b2::t_5b51fe46d661b7 11-12,14-16
+src/tabicl/_model/layers.py
+  s_3e73ad0f00d4b2::t_74da5ebf2f9dca 771,826-842
+  s_3e73ad0f00d4b2::t_d530a6459f8911 843
+scripts/icl_recipe.sh
+  s_3e73ad0f00d4b2::t_74da5ebf2f9dca 31-34
+src/tabicl/_model/icl_attention.py
+  s_3e73ad0f00d4b2::t_74da5ebf2f9dca 601-608
+src/tabicl/_model/tabicl.py
+  s_3e73ad0f00d4b2::t_74da5ebf2f9dca 461-468
+src/tabicl/train/_train_config.py
+  s_3e73ad0f00d4b2::t_74da5ebf2f9dca 92-97
+  s_3e73ad0f00d4b2::t_2cb1c2955969d7 91
+src/tabicl/_model/_sparse_grouped.py
+  s_3e73ad0f00d4b2::t_5b51fe46d661b7 55,111-114,142-157,161,165-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1fb8fcb7847c027df9996e9b0f8fc4b85bc7b072",
+  "prompts": {},
+  "sessions": {
+    "s_3e73ad0f00d4b2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f865-9567-7813-8315-cbc5c7c344f4",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
