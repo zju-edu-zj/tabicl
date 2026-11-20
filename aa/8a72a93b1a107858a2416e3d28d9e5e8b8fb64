@@ -1,0 +1,19 @@
+src/tabicl/_model/_hierarchical_frontier_triton.py
+  s_95fd9299bfe5fb::t_a236b7174e9b4e 71,80,82-87,114-118,144,147,149,153,159,171,176-181,287-291,307,310,313-314,319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aa8a72a93b1a107858a2416e3d28d9e5e8b8fb64",
+  "prompts": {},
+  "sessions": {
+    "s_95fd9299bfe5fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f825-957e-7992-82f5-50d92c40fd1d",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
