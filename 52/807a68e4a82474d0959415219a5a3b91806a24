@@ -1,0 +1,48 @@
+src/tabicl/_model/_hierarchical_frontier_triton.py
+  s_374f4f2c9e6112::t_f1c55d2e983e17 299-300
+  s_374f4f2c9e6112::t_eef8e8660313a0 842-843,847,926,931
+scripts/benchmark_stage1_training.py
+  s_374f4f2c9e6112::t_cdc69bec8a26cc 90
+src/tabicl/train/_train_config.py
+  s_374f4f2c9e6112::t_b09a99b6001cd6 411-416
+src/tabicl/_model/layers.py
+  s_374f4f2c9e6112::t_84159d13cb2243 603-605,643-651
+src/tabicl/_model/_adaptive_frontier.py
+  s_374f4f2c9e6112::t_eef8e8660313a0 106,109-110,129-131,171-177,186-190,220,233-234,240,242,244,246-254,257-266,299-316,412,430,432,434,437,439-442,450,454,457-463
+src/tabicl/train/_run.py
+  s_374f4f2c9e6112::t_b09a99b6001cd6 324,337-339,632,644-646,662-665
+src/tabicl/_model/encoders.py
+  s_374f4f2c9e6112::t_84159d13cb2243 102-104,159-161
+scripts/icl_recipe.sh
+  s_374f4f2c9e6112::t_cdc69bec8a26cc 13-15,41-43
+tests/test_icl_training_diagnostics.py
+  s_374f4f2c9e6112::t_cdc69bec8a26cc 167
+tests/test_new_attention_optimizer.py
+  s_374f4f2c9e6112::t_cdc69bec8a26cc 23
+scripts/benchmark_icl_attention.py
+  s_374f4f2c9e6112::t_cdc69bec8a26cc 247
+scripts/train_adaptive_v3_pilot.sh
+  s_374f4f2c9e6112::t_cdc69bec8a26cc 1-22
+src/tabicl/_model/learning.py
+  s_374f4f2c9e6112::t_84159d13cb2243 98-100,132-134
+scripts/train_v2_clf_stage1_adaptive_v3.sh
+  s_374f4f2c9e6112::t_cdc69bec8a26cc 1-30
+src/tabicl/_model/tabicl.py
+  s_374f4f2c9e6112::t_f905a944b9deb8 179-185,261-263,314,337-339,402-404
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "52807a68e4a82474d0959415219a5a3b91806a24",
+  "prompts": {},
+  "sessions": {
+    "s_374f4f2c9e6112": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f946-0c52-7742-a9f9-2e42e971cd6f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
