@@ -1,0 +1,19 @@
+src/tabicl/_model/_sparse_grouped.py
+  s_a0e23b5a83c245::t_9d79c91209064c 34,40,46-49,141,143,150,154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "545a2d008127342351cce028aa5ff922c4a66dac",
+  "prompts": {},
+  "sessions": {
+    "s_a0e23b5a83c245": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fa15-3213-7320-a41e-d47ca58563f9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
