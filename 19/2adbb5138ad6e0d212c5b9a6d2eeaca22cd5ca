@@ -1,0 +1,21 @@
+scripts/train_v2_clf_stage1_dual_path.sh
+  s_3e73ad0f00d4b2::t_9391c5677262e3 11,14-15
+src/tabicl/_model/_sparse_grouped.py
+  s_3e73ad0f00d4b2::t_cd1317fdc1e180 55,111,139-143,147,151-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "192adbb5138ad6e0d212c5b9a6d2eeaca22cd5ca",
+  "prompts": {},
+  "sessions": {
+    "s_3e73ad0f00d4b2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f865-9567-7813-8315-cbc5c7c344f4",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
