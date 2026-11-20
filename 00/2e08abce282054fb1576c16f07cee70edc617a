@@ -1,0 +1,19 @@
+scripts/train_v2_clf_stage1_adaptive_v3.sh
+  s_a0e23b5a83c245::t_0c4cb752fdff65 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "002e08abce282054fb1576c16f07cee70edc617a",
+  "prompts": {},
+  "sessions": {
+    "s_a0e23b5a83c245": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fa15-3213-7320-a41e-d47ca58563f9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
