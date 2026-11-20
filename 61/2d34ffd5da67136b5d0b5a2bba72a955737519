@@ -1,0 +1,19 @@
+tests/test_adaptive_v3_partition.py
+  s_374f4f2c9e6112::t_7f4eaa5d2853b9 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "612d34ffd5da67136b5d0b5a2bba72a955737519",
+  "prompts": {},
+  "sessions": {
+    "s_374f4f2c9e6112": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f946-0c52-7742-a9f9-2e42e971cd6f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
