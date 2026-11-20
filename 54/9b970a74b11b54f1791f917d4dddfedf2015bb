@@ -1,0 +1,19 @@
+tests/test_adaptive_resolution_attention.py
+  s_374f4f2c9e6112::t_1c1a4ce180ee03 318
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "549b970a74b11b54f1791f917d4dddfedf2015bb",
+  "prompts": {},
+  "sessions": {
+    "s_374f4f2c9e6112": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f946-0c52-7742-a9f9-2e42e971cd6f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
