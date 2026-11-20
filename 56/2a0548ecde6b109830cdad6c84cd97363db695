@@ -1,0 +1,19 @@
+scripts/benchmark_icl_attention.py
+  s_a0e23b5a83c245::t_3d1c34ab047d00 266-267,281-283
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "562a0548ecde6b109830cdad6c84cd97363db695",
+  "prompts": {},
+  "sessions": {
+    "s_a0e23b5a83c245": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fa15-3213-7320-a41e-d47ca58563f9",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
