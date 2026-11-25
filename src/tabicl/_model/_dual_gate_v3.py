@@ -120,44 +120,33 @@ class DualPathGateV3(nn.Module):
             global_q32 = global_q.float()
             sparse_q32 = sparse_q.float()
             base_features = self._base_features(route_quality.detach().float())
-            query_features = torch.stack((global_q32, sparse_q32), dim=-2)
-            query_weight = torch.stack(
-                (
-                    self.global_query_weight.float(),
-                    self.sparse_query_weight.float(),
-                ),
-                dim=1,
+            global_logit = (
+                torch.einsum("bhtd,hd->bht", global_q32, self.global_query_weight.float())
+                + torch.einsum(
+                    "bhtf,hf->bht", base_features, self.global_route_weight.float()
+                )
+                + self.base_bias[:, 0].float()[None, :, None]
             )
-            route_weight = torch.stack(
-                (
-                    self.global_route_weight.float(),
-                    self.sparse_route_weight.float(),
-                ),
-                dim=1,
-            )
-            logits = (
-                torch.einsum("bhtcd,hcd->bhtc", query_features, query_weight)
-                + torch.einsum("bhtf,hcf->bhtc", base_features, route_weight)
-                + self.base_bias.float()[None, :, None]
+            sparse_logit = (
+                torch.einsum("bhtd,hd->bht", sparse_q32, self.sparse_query_weight.float())
+                + torch.einsum(
+                    "bhtf,hf->bht", base_features, self.sparse_route_weight.float()
+                )
+                + self.base_bias[:, 1].float()[None, :, None]
             )
 
-            common_delta = differential_delta = torch.zeros_like(logits[..., 0])
+            common_delta = differential_delta = torch.zeros_like(global_logit)
             if self.mode == "evidence_v3":
                 evidence = self._evidence_features(route_quality, support_size)
-                adapter_features = torch.cat(
-                    (global_q32, sparse_q32, evidence), dim=-1
-                )
-                adapter_weight = torch.cat(
-                    (
-                        self.global_query_adapter.float(),
-                        self.sparse_query_adapter.float(),
-                        self.evidence_adapter.float(),
-                    ),
-                    dim=1,
-                )
                 hidden = F.silu(
                     torch.einsum(
-                        "bhtf,hfk->bhtk", adapter_features, adapter_weight
+                        "bhtd,hdk->bhtk", global_q32, self.global_query_adapter.float()
+                    )
+                    + torch.einsum(
+                        "bhtd,hdk->bhtk", sparse_q32, self.sparse_query_adapter.float()
+                    )
+                    + torch.einsum(
+                        "bhtf,hfk->bhtk", evidence, self.evidence_adapter.float()
                     )
                     + self.hidden_bias.float()[None, :, None]
                 )
@@ -169,17 +158,11 @@ class DualPathGateV3(nn.Module):
                 )
                 bounded = self.delta_max * torch.tanh(raw_delta / self.delta_max)
                 common_delta, differential_delta = bounded.unbind(-1)
-                logits = logits + torch.stack(
-                    (
-                        common_delta - differential_delta,
-                        common_delta + differential_delta,
-                    ),
-                    dim=-1,
-                )
+                global_logit = global_logit + common_delta - differential_delta
+                sparse_logit = sparse_logit + common_delta + differential_delta
 
-            global_gate, sparse_gate = torch.sigmoid(logits).unbind(-1)
-            global_gate = global_gate[..., None]
-            sparse_gate = sparse_gate[..., None]
+            global_gate = torch.sigmoid(global_logit)[..., None]
+            sparse_gate = torch.sigmoid(sparse_logit)[..., None]
         diagnostics = {
             "fusion_common_delta_rms": common_delta.detach().square().mean().sqrt(),
             "fusion_differential_delta_rms": differential_delta.detach().square().mean().sqrt(),
