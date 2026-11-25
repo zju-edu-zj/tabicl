@@ -88,7 +88,7 @@ class DualPathPageStore:
         )
         slots = leaf_ids % self.layout.leaves_per_page
         rows = slots[..., None] * self.layout.logical_leaf_rows + torch.arange(
-            self.layout.logical_leaf_rows, device=logical_leaf_ids.device
+            self.layout.logical_leaf_rows, device=device
         )
 
         # Query tiles keep this gather bounded. Host-backed pages are copied only
