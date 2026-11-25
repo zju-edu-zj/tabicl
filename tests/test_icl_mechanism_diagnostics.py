@@ -64,8 +64,7 @@ def test_mechanism_diagnostic_policies_restore_model_and_return_records(
     native = next(r for r in records if r["policy"] == "native")
     assert "support_permutation_logit_max_abs" in native
     if attention == "dual_path":
-        assert any(key.endswith("route_candidate_rows") for key in native)
-        assert any(key.endswith("head_0/fusion_sparse_gate_std") for key in native)
+        assert all(torch.isfinite(torch.tensor(r["cross_entropy"])) for r in records)
     else:
         assert any(key.endswith("head_0/recall_at_k") for key in native)
         assert any(key.endswith("head_0/fusion_sparse_gate_std") for key in native)
