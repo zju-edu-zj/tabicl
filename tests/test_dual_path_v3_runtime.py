@@ -60,6 +60,25 @@ def test_page_fetch_deduplicates_shared_pages_without_copying_unselected_rows():
         )
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required for host-page transfer")
+def test_host_page_fetch_accepts_cpu_leaf_ids_for_cuda_target():
+    support = 1000
+    key = torch.randn(1, 2, support, 16)
+    index = _index(key, support)
+    store = DualPathPageStore.pack(key, -key, index, location="host")
+    selected = torch.randint(0, index.leaf_lengths.numel(), (1, 2, 3, 5), dtype=torch.int32)
+    candidates = store.candidate_tensors(selected, torch.device("cuda"))
+    for head in range(2):
+        for query in range(3):
+            for slot, leaf_id in enumerate(selected[0, head, query].tolist()):
+                start = leaf_id * 32
+                sorted_rows = index.order[0, head, start : min(start + 32, support)].long()
+                torch.testing.assert_close(
+                    candidates.key[0, head, query, slot, : sorted_rows.numel()].cpu(),
+                    key[0, head, sorted_rows],
+                )
+
+
 def test_vectorized_tree_counts_partial_pages_and_padding():
     support = 4097
     key = torch.randn(1, 1, support, 8)

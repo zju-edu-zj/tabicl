@@ -82,10 +82,11 @@ class DualPathPageStore:
         """Fetch selected leaves while masking unselected rows in fetched pages."""
         b, h, q, selected = logical_leaf_ids.shape
         d = self.key.shape[-1]
+        leaf_ids = logical_leaf_ids.to(device=device, dtype=torch.long)
         page_ids = torch.div(
-            logical_leaf_ids.long(), self.layout.leaves_per_page, rounding_mode="floor"
+            leaf_ids, self.layout.leaves_per_page, rounding_mode="floor"
         )
-        slots = logical_leaf_ids.long() % self.layout.leaves_per_page
+        slots = leaf_ids % self.layout.leaves_per_page
         rows = slots[..., None] * self.layout.logical_leaf_rows + torch.arange(
             self.layout.logical_leaf_rows, device=logical_leaf_ids.device
         )
@@ -118,7 +119,7 @@ class DualPathPageStore:
         )
         value = unique_value.flatten(0, 1).index_select(0, flat_positions).reshape_as(key)
         sorted_position = (
-            logical_leaf_ids.long()[..., None] * self.layout.logical_leaf_rows
+            leaf_ids[..., None] * self.layout.logical_leaf_rows
             + torch.arange(self.layout.logical_leaf_rows, device=device)
         )
         valid = (sorted_position < self.support_size).flatten(-2)
