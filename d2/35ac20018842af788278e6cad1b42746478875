@@ -1,0 +1,21 @@
+src/tabicl/_model/dual_path_store.py
+  s_f5e5071e1de2de::t_92590a48d0c9d9 64
+tests/test_dual_path_v3_runtime.py
+  s_f5e5071e1de2de::t_bed00d361c9163 46-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d235ac20018842af788278e6cad1b42746478875",
+  "prompts": {},
+  "sessions": {
+    "s_f5e5071e1de2de": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2121a-bdc2-7b63-875f-bb4025b175f3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
