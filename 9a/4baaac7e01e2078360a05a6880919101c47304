@@ -1,0 +1,26 @@
+src/tabicl/_model/encoders.py
+  s_45ae9b06ddb295::t_a103dbdc0403a8 297-342
+tests/test_dual_path_profiles.py
+  s_45ae9b06ddb295::t_a103dbdc0403a8 45,55,62
+src/tabicl/_model/tabicl.py
+  s_45ae9b06ddb295::t_a103dbdc0403a8 684-732
+tests/test_streaming_frontend.py
+  s_45ae9b06ddb295::t_a103dbdc0403a8 16,257-286
+  s_45ae9b06ddb295::t_0f8a0b43dc7fb1 287-288
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9a4baaac7e01e2078360a05a6880919101c47304",
+  "prompts": {},
+  "sessions": {
+    "s_45ae9b06ddb295": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a212f5-8cd2-7533-bcb2-a368e151230e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
