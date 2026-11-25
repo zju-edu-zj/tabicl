@@ -116,6 +116,16 @@ class DualPathGateV3(nn.Module):
         )
 
     def forward(self, global_q, sparse_q, route_quality, support_size):
+        if self.mode == "static":
+            shape = (*global_q.shape[:-1], 1)
+            gate = torch.full(
+                shape, 0.5, device=global_q.device, dtype=torch.float32
+            )
+            zero = gate.new_zeros(())
+            return gate, gate, {
+                "fusion_common_delta_rms": zero,
+                "fusion_differential_delta_rms": zero,
+            }
         with torch.autocast(device_type=global_q.device.type, enabled=False):
             global_q32 = global_q.float()
             sparse_q32 = sparse_q.float()

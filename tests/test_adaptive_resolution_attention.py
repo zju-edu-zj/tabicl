@@ -95,6 +95,22 @@ def test_dual_path_v3_starts_at_exact_v1_half_gates():
     assert diagnostics["fusion_differential_delta_rms"] == 0
 
 
+def test_dual_path_static_gate_is_parameter_independent():
+    module = DualPathRetrievalAttention(
+        32, 2, block_size=16, num_selected_blocks=1,
+        partition="content_tree", qk_norm=True, dual_gate="static",
+    )
+    global_q = torch.randn(2, 2, 7, 16, requires_grad=True)
+    sparse_q = torch.randn(2, 2, 7, 16, requires_grad=True)
+    quality = torch.rand(2, 2, 7, 6)
+    global_gate, sparse_gate, _ = module.gate_controller(
+        global_q, sparse_q, quality, support_size=97
+    )
+    torch.testing.assert_close(global_gate, torch.full_like(global_gate, 0.5))
+    torch.testing.assert_close(sparse_gate, torch.full_like(sparse_gate, 0.5))
+    assert not global_gate.requires_grad and not sparse_gate.requires_grad
+
+
 def test_dual_path_v3_packed_projection_matches_independent_projection():
     torch.manual_seed(709)
     module = DualPathRetrievalAttention(
