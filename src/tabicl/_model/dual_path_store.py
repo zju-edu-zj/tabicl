@@ -109,13 +109,14 @@ class DualPathPageStore:
         else:
             unique_key = self.key[unique_batch, unique_head, unique_page].to(device=device)
             unique_value = self.value[unique_batch, unique_head, unique_page].to(device=device)
-        fetched_key = unique_key[inverse].reshape(
-            b, h, q, selected, self.layout.storage_page_rows, d
+        page_rows = self.layout.storage_page_rows
+        flat_positions = (
+            inverse.reshape(b, h, q, selected, 1) * page_rows + rows
+        ).reshape(-1)
+        key = unique_key.flatten(0, 1).index_select(0, flat_positions).reshape(
+            b, h, q, selected, self.layout.logical_leaf_rows, d
         )
-        fetched_value = unique_value[inverse].reshape_as(fetched_key)
-        row_index = rows[..., None].expand(b, h, q, selected, self.layout.logical_leaf_rows, d)
-        key = fetched_key.gather(-2, row_index).flatten(-3, -2)
-        value = fetched_value.gather(-2, row_index).flatten(-3, -2)
+        value = unique_value.flatten(0, 1).index_select(0, flat_positions).reshape_as(key)
         sorted_position = (
             logical_leaf_ids.long()[..., None] * self.layout.logical_leaf_rows
             + torch.arange(self.layout.logical_leaf_rows, device=device)

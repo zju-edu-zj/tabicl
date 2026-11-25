@@ -43,6 +43,23 @@ def test_page_fetch_excludes_unselected_rows_from_same_page():
     assert candidates.valid.all()
 
 
+def test_page_fetch_deduplicates_shared_pages_without_copying_unselected_rows():
+    support = 128
+    key = torch.arange(support * 4, dtype=torch.float32).reshape(1, 1, support, 4)
+    index = _index(key, support)
+    store = DualPathPageStore.pack(key, -key, index)
+    selected = torch.tensor([[[[0, 1, 3]]]], dtype=torch.int32)
+    candidates = store.candidate_tensors(selected, torch.device("cpu"))
+    for slot, leaf_id in enumerate(selected[0, 0, 0].tolist()):
+        start = leaf_id * 32
+        torch.testing.assert_close(
+            candidates.key[0, 0, 0, slot], store.key[0, 0, 0, start : start + 32]
+        )
+        torch.testing.assert_close(
+            candidates.value[0, 0, 0, slot], store.value[0, 0, 0, start : start + 32]
+        )
+
+
 def test_vectorized_tree_counts_partial_pages_and_padding():
     support = 4097
     key = torch.randn(1, 1, support, 8)
