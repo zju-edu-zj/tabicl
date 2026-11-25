@@ -556,10 +556,21 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
             query, key, rope
         )
         index = self._build_index(sparse_k)
+        diagnostics_requested = self.diagnostics_enabled
         global_heads = self._global_attention(global_q, global_k, global_v)
+        global_diagnostics = (
+            dict(self.last_diagnostics) if diagnostics_requested else {}
+        )
+        if diagnostics_requested:
+            self.diagnostics_enabled = True
         sparse_heads, evidence, route = self._sparse_attention_v3(
             sparse_q, sparse_k, sparse_v, index
         )
+        if diagnostics_requested:
+            self.last_diagnostics = {
+                **{f"global/{key}": value for key, value in global_diagnostics.items()},
+                **self.last_diagnostics,
+            }
         return self._fuse(
             query,
             sparse_q,
