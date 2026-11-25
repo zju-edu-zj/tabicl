@@ -4,6 +4,7 @@ import torch
 from tabicl._model.content_index_v3 import ContentIndexV3, DualPathLayout
 from tabicl._model.dual_path_store import DualPathPageStore
 from tabicl._model.encoders import Encoder
+from tabicl._model.inference_config import InferenceConfig
 from tabicl._model.layerwise_inference import layerwise_dual_path_forward
 from tabicl._model.tabicl import TabICL
 
@@ -166,11 +167,18 @@ def test_raw_tabicl_layerwise_api_matches_regular_inference():
         block.attn.use_triton = False
     x = torch.randn(1, 40, 4)
     y = torch.randint(0, 3, (1, 33))
-    expected = model(x.clone(), y, return_logits=True)
+    component = {"device": "cpu", "use_amp": False, "use_fa3": False, "offload": False}
+    inference_config = InferenceConfig(
+        COL_CONFIG=component, ROW_CONFIG=component, ICL_CONFIG=component
+    )
+    expected = model(
+        x.clone(), y, return_logits=True, inference_config=inference_config
+    )
     actual = model.forward_layerwise(
         x.clone(),
         y,
         return_logits=True,
+        inference_config=inference_config,
         support_tile_rows=17,
         query_tile_rows=3,
         page_location="device",
