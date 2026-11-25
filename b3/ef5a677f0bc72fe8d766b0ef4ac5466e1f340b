@@ -1,0 +1,34 @@
+src/tabicl/_model/layerwise_inference.py
+  s_45ae9b06ddb295::t_5d337ecc1440d9 25-26,36,48,61-62
+src/tabicl/_model/dual_path_store.py
+  s_45ae9b06ddb295::t_492018bf74eb78 118
+src/tabicl/_model/learning.py
+  s_45ae9b06ddb295::t_5d337ecc1440d9 648-649,664-665
+src/tabicl/_model/tabicl.py
+  s_45ae9b06ddb295::t_5d337ecc1440d9 628-629,673-674
+tests/test_dual_path_v3_runtime.py
+  s_45ae9b06ddb295::t_492018bf74eb78 80,82-83,86-87,103,106-111
+  s_45ae9b06ddb295::t_5d337ecc1440d9 196-197,242-243
+  s_45ae9b06ddb295::t_35f19f02420f8a 20-42,138-162
+  s_45ae9b06ddb295::t_5d5ddc9635327b 163-164
+src/tabicl/_model/encoders.py
+  s_45ae9b06ddb295::t_5d337ecc1440d9 272-273,290-291
+src/tabicl/_model/dual_path_v3.py
+  s_45ae9b06ddb295::t_492018bf74eb78 258,270,299,302,305,309,347,351-354,366
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b3ef5a677f0bc72fe8d766b0ef4ac5466e1f340b",
+  "prompts": {},
+  "sessions": {
+    "s_45ae9b06ddb295": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a212f5-8cd2-7533-bcb2-a368e151230e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
