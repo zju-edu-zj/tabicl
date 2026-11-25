@@ -549,7 +549,7 @@ def summarize(args):
         task=args.task,
         steps=args.steps,
         optimizer=args.optimizer,
-        dtype=args.dtype,
+        dtype=getattr(args, "dtype", "bfloat16"),
         seed_aggregate=aggregates,
         mechanism_points=len(mechanism_timeseries),
         parameter_points=len(parameter_timeseries),
