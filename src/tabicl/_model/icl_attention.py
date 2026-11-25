@@ -888,8 +888,9 @@ class AdaptiveResolutionAttention(SetRetrievalAttention):
     def _prepare_support(self, k, v):
         if k.shape[-2] <= self.block_size * self.num_selected_blocks:
             return {}
-        route = self._prepare_route(k)
-        order, _, lengths = route
+        order, centroids, lengths = self._prepare_route(k)
+        order = order.to(torch.int32)
+        route = (order, centroids, lengths)
         summaries = self._leaf_summaries(k, v, order, lengths)
         return {"route": route, "summaries": summaries}
 
