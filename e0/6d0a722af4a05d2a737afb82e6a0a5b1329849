@@ -1,0 +1,62 @@
+src/tabicl/_model/encoders.py
+  s_74506c97ce38f2::t_b80bbdfa4ad392 101,156
+src/tabicl/_model/tabicl.py
+  s_74506c97ce38f2::t_989e9b6124bc67 253,305,323-326,393
+scripts/benchmark_icl_attention.py
+  s_74506c97ce38f2::t_c434be0f0541a3 247-248
+tests/test_adaptive_resolution_attention.py
+  s_74506c97ce38f2::t_24d8b10553c1ad 33-40
+  s_74506c97ce38f2::t_c434be0f0541a3 63-67,80-143
+  s_74506c97ce38f2::t_f9cb11abf26a60 144-145
+tests/test_icl_screening.py
+  s_74506c97ce38f2::t_24d8b10553c1ad 14,21,42-58
+  s_74506c97ce38f2::t_d6e848b387bab0 91-96
+  s_74506c97ce38f2::t_78d9ec4d33e275 59-60
+src/tabicl/_model/learning.py
+  s_74506c97ce38f2::t_b80bbdfa4ad392 97,129
+src/tabicl/train/_run.py
+  s_74506c97ce38f2::t_989e9b6124bc67 324-325,335,629,640,656-657
+  s_74506c97ce38f2::t_b98ffed77ffc21 931-932,1153-1171,1245-1246
+tests/test_icl_mechanism_diagnostics.py
+  s_74506c97ce38f2::t_24d8b10553c1ad 4,9,13-15,32-33,37-38,51-55,68-73
+scripts/diagnose_icl_checkpoint.py
+  s_74506c97ce38f2::t_aaa4285eec82ca 31,51-53,76-82,91-93,99-105,114-136,187,190-193
+src/tabicl/_model/_dual_gate_v3.py
+  s_74506c97ce38f2::t_24d8b10553c1ad 78-86,93,110-113
+  s_74506c97ce38f2::t_1054405a6dcd07 1-77,87-92,94-109,114-170
+scripts/screen_dual_path_v3.sh
+  s_74506c97ce38f2::t_d6e848b387bab0 1-27
+scripts/screen_icl_attention.py
+  s_74506c97ce38f2::t_d6e848b387bab0 6-7,45-49,72-76,91-93,160-162,167-168,177,195-198,230,531,552
+src/tabicl/_model/icl_attention.py
+  s_74506c97ce38f2::t_24d8b10553c1ad 532-533,824,846-861
+  s_74506c97ce38f2::t_aaa4285eec82ca 15,522,524,554-556,558-559,583-654,663-690,701,721,750-751,778-780,798-800,802-811,816-820,822-823,830,845
+src/tabicl/_model/layers.py
+  s_74506c97ce38f2::t_b80bbdfa4ad392 602,642-643
+scripts/train_v2_clf_stage1_dual_path_v3.sh
+  s_74506c97ce38f2::t_7641db1d1e13cf 1-29
+tests/test_new_attention_optimizer.py
+  s_74506c97ce38f2::t_c434be0f0541a3 23,51
+scripts/icl_recipe.sh
+  s_74506c97ce38f2::t_7641db1d1e13cf 12,38
+src/tabicl/train/_train_config.py
+  s_74506c97ce38f2::t_989e9b6124bc67 400-405
+src/tabicl/train/_screening.py
+  s_74506c97ce38f2::t_54c948e3086089 76-86,143-144,146-148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e06d0a722af4a05d2a737afb82e6a0a5b1329849",
+  "prompts": {},
+  "sessions": {
+    "s_74506c97ce38f2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21149-7c4d-7921-b38e-60e6f0782cd5",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
