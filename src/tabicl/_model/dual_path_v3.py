@@ -12,6 +12,7 @@ from ._dual_gate_v3 import DualPathGateV3
 from .content_index_v3 import ContentIndexV3, DualPathLayout
 from .dual_path_store import DualPathPageStore, PreparedDualPathSupport
 from .icl_attention import SetRetrievalAttention
+from .layers import GlobalLinearAttention
 from .qk_norm import ICLQKNorm
 
 
@@ -341,12 +342,13 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
             sparse_flat, self.out_proj.weight, self.out_proj.bias
         )
         if self.diagnostics_enabled:
+            diagnostics = {}
             for head in range(self.num_heads):
                 values = attention_evidence[:, head, :, 0].detach().float().reshape(-1)
-                self.last_diagnostics[f"head_{head}/fusion_sparse_gate_mean"] = values.mean()
-                self.last_diagnostics[f"head_{head}/fusion_sparse_gate_std"] = values.std(unbiased=False)
-                self.last_diagnostics[f"head_{head}/fusion_sparse_gate_min"] = values.min()
-                self.last_diagnostics[f"head_{head}/fusion_sparse_gate_max"] = values.max()
+                diagnostics[f"head_{head}/fusion_sparse_gate_mean"] = values.mean()
+                diagnostics[f"head_{head}/fusion_sparse_gate_std"] = values.std(unbiased=False)
+                diagnostics[f"head_{head}/fusion_sparse_gate_min"] = values.min()
+                diagnostics[f"head_{head}/fusion_sparse_gate_max"] = values.max()
             self.last_diagnostics = {
                 "fusion_global_scale_mean": global_scale.detach().mean(),
                 "fusion_sparse_scale_mean": sparse_scale.detach().mean(),
@@ -357,6 +359,7 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
                 "route_candidate_rows": route.candidate_rows.detach().mean(),
                 "route_visited_nodes": route.visited_nodes.detach().float().mean(),
                 **controller_diagnostics,
+                **diagnostics,
             }
             self.diagnostics_enabled = False
         return output
@@ -367,7 +370,7 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
             normalized_support, rope
         )
         index = self._build_index(sparse_k)
-        global_state = super()._prepare_support(global_k, global_v)
+        global_state = GlobalLinearAttention._prepare_support(self, global_k, global_v)
         page_store = DualPathPageStore.pack(
             sparse_k, sparse_v, index, location=location
         )
