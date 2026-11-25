@@ -255,7 +255,7 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
             out = torch.cat(outputs, 2)
             evidence = torch.cat(evidence_parts, 2)
         if self.diagnostics_enabled:
-            self._diagnose(
+            self.last_diagnostics = self._diagnose(
                 attention_q,
                 k,
                 v,
@@ -267,6 +267,7 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
     @torch.no_grad()
     def _diagnose(self, q, k, v, selected=None, order=None):
         """Collect semantic retrieval diagnostics without changing execution."""
+        diagnostics = {}
         first = min(max(self.diagnostic_query_start, 0), q.shape[-2] - 1)
         count = min(self.diagnostic_queries, q.shape[-2] - first)
         sample = torch.linspace(first, q.shape[-2] - 1, count, device=q.device).long()
@@ -295,16 +296,17 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
         sparse_out = torch.einsum("bhqs,bhsd->bhqd", sparse_prob, sorted_v.float())
         for head in range(self.num_heads):
             dense_rms = dense_out[:, head].square().mean().sqrt().clamp_min(1e-6)
-            self.last_diagnostics[f"head_{head}/recall_at_k"] = (
+            diagnostics[f"head_{head}/recall_at_k"] = (
                 mask[:, head].gather(-1, topk[:, head]).float().mean()
             )
-            self.last_diagnostics[f"head_{head}/retained_mass"] = (
+            diagnostics[f"head_{head}/retained_mass"] = (
                 dense_prob[:, head] * mask[:, head]
             ).sum(-1).mean()
-            self.last_diagnostics[f"head_{head}/dense_output_relative_error"] = (
+            diagnostics[f"head_{head}/dense_output_relative_error"] = (
                 (sparse_out[:, head] - dense_out[:, head]).square().mean().sqrt()
                 / dense_rms
             )
+        return diagnostics
 
     def _fuse(
         self,
@@ -342,13 +344,14 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
             sparse_flat, self.out_proj.weight, self.out_proj.bias
         )
         if self.diagnostics_enabled:
+            retrieval_diagnostics = dict(self.last_diagnostics)
             diagnostics = {}
             for head in range(self.num_heads):
                 values = attention_evidence[:, head, :, 0].detach().float().reshape(-1)
-                diagnostics[f"head_{head}/fusion_sparse_gate_mean"] = values.mean()
-                diagnostics[f"head_{head}/fusion_sparse_gate_std"] = values.std(unbiased=False)
-                diagnostics[f"head_{head}/fusion_sparse_gate_min"] = values.min()
-                diagnostics[f"head_{head}/fusion_sparse_gate_max"] = values.max()
+                diagnostics[f"head_{head}/sparse_peak_probability_mean"] = values.mean()
+                diagnostics[f"head_{head}/sparse_peak_probability_std"] = values.std(unbiased=False)
+                diagnostics[f"head_{head}/sparse_peak_probability_min"] = values.min()
+                diagnostics[f"head_{head}/sparse_peak_probability_max"] = values.max()
             self.last_diagnostics = {
                 "fusion_global_scale_mean": global_scale.detach().mean(),
                 "fusion_sparse_scale_mean": sparse_scale.detach().mean(),
@@ -360,6 +363,7 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
                 "route_visited_nodes": route.visited_nodes.detach().float().mean(),
                 **controller_diagnostics,
                 **diagnostics,
+                **retrieval_diagnostics,
             }
             self.diagnostics_enabled = False
         return output

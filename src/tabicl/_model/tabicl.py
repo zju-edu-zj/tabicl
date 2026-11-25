@@ -625,7 +625,8 @@ class TabICL(nn.Module):
         return_logits: bool = True,
         softmax_temperature: float = 0.9,
         inference_config: Optional[InferenceConfig] = None,
-        support_tile_rows: int = 65536,
+        projection_chunk_rows: int = 65536,
+        support_query_tile_rows: int = 256,
         query_tile_rows: int = 256,
         page_location: str = "device",
     ) -> Tensor:
@@ -669,7 +670,8 @@ class TabICL(nn.Module):
         output = self.icl_predictor.forward_layerwise(
             representations,
             y_train,
-            support_tile_rows=support_tile_rows,
+            projection_chunk_rows=projection_chunk_rows,
+            support_query_tile_rows=support_query_tile_rows,
             query_tile_rows=query_tile_rows,
             page_location=page_location,
         )

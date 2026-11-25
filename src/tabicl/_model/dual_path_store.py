@@ -115,7 +115,7 @@ class DualPathPageStore:
             inverse.reshape(b, h, q, selected, 1) * page_rows + rows
         ).reshape(-1)
         key = unique_key.flatten(0, 1).index_select(0, flat_positions).reshape(
-            b, h, q, selected, self.layout.logical_leaf_rows, d
+            b, h, q, selected * self.layout.logical_leaf_rows, d
         )
         value = unique_value.flatten(0, 1).index_select(0, flat_positions).reshape_as(key)
         sorted_position = (

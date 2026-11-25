@@ -17,6 +17,29 @@ def _index(key, support):
     )
 
 
+def _attention(device):
+    encoder = Encoder(
+        1,
+        32,
+        2,
+        64,
+        attention_type="dual_path",
+        sparse_every=1,
+        block_size=32,
+        num_selected_blocks=32,
+        query_chunk_size=3,
+        router="hierarchical",
+        router_beam=64,
+        partition="content_tree",
+        dual_controller="none",
+        qk_norm=True,
+        zero_init=False,
+    ).to(device).eval()
+    attention = encoder.blocks[0].attn
+    attention.use_triton = False
+    return attention
+
+
 @pytest.mark.parametrize("support", [31, 32, 33, 127, 128, 129])
 def test_logical_leaf_and_physical_page_tails(support):
     key = torch.randn(1, 2, support, 16)
@@ -54,11 +77,14 @@ def test_page_fetch_deduplicates_shared_pages_without_copying_unselected_rows():
     candidates = store.candidate_tensors(selected, torch.device("cpu"))
     for slot, leaf_id in enumerate(selected[0, 0, 0].tolist()):
         start = leaf_id * 32
+        candidate_start = slot * 32
         torch.testing.assert_close(
-            candidates.key[0, 0, 0, slot], store.key[0, 0, 0, start : start + 32]
+            candidates.key[0, 0, 0, candidate_start : candidate_start + 32],
+            store.key[0, 0, 0, start : start + 32],
         )
         torch.testing.assert_close(
-            candidates.value[0, 0, 0, slot], store.value[0, 0, 0, start : start + 32]
+            candidates.value[0, 0, 0, candidate_start : candidate_start + 32],
+            store.value[0, 0, 0, start : start + 32],
         )
 
 
@@ -74,9 +100,15 @@ def test_host_page_fetch_accepts_cpu_leaf_ids_for_cuda_target():
         for query in range(3):
             for slot, leaf_id in enumerate(selected[0, head, query].tolist()):
                 start = leaf_id * 32
+                candidate_start = slot * 32
                 sorted_rows = index.order[0, head, start : min(start + 32, support)].long()
                 torch.testing.assert_close(
-                    candidates.key[0, head, query, slot, : sorted_rows.numel()].cpu(),
+                    candidates.key[
+                        0,
+                        head,
+                        query,
+                        candidate_start : candidate_start + sorted_rows.numel(),
+                    ].cpu(),
                     key[0, head, sorted_rows],
                 )
 
@@ -101,6 +133,33 @@ def test_vectorized_tree_counts_partial_pages_and_padding():
     ).sum((0, 1)) / support
     torch.testing.assert_close(weighted_root, expected_root)
     assert (index.tree_rep_counts[64 + 33 :] == 0).all()
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required for host-page transfer")
+def test_host_page_attention_matches_resident_pages():
+    torch.manual_seed(20261125)
+    attention = _attention("cuda")
+    support = torch.randn(1, 129, 32, device="cuda")
+    query = torch.randn(1, 7, 32, device="cuda")
+    with torch.inference_mode():
+        resident = attention.prepare_support(support, location="device")
+        host = attention.prepare_support(support, location="host")
+        expected = attention.apply_prepared(query, resident)
+        actual = attention.apply_prepared(query, host)
+    torch.testing.assert_close(actual, expected, atol=2e-5, rtol=2e-4)
+
+
+def test_diagnostics_keep_retrieval_and_name_attention_evidence():
+    torch.manual_seed(20261125)
+    attention = _attention("cpu")
+    attention.diagnostics_enabled = True
+    attention.diagnostic_queries = 2
+    rows = torch.randn(1, 65, 32)
+    with torch.inference_mode():
+        attention(rows)
+    assert "head_0/recall_at_k" in attention.last_diagnostics
+    assert "head_0/sparse_peak_probability_mean" in attention.last_diagnostics
+    assert "head_0/fusion_sparse_gate_mean" not in attention.last_diagnostics
 
 
 def test_layerwise_executor_matches_regular_encoder():
@@ -134,7 +193,8 @@ def test_layerwise_executor_matches_regular_encoder():
             encoder,
             support,
             query,
-            support_tile_rows=17,
+            projection_chunk_rows=17,
+            support_query_tile_rows=5,
             query_tile_rows=3,
         )
     torch.testing.assert_close(actual, expected, atol=5e-6, rtol=5e-5)
@@ -179,7 +239,8 @@ def test_raw_tabicl_layerwise_api_matches_regular_inference():
         y,
         return_logits=True,
         inference_config=inference_config,
-        support_tile_rows=17,
+        projection_chunk_rows=17,
+        support_query_tile_rows=5,
         query_tile_rows=3,
         page_location="device",
     )

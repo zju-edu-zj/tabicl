@@ -22,7 +22,8 @@ def layerwise_dual_path_forward(
     support,
     query,
     *,
-    support_tile_rows=65536,
+    projection_chunk_rows=65536,
+    support_query_tile_rows=256,
     query_tile_rows=256,
     page_location="device",
     return_support=False,
@@ -32,7 +33,7 @@ def layerwise_dual_path_forward(
         raise ValueError("support and query must have shape [B,N,D]")
     if support.shape[0] != query.shape[0] or support.shape[-1] != query.shape[-1]:
         raise ValueError("support and query batch/model dimensions must match")
-    if support_tile_rows < 1 or query_tile_rows < 1:
+    if min(projection_chunk_rows, support_query_tile_rows, query_tile_rows) < 1:
         raise ValueError("tile sizes must be positive")
 
     current_support, current_query = support, query
@@ -44,7 +45,7 @@ def layerwise_dual_path_forward(
             block.norm1,
             rope=encoder.rope,
             location=page_location,
-            chunk_rows=support_tile_rows,
+            chunk_rows=projection_chunk_rows,
         )
 
         next_query = torch.empty_like(current_query)
@@ -57,8 +58,8 @@ def layerwise_dual_path_forward(
         last_layer = layer_index + 1 == len(encoder.blocks)
         if not last_layer or return_support:
             next_support = torch.empty_like(current_support)
-            for start in range(0, current_support.shape[1], support_tile_rows):
-                end = min(start + support_tile_rows, current_support.shape[1])
+            for start in range(0, current_support.shape[1], support_query_tile_rows):
+                end = min(start + support_query_tile_rows, current_support.shape[1])
                 next_support[:, start:end] = _apply_block(
                     block, current_support[:, start:end], prepared, encoder.rope
                 )

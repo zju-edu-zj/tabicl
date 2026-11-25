@@ -645,7 +645,8 @@ class ICLearning(nn.Module):
         R: Tensor,
         y_train: Tensor,
         *,
-        support_tile_rows: int = 65536,
+        projection_chunk_rows: int = 65536,
+        support_query_tile_rows: int = 256,
         query_tile_rows: int = 256,
         page_location: str = "device",
     ) -> Tensor:
@@ -660,7 +661,8 @@ class ICLearning(nn.Module):
         output = self.tf_icl.forward_layerwise(
             torch.cat((support, query), 1),
             train_size,
-            support_tile_rows=support_tile_rows,
+            projection_chunk_rows=projection_chunk_rows,
+            support_query_tile_rows=support_query_tile_rows,
             query_tile_rows=query_tile_rows,
             page_location=page_location,
         )
