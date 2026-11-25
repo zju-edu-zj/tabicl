@@ -200,6 +200,13 @@ def _enable_diagnostics(modules, query_count, query_start=0):
                        module.last_diagnostics, module._diagnose, module.diagnostic_query_start))
         original_diagnose = module._diagnose
 
+        if isinstance(module, DualPathRetrievalAttention):
+            module.diagnostics_enabled = query_count > 0
+            module.diagnostic_queries = max(1, query_count)
+            module.diagnostic_query_start = query_start
+            module.last_diagnostics = {}
+            continue
+
         @torch.no_grad()
         def diagnose_by_head(self, q, k, v, selected=None, _original=original_diagnose):
             _original(q, k, v, selected)

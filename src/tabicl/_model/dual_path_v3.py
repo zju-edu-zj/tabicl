@@ -304,7 +304,6 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
                 (sparse_out[:, head] - dense_out[:, head]).square().mean().sqrt()
                 / dense_rms
             )
-        self.diagnostics_enabled = False
 
     def _fuse(
         self,
@@ -342,6 +341,12 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
             sparse_flat, self.out_proj.weight, self.out_proj.bias
         )
         if self.diagnostics_enabled:
+            for head in range(self.num_heads):
+                values = attention_evidence[:, head, :, 0].detach().float().reshape(-1)
+                self.last_diagnostics[f"head_{head}/fusion_sparse_gate_mean"] = values.mean()
+                self.last_diagnostics[f"head_{head}/fusion_sparse_gate_std"] = values.std(unbiased=False)
+                self.last_diagnostics[f"head_{head}/fusion_sparse_gate_min"] = values.min()
+                self.last_diagnostics[f"head_{head}/fusion_sparse_gate_max"] = values.max()
             self.last_diagnostics = {
                 "fusion_global_scale_mean": global_scale.detach().mean(),
                 "fusion_sparse_scale_mean": sparse_scale.detach().mean(),
@@ -362,7 +367,7 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
             normalized_support, rope
         )
         index = self._build_index(sparse_k)
-        global_state = self._prepare_support(global_k, global_v)
+        global_state = super()._prepare_support(global_k, global_v)
         page_store = DualPathPageStore.pack(
             sparse_k, sparse_v, index, location=location
         )
