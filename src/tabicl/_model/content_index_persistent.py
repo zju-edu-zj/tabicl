@@ -111,6 +111,35 @@ def _record_dtype(head_dim: int) -> np.dtype:
     ])
 
 
+def _task_dtype(head_dim: int) -> np.dtype:
+    return np.dtype([
+        ("offset", _DTYPES["int64"]),
+        ("count", _DTYPES["int64"]),
+        ("capacity", _DTYPES["int64"]),
+        ("ordering_direction", _DTYPES["float32"], (head_dim,)),
+    ])
+
+
+def _task_record(task: _PartitionTask, dtype: np.dtype) -> np.ndarray:
+    record = np.empty(1, dtype=dtype)
+    record["offset"] = task.offset
+    record["count"] = task.count
+    record["capacity"] = task.capacity
+    record["ordering_direction"] = task.ordering_direction
+    return record
+
+
+def _partition_task_from_record(record: np.void) -> _PartitionTask:
+    return _PartitionTask(
+        offset=int(record["offset"]),
+        count=int(record["count"]),
+        capacity=int(record["capacity"]),
+        ordering_direction=np.asarray(
+            record["ordering_direction"], dtype=np.float32
+        ).copy(),
+    )
+
+
 def _write_array(path: Path, value: np.ndarray) -> None:
     value = np.ascontiguousarray(value)
     with path.open("wb") as stream:
@@ -365,6 +394,7 @@ class PersistentContentIndexBuilder:
                 )
         self.path.mkdir(parents=True, exist_ok=True)
         self._record_dtype = _record_dtype(self.head_dim)
+        self._task_dtype = _task_dtype(self.head_dim)
         self._closed = False
         self._published = False
         self._states = [
@@ -501,32 +531,61 @@ class PersistentContentIndexBuilder:
             _PartitionTask(right_offset, right_count, task.capacity // 2, direction),
         ], right_offset + right_count
 
-    def _build_partition(self, head: int, rows: int) -> tuple[Path, list[_PartitionTask]]:
+    def _build_partition(self, head: int, rows: int) -> tuple[Path, Path, int]:
         leaves = (rows + self.layout.logical_leaf_rows - 1) // self.layout.logical_leaf_rows
         capacity = self.layout.logical_leaf_rows * (1 << (leaves - 1).bit_length())
         current = self._work_path(head, "ingest.records")
-        tasks = [_PartitionTask(0, rows, capacity, _initial_direction(self.head_dim))]
+        current_tasks = self._work_path(head, "tasks-000.records")
+        _task_record(
+            _PartitionTask(0, rows, capacity, _initial_direction(self.head_dim)),
+            self._task_dtype,
+        ).tofile(current_tasks)
+        task_count = 1
         level = 0
-        while tasks[0].capacity > self.layout.logical_leaf_rows:
+        while capacity > self.layout.logical_leaf_rows:
             following = self._work_path(head, f"level-{level:03d}.records")
-            next_tasks: list[_PartitionTask] = []
+            following_tasks = self._work_path(head, f"tasks-{level + 1:03d}.records")
+            next_task_count = 0
             output_offset = 0
-            with following.open("wb") as output:
-                for task_index, task in enumerate(tasks):
-                    right = self._work_path(
-                        head, f"right-{level:03d}-{task_index:08d}.records"
-                    )
-                    children, output_offset = self._partition_task(
-                        current, task, output, output_offset, right
-                    )
-                    next_tasks.extend(children)
+            with following.open("wb") as output, following_tasks.open("wb") as task_output:
+                task_index = 0
+                for task_records in _iter_records(
+                    current_tasks,
+                    self._task_dtype,
+                    0,
+                    task_count,
+                    self.layout.build_chunk_rows,
+                ):
+                    child_buffer = []
+                    for task_record in task_records:
+                        task = _partition_task_from_record(task_record)
+                        right = self._work_path(
+                            head, f"right-{level:03d}-{task_index:08d}.records"
+                        )
+                        children, output_offset = self._partition_task(
+                            current, task, output, output_offset, right
+                        )
+                        child_buffer.extend(children)
+                        task_index += 1
+                    child_records = np.empty(len(child_buffer), dtype=self._task_dtype)
+                    for index, child in enumerate(child_buffer):
+                        child_records[index] = _task_record(
+                            child, self._task_dtype
+                        )[0]
+                    child_records.tofile(task_output)
+                    next_task_count += len(child_buffer)
                 output.flush()
                 os.fsync(output.fileno())
+                task_output.flush()
+                os.fsync(task_output.fileno())
             current.unlink()
+            current_tasks.unlink()
             current = following
-            tasks = next_tasks
+            current_tasks = following_tasks
+            task_count = next_task_count
+            capacity //= 2
             level += 1
-        return current, tasks
+        return current, current_tasks, task_count
 
     def _terminal_records(self, source: Path, task: _PartitionTask) -> np.ndarray:
         records = next(_iter_records(
@@ -638,39 +697,69 @@ class PersistentContentIndexBuilder:
         if state.row_count < 1:
             raise ValueError(f"head {head} has no ingested rows")
         self._close_ingest(state)
-        source, tasks = self._build_partition(head, state.row_count)
+        source, task_path, task_count = self._build_partition(head, state.row_count)
         row_ids_path = self._array_path(head, "row-ids.i64")
         leaf_counts_path = self._array_path(head, "leaf-counts.i32")
         leaf_reps_path = self._array_path(head, "leaf-representatives.f32")
         leaf_rep_counts_path = self._array_path(head, "leaf-rep-counts.i64")
-        leaf_counts = np.empty(len(tasks), dtype=_DTYPES["int32"])
-        leaf_representatives = np.zeros(
-            (len(tasks), 2, self.head_dim), dtype=_DTYPES["float32"]
+        leaf_counts = np.memmap(
+            leaf_counts_path,
+            mode="w+",
+            dtype=_DTYPES["int32"],
+            shape=(task_count,),
         )
-        leaf_rep_counts = np.zeros((len(tasks), 2), dtype=_DTYPES["int64"])
+        leaf_representatives = np.memmap(
+            leaf_reps_path,
+            mode="w+",
+            dtype=_DTYPES["float32"],
+            shape=(task_count, 2, self.head_dim),
+        )
+        leaf_rep_counts = np.memmap(
+            leaf_rep_counts_path,
+            mode="w+",
+            dtype=_DTYPES["int64"],
+            shape=(task_count, 2),
+        )
+        leaf_representatives[:] = 0
+        leaf_rep_counts[:] = 0
         micro_rows = self.layout.logical_leaf_rows // 2
         with row_ids_path.open("wb") as row_stream:
-            for leaf, task in enumerate(tasks):
-                records = self._terminal_records(source, task)
-                records["row_id"].astype(_DTYPES["int64"], copy=False).tofile(row_stream)
-                leaf_counts[leaf] = task.count
-                first = min(task.count, micro_rows)
-                second = task.count - first
-                leaf_rep_counts[leaf] = (first, second)
-                leaf_representatives[leaf, 0] = records["key"][:first].mean(0)
-                if second:
-                    leaf_representatives[leaf, 1] = records["key"][first:].mean(0)
+            leaf = 0
+            for task_records in _iter_records(
+                task_path,
+                self._task_dtype,
+                0,
+                task_count,
+                self.layout.build_chunk_rows,
+            ):
+                for task_record in task_records:
+                    task = _partition_task_from_record(task_record)
+                    records = self._terminal_records(source, task)
+                    records["row_id"].astype(
+                        _DTYPES["int64"], copy=False
+                    ).tofile(row_stream)
+                    leaf_counts[leaf] = task.count
+                    first = min(task.count, micro_rows)
+                    second = task.count - first
+                    leaf_rep_counts[leaf] = (first, second)
+                    leaf_representatives[leaf, 0] = records["key"][:first].mean(0)
+                    if second:
+                        leaf_representatives[leaf, 1] = records["key"][first:].mean(0)
+                    leaf += 1
             row_stream.flush()
             os.fsync(row_stream.fileno())
+        if leaf != task_count:
+            raise RuntimeError("content-tree task manifest has the wrong leaf count")
         source.unlink()
-        _write_array(leaf_counts_path, leaf_counts)
-        _write_array(leaf_reps_path, leaf_representatives)
-        _write_array(leaf_rep_counts_path, leaf_rep_counts)
+        task_path.unlink()
+        leaf_counts.flush()
+        leaf_representatives.flush()
+        leaf_rep_counts.flush()
 
-        leaf_row_offsets = np.zeros(len(tasks) + 1, dtype=_DTYPES["int64"])
+        leaf_row_offsets = np.zeros(task_count + 1, dtype=_DTYPES["int64"])
         np.cumsum(leaf_counts, dtype=np.int64, out=leaf_row_offsets[1:])
-        leaf_page_ids = np.empty(len(tasks), dtype=_DTYPES["int64"])
-        leaf_page_offsets = np.empty(len(tasks), dtype=_DTYPES["int32"])
+        leaf_page_ids = np.empty(task_count, dtype=_DTYPES["int64"])
+        leaf_page_offsets = np.empty(task_count, dtype=_DTYPES["int32"])
         page_leaf_ids = []
         page_leaf_offsets = [0]
         page_row_counts = []
@@ -720,15 +809,15 @@ class PersistentContentIndexBuilder:
         arrays = {
             "row_ids": _array_spec(row_ids_path, _DTYPES["int64"], (state.row_count,)),
             "leaf_counts": _array_spec(
-                leaf_counts_path, _DTYPES["int32"], (len(tasks),)
+                leaf_counts_path, _DTYPES["int32"], (task_count,)
             ),
             "leaf_representatives": _array_spec(
                 leaf_reps_path,
                 _DTYPES["float32"],
-                (len(tasks), 2, self.head_dim),
+                (task_count, 2, self.head_dim),
             ),
             "leaf_rep_counts": _array_spec(
-                leaf_rep_counts_path, _DTYPES["int64"], (len(tasks), 2)
+                leaf_rep_counts_path, _DTYPES["int64"], (task_count, 2)
             ),
         }
         for name, (path, value) in generated.items():
@@ -739,7 +828,7 @@ class PersistentContentIndexBuilder:
         return {
             "head": head,
             "rows": state.row_count,
-            "leaves": len(tasks),
+            "leaves": task_count,
             "leaf_capacity": leaf_capacity,
             "pages": len(page_row_counts),
             "min_row_id": state.first_row_id,
@@ -1115,7 +1204,7 @@ class PersistentContentIndex:
         for index, page in enumerate(pages):
             leaves = np.asarray(
                 page_leaves[int(page_offsets[page]) : int(page_offsets[page + 1])]
-            )
+            ).copy()
             rows, row_valid = self.rows_for_leaves(
                 head, torch.as_tensor(leaves, dtype=torch.int64)
             )

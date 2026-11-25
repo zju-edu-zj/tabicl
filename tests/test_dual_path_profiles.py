@@ -42,8 +42,7 @@ def test_formal_profiles_match_regular_encoder(tmp_path):
         expected = encoder(
             torch.cat((support, query), 1), train_size=support.shape[1]
         )[:, support.shape[1] :]
-        one_shot = one_shot_layerwise_forward(
-            encoder,
+        one_shot = encoder.forward_one_shot(
             support,
             query,
             OneShotLayerwiseProfile(
@@ -53,16 +52,14 @@ def test_formal_profiles_match_regular_encoder(tmp_path):
                 page_location="host",
             ),
         )
-        snapshot = build_online_hidden_snapshot(
-            encoder,
+        snapshot = encoder.build_online_snapshot(
             support,
             tmp_path / "snapshot",
             model_fingerprint="unit-test",
             projection_chunk_rows=17,
             support_query_tile_rows=5,
         )
-        online = online_hidden_forward(
-            encoder,
+        online = encoder.forward_online(
             query,
             snapshot,
             OnlineHiddenProfile(

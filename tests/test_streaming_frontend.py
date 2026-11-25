@@ -13,6 +13,7 @@ from tabicl._model.streaming_frontend import (
     MmapRowStore,
     StreamingFrontendExecutor,
 )
+from tabicl._model.tabicl import TabICL
 
 
 def _modules(
@@ -251,6 +252,38 @@ def test_streaming_frontend_rejects_dropout():
     col, row = _modules(dropout=0.1)
     with pytest.raises(NotImplementedError, match="dropout=0"):
         StreamingFrontendExecutor(col, row)
+
+
+def test_tabicl_exposes_streaming_frontend(tmp_path):
+    torch.manual_seed(20261125)
+    model = TabICL(
+        max_classes=4,
+        embed_dim=12,
+        col_num_blocks=1,
+        col_nhead=3,
+        col_num_inds=4,
+        col_feature_group=False,
+        row_num_blocks=1,
+        row_nhead=3,
+        row_num_cls=2,
+        icl_num_blocks=1,
+        icl_nhead=3,
+        zero_init=False,
+    ).eval()
+    x = torch.randn(1, 9, 4)
+    y = torch.randint(0, 4, (1, 6)).float()
+    with torch.inference_mode():
+        expected = _eager_frontend(model.col_embedder, model.row_interactor, x, y)
+        store = model.forward_frontend_streaming(
+            x,
+            y,
+            row_tile_rows=3,
+            mmap_directory=tmp_path,
+        )
+        actual = store.tensor.clone()
+        store.close()
+    torch.testing.assert_close(actual, expected, rtol=5e-5, atol=5e-6)
+    assert not list(tmp_path.iterdir())
 
 
 def test_streaming_frontend_rejects_unmatched_reserved_tokens():

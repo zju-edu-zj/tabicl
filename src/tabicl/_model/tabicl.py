@@ -681,6 +681,55 @@ class TabICL(nn.Module):
                 output = torch.softmax(output / softmax_temperature, dim=-1)
         return output
 
+    @torch.inference_mode()
+    def forward_frontend_streaming(
+        self,
+        X,
+        y_train: Tensor,
+        *,
+        row_tile_rows: int = 65536,
+        intermediate_location: str = "mmap",
+        output_location: str = "mmap",
+        mmap_directory=None,
+        output_store=None,
+        embed_with_test: bool = False,
+    ):
+        """Stream raw rows through column embedding and row interaction.
+
+        The returned RowStore owns its backing resource. Call ``close()`` when
+        it is no longer needed; mmap output is unlinked by default on close.
+        """
+        from .streaming_frontend import (
+            DeviceTensorRowSource,
+            HostTensorRowSource,
+            RowSource,
+            StreamingFrontendExecutor,
+        )
+
+        if isinstance(X, Tensor):
+            source = (
+                HostTensorRowSource(X)
+                if X.device.type == "cpu"
+                else DeviceTensorRowSource(X)
+            )
+        elif isinstance(X, RowSource):
+            source = X
+        else:
+            raise TypeError("X must be a Tensor or streaming RowSource")
+        return StreamingFrontendExecutor(
+            self.col_embedder,
+            self.row_interactor,
+            row_tile_rows=row_tile_rows,
+            intermediate_location=intermediate_location,
+            output_location=output_location,
+            mmap_directory=mmap_directory,
+        ).run(
+            source,
+            y_train,
+            output_store=output_store,
+            embed_with_test=embed_with_test,
+        )
+
     def forward(
         self,
         X: Tensor,

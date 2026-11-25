@@ -294,6 +294,52 @@ class Encoder(nn.Module):
             return_support=return_support,
         )
 
+    def forward_one_shot(
+        self,
+        support: Tensor,
+        query: Tensor,
+        profile=None,
+    ):
+        """Run the formal one-shot layerwise Dual-Path profile."""
+        if self.attention_type != "dual_path":
+            raise ValueError("forward_one_shot requires attention_type='dual_path'")
+        from .dual_path_profiles import one_shot_layerwise_forward
+
+        return one_shot_layerwise_forward(self, support, query, profile)
+
+    def build_online_snapshot(
+        self,
+        support: Tensor,
+        directory,
+        *,
+        model_fingerprint: str,
+        projection_chunk_rows: int = 65536,
+        support_query_tile_rows: int = 256,
+        generation: int = 0,
+    ):
+        """Build a fixed-support online snapshot without storing layer K/V."""
+        if self.attention_type != "dual_path":
+            raise ValueError("online snapshots require attention_type='dual_path'")
+        from .dual_path_profiles import build_online_hidden_snapshot
+
+        return build_online_hidden_snapshot(
+            self,
+            support,
+            directory,
+            model_fingerprint=model_fingerprint,
+            projection_chunk_rows=projection_chunk_rows,
+            support_query_tile_rows=support_query_tile_rows,
+            generation=generation,
+        )
+
+    def forward_online(self, query: Tensor, snapshot, profile=None):
+        """Run queries against a fixed-support online hidden snapshot."""
+        if self.attention_type != "dual_path":
+            raise ValueError("forward_online requires attention_type='dual_path'")
+        from .dual_path_profiles import online_hidden_forward
+
+        return online_hidden_forward(self, query, snapshot, profile)
+
 
 class SetTransformer(nn.Module):
     """Stack of induced self-attention blocks.
