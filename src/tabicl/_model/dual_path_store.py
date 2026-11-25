@@ -61,7 +61,7 @@ class DualPathPageStore:
         b, h, support, d = key.shape
         page_rows = index.layout.storage_page_rows
         pages = (support + page_rows - 1) // page_rows
-        gather = index.order[..., None].expand(b, h, support, d)
+        gather = index.order.long()[..., None].expand(b, h, support, d)
         sorted_key = key.gather(2, gather)
         sorted_value = value.gather(2, gather)
         pad = pages * page_rows - support

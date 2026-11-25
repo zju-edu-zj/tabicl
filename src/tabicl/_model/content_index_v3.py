@@ -89,7 +89,7 @@ class ContentIndexV3:
             ).argsort(dim=-1, stable=True)
         order = content_tree_order(
             k, initial_order, layout.logical_leaf_rows, use_triton=use_triton
-        ).to(torch.int64)
+        ).to(torch.int32)
 
         micro_rows = layout.logical_leaf_rows // 2
         micro = block_mean(k, order.to(torch.int32), micro_rows).float()
@@ -104,16 +104,18 @@ class ContentIndexV3:
 
         pages = (leaves + layout.leaves_per_page - 1) // layout.leaves_per_page
         capacity = 1 << (pages - 1).bit_length()
-        page_sums = torch.zeros((b, h, capacity, d), device=k.device, dtype=torch.float32)
-        page_counts = torch.zeros(capacity, device=k.device, dtype=torch.float32)
         leaf_sums = (
             leaf_representatives * leaf_rep_counts[None, None, :, :, None]
         ).sum(3)
-        for page in range(pages):
-            start = page * layout.leaves_per_page
-            end = min(start + layout.leaves_per_page, leaves)
-            page_sums[:, :, page] = leaf_sums[:, :, start:end].sum(2)
-            page_counts[page] = leaf_lengths[start:end].sum()
+        padded_leaves = capacity * layout.leaves_per_page
+        padded_leaf_sums = F.pad(
+            leaf_sums, (0, 0, 0, padded_leaves - leaves)
+        ).reshape(b, h, capacity, layout.leaves_per_page, d)
+        padded_leaf_lengths = F.pad(
+            leaf_lengths, (0, padded_leaves - leaves)
+        ).reshape(capacity, layout.leaves_per_page)
+        page_sums = padded_leaf_sums.sum(3)
+        page_counts = padded_leaf_lengths.sum(1)
 
         nodes = 2 * capacity - 1
         sums = torch.zeros((b, h, nodes, d), device=k.device, dtype=torch.float32)
@@ -121,36 +123,47 @@ class ContentIndexV3:
         leaf_offset = capacity - 1
         sums[:, :, leaf_offset:] = page_sums
         counts[leaf_offset:] = page_counts
-        for node in range(leaf_offset - 1, -1, -1):
-            left = 2 * node + 1
-            right = left + 1
-            sums[:, :, node] = sums[:, :, left] + sums[:, :, right]
-            counts[node] = counts[left] + counts[right]
-
         representatives = torch.zeros(
             (b, h, nodes, 2, d), device=k.device, dtype=torch.float32
         )
         rep_counts = torch.zeros((nodes, 2), device=k.device, dtype=torch.float32)
-        for node in range(leaf_offset):
-            children = (2 * node + 1, 2 * node + 2)
-            for slot, child in enumerate(children):
-                representatives[:, :, node, slot] = (
-                    sums[:, :, child] / counts[child].clamp_min(1)
-                )
-                rep_counts[node, slot] = counts[child]
-        # At the page level, retain two half-page representatives rather than
-        # collapsing a potentially multimodal page to one mean.
-        for page in range(pages):
-            node = leaf_offset + page
-            start = page * layout.leaves_per_page
-            middle = min(start + layout.leaves_per_page // 2, leaves)
-            end = min(start + layout.leaves_per_page, leaves)
-            for slot, (lo, hi) in enumerate(((start, middle), (middle, end))):
-                if lo < hi:
-                    count = leaf_lengths[lo:hi].sum().float()
-                    value = leaf_sums[:, :, lo:hi].sum(2) / count.clamp_min(1)
-                    representatives[:, :, node, slot] = value
-                    rep_counts[node, slot] = count
+        # Build each tree level in parallel. Python work now scales with tree
+        # depth, not with the number of physical pages or internal nodes.
+        level_start = leaf_offset
+        level_width = capacity
+        while level_width > 1:
+            parent_start = (level_start - 1) // 2
+            parent_width = level_width // 2
+            left = sums[:, :, level_start : level_start + level_width : 2]
+            right = sums[:, :, level_start + 1 : level_start + level_width : 2]
+            left_count = counts[level_start : level_start + level_width : 2]
+            right_count = counts[level_start + 1 : level_start + level_width : 2]
+            parent_slice = slice(parent_start, parent_start + parent_width)
+            sums[:, :, parent_slice] = left + right
+            counts[parent_slice] = left_count + right_count
+            representatives[:, :, parent_slice, 0] = (
+                left / left_count.clamp_min(1)[None, None, :, None]
+            )
+            representatives[:, :, parent_slice, 1] = (
+                right / right_count.clamp_min(1)[None, None, :, None]
+            )
+            rep_counts[parent_slice, 0] = left_count
+            rep_counts[parent_slice, 1] = right_count
+            level_start, level_width = parent_start, parent_width
+
+        # Page nodes retain two half-page representatives. This is vectorized
+        # over pages, including the partial final page.
+        half = layout.leaves_per_page // 2
+        page_leaf_sums = padded_leaf_sums.reshape(
+            b, h, capacity, 2, half, d
+        ).sum(4)
+        page_leaf_counts = padded_leaf_lengths.reshape(capacity, 2, half).sum(2)
+        page_reps = page_leaf_sums / page_leaf_counts.clamp_min(1)[None, None, :, :, None]
+        representatives[:, :, leaf_offset:, :] = page_reps
+        rep_counts[leaf_offset:, :] = page_leaf_counts
+        if pages < capacity:
+            representatives[:, :, leaf_offset + pages :] = 0
+            rep_counts[leaf_offset + pages :] = 0
 
         return cls(
             order=order,

@@ -43,6 +43,28 @@ def test_page_fetch_excludes_unselected_rows_from_same_page():
     assert candidates.valid.all()
 
 
+def test_vectorized_tree_counts_partial_pages_and_padding():
+    support = 4097
+    key = torch.randn(1, 1, support, 8)
+    index = _index(key, support)
+    assert index.order.dtype == torch.int32
+    assert index.num_pages == 33
+    assert index.page_capacity == 64
+    assert index.tree_rep_counts[0].sum().item() == support
+    assert index.tree_rep_counts[0].tolist() == [4096, 1]
+    assert index.tree_rep_counts[64 + 31].tolist() == [1, 0]
+    weighted_root = (
+        index.tree_representatives[0, 0, 0]
+        * index.tree_rep_counts[0, :, None]
+    ).sum(0) / support
+    expected_root = (
+        index.leaf_representatives[0, 0]
+        * index.leaf_rep_counts[:, :, None]
+    ).sum((0, 1)) / support
+    torch.testing.assert_close(weighted_root, expected_root)
+    assert (index.tree_rep_counts[64 + 33 :] == 0).all()
+
+
 def test_layerwise_executor_matches_regular_encoder():
     torch.manual_seed(20261125)
     encoder = Encoder(
