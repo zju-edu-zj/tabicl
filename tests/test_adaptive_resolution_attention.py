@@ -224,7 +224,7 @@ def test_adaptive_frontier_cache_and_full_budget_fast_path():
     torch.manual_seed(703)
     module = AdaptiveResolutionAttention(
         32, 2, block_size=16, num_selected_blocks=2,
-        partition="content_tree", summary_slots=1,
+        partition="content_tree", summary_slots=1, qk_norm=True,
     ).eval()
     module.use_triton = False
     query = torch.randn(1, 7, 32)

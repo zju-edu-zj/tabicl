@@ -164,7 +164,7 @@ def train_options(args, variant, seed):
     pilot = args.preset == "pilot"
     options = dict(
         device="cuda",
-        dtype=args.dtype,
+        dtype=getattr(args, "dtype", "bfloat16"),
         amp=args.dtype != "float32",
         np_seed=seed,
         torch_seed=seed,
@@ -528,7 +528,7 @@ def summarize(args):
         task=args.task,
         steps=args.steps,
         optimizer=args.optimizer,
-        dtype=args.dtype,
+        dtype=getattr(args, "dtype", "bfloat16"),
         eval_policies=args.eval_policies,
         results=rows,
         seed_aggregate=aggregates,
