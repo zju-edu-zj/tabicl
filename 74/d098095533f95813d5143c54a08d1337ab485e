@@ -1,0 +1,21 @@
+scripts/screen_icl_attention.py
+  s_74506c97ce38f2::t_ec8bcdb1059e51 167,531
+tests/test_adaptive_resolution_attention.py
+  s_74506c97ce38f2::t_c0f7b975d3b826 227
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "74d098095533f95813d5143c54a08d1337ab485e",
+  "prompts": {},
+  "sessions": {
+    "s_74506c97ce38f2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21149-7c4d-7921-b38e-60e6f0782cd5",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
