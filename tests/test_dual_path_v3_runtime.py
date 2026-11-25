@@ -5,6 +5,7 @@ from tabicl._model.content_index_v3 import ContentIndexV3, DualPathLayout
 from tabicl._model.dual_path_store import DualPathPageStore
 from tabicl._model.encoders import Encoder
 from tabicl._model.layerwise_inference import layerwise_dual_path_forward
+from tabicl._model.tabicl import TabICL
 
 
 def _index(key, support):
@@ -136,3 +137,42 @@ def test_layerwise_executor_matches_regular_encoder():
             query_tile_rows=3,
         )
     torch.testing.assert_close(actual, expected, atol=5e-6, rtol=5e-5)
+
+
+def test_raw_tabicl_layerwise_api_matches_regular_inference():
+    torch.manual_seed(20261125)
+    model = TabICL(
+        max_classes=3,
+        embed_dim=16,
+        col_num_blocks=1,
+        col_nhead=2,
+        col_num_inds=4,
+        col_feature_group=False,
+        row_num_blocks=1,
+        row_nhead=2,
+        row_num_cls=2,
+        icl_num_blocks=2,
+        icl_nhead=2,
+        icl_attention="dual_path",
+        icl_attention_impl_version=9,
+        icl_ssmax=False,
+        icl_block_size=32,
+        icl_num_selected_blocks=32,
+        icl_partition="content_tree",
+        icl_qk_norm=True,
+        zero_init=False,
+    ).eval()
+    for block in model.icl_predictor.tf_icl.blocks:
+        block.attn.use_triton = False
+    x = torch.randn(1, 40, 4)
+    y = torch.randint(0, 3, (1, 33))
+    expected = model(x.clone(), y, return_logits=True)
+    actual = model.forward_layerwise(
+        x.clone(),
+        y,
+        return_logits=True,
+        support_tile_rows=17,
+        query_tile_rows=3,
+        page_location="device",
+    )
+    torch.testing.assert_close(actual, expected, atol=8e-6, rtol=8e-5)

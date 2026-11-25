@@ -614,6 +614,71 @@ class TabICL(nn.Module):
 
         return out
 
+    @torch.inference_mode()
+    def forward_layerwise(
+        self,
+        X: Tensor,
+        y_train: Tensor,
+        *,
+        feature_shuffles: Optional[List[List[int]]] = None,
+        embed_with_test: bool = False,
+        return_logits: bool = True,
+        softmax_temperature: float = 0.9,
+        inference_config: Optional[InferenceConfig] = None,
+        support_tile_rows: int = 65536,
+        query_tile_rows: int = 256,
+        page_location: str = "device",
+    ) -> Tensor:
+        """Run raw-table inference with one ICL layer's sparse pages live at a time.
+
+        Column embedding and row interaction retain their existing inference
+        semantics. The bounded-lifetime guarantee applies to the ICL stack.
+        """
+        if self.training:
+            raise RuntimeError("forward_layerwise is an inference-only API")
+        if self.icl_attention != "dual_path":
+            raise ValueError("forward_layerwise requires icl_attention='dual_path'")
+        if inference_config is None:
+            inference_config = InferenceConfig()
+        train_size = y_train.shape[1]
+        if not 0 < train_size <= X.shape[1]:
+            raise ValueError("y_train must select a non-empty support prefix")
+
+        representations = self.row_interactor(
+            self.col_embedder(
+                X,
+                y_train=y_train,
+                embed_with_test=embed_with_test,
+                feature_shuffles=feature_shuffles,
+                mgr_config=inference_config.COL_CONFIG,
+            ),
+            mgr_config=inference_config.ROW_CONFIG,
+        )
+        if self.max_classes > 0:
+            class_counts = [len(torch.unique(target)) for target in y_train]
+            if len(set(class_counts)) != 1:
+                raise ValueError("all tables must have the same number of classes")
+            num_classes = class_counts[0]
+            if num_classes > self.max_classes:
+                raise NotImplementedError(
+                    "layerwise V3 inference does not yet support hierarchical classification"
+                )
+        else:
+            num_classes = None
+
+        output = self.icl_predictor.forward_layerwise(
+            representations,
+            y_train,
+            support_tile_rows=support_tile_rows,
+            query_tile_rows=query_tile_rows,
+            page_location=page_location,
+        )
+        if num_classes is not None:
+            output = output[..., :num_classes]
+            if not return_logits:
+                output = torch.softmax(output / softmax_temperature, dim=-1)
+        return output
+
     def forward(
         self,
         X: Tensor,
