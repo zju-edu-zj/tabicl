@@ -1,0 +1,38 @@
+src/tabicl/_model/tabicl.py
+  s_45ae9b06ddb295::t_a103dbdc0403a8 684-732
+src/tabicl/_model/content_index_persistent.py
+  s_f5e5071e1de2de::t_b742b4c89653d0 534,538-543,545,547-548,550-576,579-580,582,584-586,588,700,705-721,723-724,727-748,751-752,754-757,759,761-762,812,817,820,831
+  s_f5e5071e1de2de::t_e2a05792e1708d 1207
+  s_f5e5071e1de2de::t_f7f66df510585b 114-142,397
+tests/test_streaming_frontend.py
+  s_45ae9b06ddb295::t_a103dbdc0403a8 16,257-286
+  s_45ae9b06ddb295::t_0f8a0b43dc7fb1 287-288
+tests/test_dual_path_profiles.py
+  s_45ae9b06ddb295::t_a103dbdc0403a8 45,55,62
+src/tabicl/_model/encoders.py
+  s_45ae9b06ddb295::t_a103dbdc0403a8 297-342
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "002e285b950e977094dbc502383e1f261265ffad",
+  "prompts": {},
+  "sessions": {
+    "s_45ae9b06ddb295": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a212f5-8cd2-7533-bcb2-a368e151230e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    },
+    "s_f5e5071e1de2de": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2121a-bdc2-7b63-875f-bb4025b175f3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": null
+    }
+  }
+}
