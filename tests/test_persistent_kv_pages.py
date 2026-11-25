@@ -54,7 +54,11 @@ def test_persistent_pages_roundtrip_and_explicit_leaf_mapping(tmp_path, dtype):
 
 def test_writer_rejects_invalid_pages_and_checksum_corruption(tmp_path):
     writer = PersistentKVPageWriter(
-        tmp_path / "pages", num_heads=1, head_dim=2, page_rows=4
+        tmp_path / "pages",
+        num_heads=1,
+        head_dim=2,
+        page_rows=4,
+        logical_leaf_rows=2,
     )
     with pytest.raises(ValueError, match="valid_rows"):
         writer.append(0, torch.randn(3, 2), torch.randn(3, 2), valid_rows=2)
