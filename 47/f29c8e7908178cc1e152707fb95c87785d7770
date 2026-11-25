@@ -1,0 +1,21 @@
+src/tabicl/_model/_dual_gate_v3.py
+  s_74506c97ce38f2::t_837bc92c41ae10 119-128
+tests/test_adaptive_resolution_attention.py
+  s_74506c97ce38f2::t_9b3d14326cf1a2 98-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "47f29c8e7908178cc1e152707fb95c87785d7770",
+  "prompts": {},
+  "sessions": {
+    "s_74506c97ce38f2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21149-7c4d-7921-b38e-60e6f0782cd5",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
