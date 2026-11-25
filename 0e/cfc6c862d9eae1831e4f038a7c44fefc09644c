@@ -1,0 +1,19 @@
+src/tabicl/_model/dual_path_v3.py
+  s_45ae9b06ddb295::t_b36cbfb9054ba0 559,561-565,569-573
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0ecfc6c862d9eae1831e4f038a7c44fefc09644c",
+  "prompts": {},
+  "sessions": {
+    "s_45ae9b06ddb295": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a212f5-8cd2-7533-bcb2-a368e151230e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
