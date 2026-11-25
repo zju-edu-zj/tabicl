@@ -28,7 +28,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-from tabicl._model.icl_attention import SetRetrievalAttention
+from tabicl._model.icl_attention import DualPathRetrievalAttention, SetRetrievalAttention
 from tabicl._model.tabicl import TabICL
 from tabicl.prior._dataset import PriorDataset
 from tabicl.prior.graph_lib._config import PriorConfig
@@ -48,8 +48,9 @@ def _make_oracle_route(module):
     original_route = module.route
 
     @torch.no_grad()
-    def route(q, k):
-        order, _ = original_route(q, k)
+    def route(q, k, prepared=None, return_quality=False):
+        route_state = module._prepare_route(k) if prepared is None else prepared
+        order, centroids, lengths = route_state
         sorted_k = k.gather(2, order.long()[..., None].expand_as(k)).float()
         block_size = module.block_size
         nk = (k.shape[-2] + block_size - 1) // block_size
@@ -72,7 +73,13 @@ def _make_oracle_route(module):
             ids = (torch.arange(nk * block_size, device=q.device) // block_size)
             block_mass.scatter_add_(-1, ids.view(1, 1, 1, -1).expand_as(probs), probs)
             chosen.append(block_mass.topk(budget, dim=-1).indices)
-        return order, torch.cat(chosen, dim=2).to(torch.int32)
+        selected = torch.cat(chosen, dim=2).to(torch.int32)
+        if return_quality:
+            _, quality = module._centroid_route_quality(
+                q, centroids, lengths, budget, k.shape[-2], selected
+            )
+            return order.to(torch.int32), selected, quality
+        return order.to(torch.int32), selected
 
     return route
 
@@ -81,14 +88,21 @@ def _make_random_route(module, generator):
     original_route = module.route
 
     @torch.no_grad()
-    def route(q, k):
-        order, _ = original_route(q, k)
+    def route(q, k, prepared=None, return_quality=False):
+        route_state = module._prepare_route(k) if prepared is None else prepared
+        order, centroids, lengths = route_state
         nk = (k.shape[-2] + module.block_size - 1) // module.block_size
         budget = min(module.num_selected_blocks, nk)
         shape = (*q.shape[:3], nk)
         # Generate on CPU so results are reproducible across CUDA devices.
         selected = torch.rand(shape, generator=generator, device="cpu").argsort(-1)[..., :budget]
-        return order, selected.to(device=q.device, dtype=torch.int32)
+        selected = selected.to(device=q.device, dtype=torch.int32)
+        if return_quality:
+            _, quality = module._centroid_route_quality(
+                q, centroids, lengths, budget, k.shape[-2], selected
+            )
+            return order.to(torch.int32), selected, quality
+        return order.to(torch.int32), selected
 
     return route
 
@@ -97,7 +111,29 @@ def _install_policy(modules, policy, seed):
     saved = []
     generator = torch.Generator(device="cpu").manual_seed(seed)
     for name, module in modules:
-        saved.append((name, module, module._hybrid_attention, module.route))
+        saved.append((
+            name,
+            module,
+            module._hybrid_attention,
+            module.route,
+            getattr(module, "_branch_policy", None),
+            getattr(module, "_force_dense_sparse", None),
+        ))
+        if isinstance(module, DualPathRetrievalAttention):
+            if policy == "global_only":
+                module._branch_policy = "global_only"
+            elif policy == "sparse_only":
+                module._branch_policy = "sparse_only"
+            elif policy == "dense_only":
+                module._branch_policy = "sparse_only"
+                module._force_dense_sparse = True
+            elif policy in ("random_candidates", "oracle_candidates"):
+                module.route = (
+                    _make_random_route(module, generator)
+                    if policy == "random_candidates"
+                    else _make_oracle_route(module)
+                )
+            continue
         if policy == "native":
             original_hybrid = module._hybrid_attention
 
@@ -148,9 +184,13 @@ def _install_policy(modules, policy, seed):
 
 
 def _restore(saved):
-    for _, module, hybrid, route in saved:
+    for _, module, hybrid, route, branch_policy, force_dense_sparse in saved:
         module._hybrid_attention = hybrid
         module.route = route
+        if branch_policy is not None:
+            module._branch_policy = branch_policy
+        if force_dense_sparse is not None:
+            module._force_dense_sparse = force_dense_sparse
 
 
 def _enable_diagnostics(modules, query_count, query_start=0):

@@ -3,7 +3,8 @@
 Default: 20K steps, log-uniform 1K–8K screening of dense, global, periodic
 retrieval, alternating, same-layer fused and all-sparse ICL architectures.
 Fixed validation also performs branch interventions and stability diagnostics.
-The stage1 preset retains the original fixed-1024 data distribution.
+The stage1 preset retains the original fixed-1024 data distribution;
+stage1_2048 matches the production Stage-1 row budget.
 The explicit pilot preset uses a small model and is NOT a pretraining ranking.
 """
 
@@ -41,6 +42,11 @@ VARIANTS = {
     "global_sparse_alternating_content_tree": (
         "global_sparse_alternating", "elu", "content_tree"
     ),
+    "dual_path_static": ("dual_path", "elu", "content_tree", "static"),
+    "dual_path_linear_v1": ("dual_path", "elu", "content_tree", "linear_v1"),
+    "dual_path_evidence_v3": (
+        "dual_path", "elu", "content_tree", "evidence_v3"
+    ),
 }
 DEFAULT_VARIANTS = (
     "dense",
@@ -63,7 +69,11 @@ def arguments():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("action", choices=("plan", "prepare", "run", "summarize"))
     p.add_argument("--output", type=Path, required=True)
-    p.add_argument("--preset", choices=("stage1", "routing", "pilot"), default="routing")
+    p.add_argument(
+        "--preset",
+        choices=("stage1", "stage1_2048", "routing", "pilot"),
+        default="routing",
+    )
     p.add_argument("--steps", type=int)
     p.add_argument("--variants", nargs="+", choices=VARIANTS, default=list(DEFAULT_VARIANTS))
     p.add_argument("--seeds", type=int, nargs="+", default=[42])
@@ -78,6 +88,9 @@ def arguments():
     p.add_argument("--micro-batch-size", type=int, default=1)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--optimizer", choices=("hybrid", "adamw"), default="hybrid")
+    p.add_argument(
+        "--dtype", choices=("float32", "bfloat16"), default="bfloat16"
+    )
     p.add_argument("--lr", type=float, default=4e-4, help="Muon matrix peak LR")
     p.add_argument("--adamw-lr", type=float, default=1e-4, help="Hybrid AdamW peak LR")
     p.add_argument("--diagnostics-every", type=int, default=200)
@@ -144,13 +157,15 @@ def arguments():
 
 
 def train_options(args, variant, seed):
-    attention, global_type, partition = VARIANTS[variant]
+    specification = VARIANTS[variant]
+    attention, global_type, partition = specification[:3]
+    dual_gate = specification[3] if len(specification) == 4 else "evidence_v3"
     job = args.output / f"seed_{seed}" / variant
     pilot = args.preset == "pilot"
     options = dict(
         device="cuda",
-        dtype="bfloat16",
-        amp=True,
+        dtype=args.dtype,
+        amp=args.dtype != "float32",
         np_seed=seed,
         torch_seed=seed,
         max_steps=args.steps,
@@ -159,6 +174,7 @@ def train_options(args, variant, seed):
         lr=args.lr if args.optimizer == "hybrid" else args.adamw_lr,
         adamw_lr=args.adamw_lr,
         muon=args.optimizer == "hybrid",
+        muon_route_mode="attention",
         beta1=0.9,
         weight_decay=0.01,
         use_cautious_wd=False,
@@ -176,7 +192,10 @@ def train_options(args, variant, seed):
         min_features=1,
         max_features=8 if pilot else 100,
         max_classes=10,
-        max_seq_len=8193 if args.preset == "routing" else 1024,
+        max_seq_len=(
+            8193 if args.preset == "routing"
+            else 2048 if args.preset == "stage1_2048" else 1024
+        ),
         min_train_size=0.79 if args.preset == "routing" else 0.3,
         max_train_size=0.81 if args.preset == "routing" else 0.9,
         seq_len_per_gp=True,
@@ -208,6 +227,7 @@ def train_options(args, variant, seed):
         icl_global_type=global_type,
         icl_num_induced_slots=128,
         icl_partition=partition,
+        icl_dual_gate=dual_gate,
         icl_router="centroid",
         icl_sparse_every=3,
         icl_block_size=128,
@@ -508,6 +528,7 @@ def summarize(args):
         task=args.task,
         steps=args.steps,
         optimizer=args.optimizer,
+        dtype=args.dtype,
         eval_policies=args.eval_policies,
         results=rows,
         seed_aggregate=aggregates,
@@ -528,6 +549,7 @@ def summarize(args):
         task=args.task,
         steps=args.steps,
         optimizer=args.optimizer,
+        dtype=args.dtype,
         seed_aggregate=aggregates,
         mechanism_points=len(mechanism_timeseries),
         parameter_points=len(parameter_timeseries),

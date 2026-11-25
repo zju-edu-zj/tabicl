@@ -9,6 +9,7 @@ ICL_ROUTER=${ICL_ROUTER:-centroid}
 ICL_ROUTER_BEAM=${ICL_ROUTER_BEAM:-16}
 ICL_PARTITION=${ICL_PARTITION:-projection}
 ICL_FUSION=${ICL_FUSION:-legacy}
+ICL_DUAL_GATE=${ICL_DUAL_GATE:-evidence_v3}
 ICL_SUMMARY_SLOTS=${ICL_SUMMARY_SLOTS:-1}
 ICL_GLOBAL_TYPE=${ICL_GLOBAL_TYPE:-elu}
 ICL_NUM_INDUCED_SLOTS=${ICL_NUM_INDUCED_SLOTS:-128}
@@ -34,6 +35,7 @@ ICL_ARGS=(
     --icl_router_beam "$ICL_ROUTER_BEAM"
     --icl_partition "$ICL_PARTITION"
     --icl_fusion "$ICL_FUSION"
+    --icl_dual_gate "$ICL_DUAL_GATE"
     --icl_summary_slots "$ICL_SUMMARY_SLOTS"
     --icl_global_type "$ICL_GLOBAL_TYPE"
     --icl_num_induced_slots "$ICL_NUM_INDUCED_SLOTS"

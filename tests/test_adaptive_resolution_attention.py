@@ -30,6 +30,14 @@ def test_new_attention_requires_content_tree(attention_class):
         attention_class(32, 2, block_size=16, num_selected_blocks=1)
 
 
+def test_dual_path_v3_requires_qk_norm():
+    with pytest.raises(ValueError, match="qk_norm=True"):
+        DualPathRetrievalAttention(
+            32, 2, block_size=16, num_selected_blocks=1,
+            partition="content_tree", qk_norm=False,
+        )
+
+
 def test_dual_path_cache_gates_and_all_branch_gradients():
     torch.manual_seed(701)
     module = DualPathRetrievalAttention(
@@ -52,10 +60,11 @@ def test_dual_path_cache_gates_and_all_branch_gradients():
         module.global_in_proj_weight,
         module.out_proj.weight,
         module.global_out_proj.weight,
-        module.global_gate_query_weight,
-        module.sparse_gate_query_weight,
-        module.global_gate_route_weight,
-        module.sparse_gate_route_weight,
+        module.gate_controller.global_query_weight,
+        module.gate_controller.sparse_query_weight,
+        module.gate_controller.global_route_weight,
+        module.gate_controller.sparse_route_weight,
+        module.gate_controller.output_weight,
     )
     assert query.grad is not None and torch.isfinite(query.grad).all()
     assert support.grad is not None and torch.isfinite(support.grad).all()
@@ -66,6 +75,72 @@ def test_dual_path_cache_gates_and_all_branch_gradients():
     features = module._gate_route_features(quality)
     assert features.shape == quality.shape
     assert ((features >= 0) & (features <= 1)).all()
+
+
+def test_dual_path_v3_starts_at_exact_v1_half_gates():
+    torch.manual_seed(708)
+    module = DualPathRetrievalAttention(
+        32, 2, block_size=16, num_selected_blocks=1,
+        partition="content_tree", qk_norm=True,
+    )
+    global_q = torch.randn(2, 2, 7, 16)
+    sparse_q = torch.randn(2, 2, 7, 16)
+    quality = torch.rand(2, 2, 7, 6)
+    global_gate, sparse_gate, diagnostics = module.gate_controller(
+        global_q, sparse_q, quality, support_size=97
+    )
+    torch.testing.assert_close(global_gate, torch.full_like(global_gate, 0.5))
+    torch.testing.assert_close(sparse_gate, torch.full_like(sparse_gate, 0.5))
+    assert diagnostics["fusion_common_delta_rms"] == 0
+    assert diagnostics["fusion_differential_delta_rms"] == 0
+
+
+def test_dual_path_v3_packed_projection_matches_independent_projection():
+    torch.manual_seed(709)
+    module = DualPathRetrievalAttention(
+        32, 2, block_size=16, num_selected_blocks=1,
+        partition="content_tree", qk_norm=True,
+    )
+    query, support = torch.randn(2, 7, 32), torch.randn(2, 41, 32)
+    actual = module._project_dual(query, support, support, None)
+    sparse = module._project(query, support, support, None)
+    global_branch = module._project_global(query, support, support, None)
+    for got, expected in zip(actual, (*sparse, *global_branch)):
+        torch.testing.assert_close(got, expected)
+
+
+def test_dual_path_v3_evidence_is_bounded_at_ten_million_rows():
+    module = DualPathRetrievalAttention(
+        32, 2, block_size=128, num_selected_blocks=4,
+        partition="content_tree", qk_norm=True,
+    )
+    quality = torch.tensor([[[[2.0, 512 / 10_000_000, 0.7, 8.0, 4.0, 0.5]]]])
+    evidence = module.gate_controller._evidence_features(quality, 10_000_000)
+    assert evidence.shape[-1] == module.gate_controller._EVIDENCE_FEATURES
+    assert torch.isfinite(evidence).all()
+    assert ((evidence >= -1) & (evidence <= 1)).all()
+
+
+def test_dual_path_branch_policy_is_native_gate_knockout():
+    torch.manual_seed(710)
+    module = DualPathRetrievalAttention(
+        32, 2, block_size=16, num_selected_blocks=1,
+        partition="content_tree", qk_norm=True,
+    )
+    module.use_triton = False
+    query, support = torch.randn(1, 5, 32), torch.randn(1, 41, 32)
+    outputs = {}
+    for policy in ("native", "global_only", "sparse_only"):
+        module._branch_policy = policy
+        outputs[policy] = module(query, support, support)
+    module._branch_policy = "native"
+    bias = module.out_proj.bias
+    torch.testing.assert_close(
+        outputs["native"],
+        outputs["global_only"] + outputs["sparse_only"] - bias,
+        atol=3e-6,
+        rtol=3e-5,
+    )
 
 
 @pytest.mark.parametrize(

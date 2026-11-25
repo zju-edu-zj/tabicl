@@ -244,7 +244,8 @@ def main():
                 icl_num_induced_slots=args.induced_slots,
                 icl_qk_norm=True,
                 icl_attention_impl_version=(
-                    5 if args.attention in ("dual_path", "adaptive_frontier") else 4
+                    8 if args.attention == "dual_path"
+                    else 5 if args.attention == "adaptive_frontier" else 4
                 ),
                 recompute=args.recompute,
                 zero_init=False,

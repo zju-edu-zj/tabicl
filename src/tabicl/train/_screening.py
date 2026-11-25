@@ -73,6 +73,17 @@ def load_common_initialization(model, path, model_config, seed):
         ".sparse_gate_route_weight",
         ".global_gate_bias",
         ".sparse_gate_bias",
+        ".gate_controller.global_query_weight",
+        ".gate_controller.sparse_query_weight",
+        ".gate_controller.global_route_weight",
+        ".gate_controller.sparse_route_weight",
+        ".gate_controller.base_bias",
+        ".gate_controller.global_query_adapter",
+        ".gate_controller.sparse_query_adapter",
+        ".gate_controller.evidence_adapter",
+        ".gate_controller.hidden_bias",
+        ".gate_controller.output_weight",
+        ".gate_controller.output_bias",
         ".global_qk_norm.q_weight",
         ".global_qk_norm.k_weight",
         ".global_qk_norm.base_log_scale",
@@ -128,44 +139,13 @@ def _attention_policy(model, policy):
                 "adaptive_frontier only defines the native unified frontier; "
                 "use eval_attention_policies=native"
             )
-        method_name = (
-            "_dual_attention" if isinstance(module, DualPathRetrievalAttention)
-            else "_hybrid_attention"
-        )
+        if isinstance(module, DualPathRetrievalAttention):
+            saved.append((module, "_branch_policy", True, module._branch_policy))
+            module._branch_policy = policy
+            continue
+        method_name = "_hybrid_attention"
         had_override = method_name in module.__dict__
         saved.append((module, method_name, had_override, module.__dict__.get(method_name)))
-
-        if isinstance(module, DualPathRetrievalAttention):
-            def dual_intervention(
-                self, sparse_q, sparse_k, sparse_v, global_q, global_k, global_v,
-                prepared=None, selected_policy=policy,
-            ):
-                if selected_policy == "global_only":
-                    state = None if prepared is None else prepared.get("global")
-                    heads = self._global_attention(global_q, global_k, global_v, state)
-                    flat = heads.transpose(-3, -2).contiguous().view(
-                        *global_q.shape[:-3], global_q.shape[-2], self.embed_dim
-                    )
-                    return F.linear(flat, self.global_out_proj.weight)
-                if sparse_k.shape[-2] <= self.block_size * self.num_selected_blocks:
-                    attention_q = (
-                        self.qk_norm.scale_query(sparse_q, sparse_k.shape[-2])
-                        if self.qk_norm is not None else sparse_q
-                    )
-                    heads = F.scaled_dot_product_attention(attention_q, sparse_k, sparse_v)
-                else:
-                    route = None if prepared is None else prepared.get("route")
-                    heads = self._sparse_attention(
-                        sparse_q, sparse_k, sparse_v,
-                        {"route": route} if route is not None else None,
-                    )
-                flat = heads.transpose(-3, -2).contiguous().view(
-                    *sparse_q.shape[:-3], sparse_q.shape[-2], self.embed_dim
-                )
-                return F.linear(flat, self.out_proj.weight, self.out_proj.bias)
-
-            module._dual_attention = types.MethodType(dual_intervention, module)
-            continue
 
         def intervention(self, q, k, v, selected_policy=policy):
             diagnose = self.diagnostics_enabled

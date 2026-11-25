@@ -12,6 +12,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint
 
+from ._dual_gate_v3 import DualPathGateV3
 from .layers import GlobalLinearAttention
 from .qk_norm import ICLQKNorm
 
@@ -518,9 +519,9 @@ class SetRetrievalAttention(GlobalLinearAttention):
 
 
 class DualPathRetrievalAttention(SetRetrievalAttention):
-    """Independent global and routed-softmax channels with unconstrained gates."""
+    """Independent global and routed-softmax experts with additive V3 fusion."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, dual_gate="evidence_v3", **kwargs):
         kwargs.pop("mode", None)
         kwargs.pop("fusion", None)
         super().__init__(*args, mode="sparse", fusion="legacy", **kwargs)
@@ -528,6 +529,8 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
             raise ValueError("dual_path requires partition=content_tree")
         if self.global_type != "elu":
             raise ValueError("dual_path currently requires global_type=elu")
+        if self.qk_norm is None:
+            raise ValueError("dual_path v3 requires qk_norm=True")
         self.global_in_proj_weight = nn.Parameter(
             torch.empty(3 * self.embed_dim, self.embed_dim)
         )
@@ -548,16 +551,12 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
         nn.init.xavier_uniform_(self.out_proj.weight)
         nn.init.xavier_uniform_(self.global_out_proj.weight)
         nn.init.zeros_(self.out_proj.bias)
-        self.global_gate_query_weight = nn.Parameter(
-            torch.zeros(self.num_heads, self.head_dim)
+        self.dual_gate = dual_gate
+        self.gate_controller = DualPathGateV3(
+            self.num_heads, self.head_dim, mode=dual_gate
         )
-        self.sparse_gate_query_weight = nn.Parameter(
-            torch.zeros(self.num_heads, self.head_dim)
-        )
-        self.global_gate_route_weight = nn.Parameter(torch.zeros(self.num_heads, 6))
-        self.sparse_gate_route_weight = nn.Parameter(torch.zeros(self.num_heads, 6))
-        self.global_gate_bias = nn.Parameter(torch.zeros(self.num_heads))
-        self.sparse_gate_bias = nn.Parameter(torch.zeros(self.num_heads))
+        self._branch_policy = "native"
+        self._force_dense_sparse = False
 
     def zero_init_output(self):
         nn.init.zeros_(self.out_proj.weight)
@@ -581,6 +580,78 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
             k = self.global_qk_norm.normalize_k(k)
         return q, k, v
 
+    def _project_dual(self, query, key, value, rope):
+        """Project both experts with two packed GEMMs while retaining distinct parameters."""
+        bshape = query.shape[:-2]
+        tgt_len, src_len = query.shape[-2], key.shape[-2]
+        q_weight = torch.cat((
+            self.in_proj_weight[: self.embed_dim],
+            self.global_in_proj_weight[: self.embed_dim],
+        ))
+        q_bias = torch.cat((
+            self.in_proj_bias[: self.embed_dim],
+            self.global_in_proj_bias[: self.embed_dim],
+        ))
+        sparse_q, global_q = F.linear(query, q_weight, q_bias).split(
+            self.embed_dim, dim=-1
+        )
+        if key is value:
+            kv_weight = torch.cat((
+                self.in_proj_weight[self.embed_dim :],
+                self.global_in_proj_weight[self.embed_dim :],
+            ))
+            kv_bias = torch.cat((
+                self.in_proj_bias[self.embed_dim :],
+                self.global_in_proj_bias[self.embed_dim :],
+            ))
+            sparse_k, sparse_v, global_k, global_v = F.linear(
+                key, kv_weight, kv_bias
+            ).split(self.embed_dim, dim=-1)
+        else:
+            k_weight = torch.cat((
+                self.in_proj_weight[self.embed_dim : 2 * self.embed_dim],
+                self.global_in_proj_weight[self.embed_dim : 2 * self.embed_dim],
+            ))
+            v_weight = torch.cat((
+                self.in_proj_weight[2 * self.embed_dim :],
+                self.global_in_proj_weight[2 * self.embed_dim :],
+            ))
+            k_bias = torch.cat((
+                self.in_proj_bias[self.embed_dim : 2 * self.embed_dim],
+                self.global_in_proj_bias[self.embed_dim : 2 * self.embed_dim],
+            ))
+            v_bias = torch.cat((
+                self.in_proj_bias[2 * self.embed_dim :],
+                self.global_in_proj_bias[2 * self.embed_dim :],
+            ))
+            sparse_k, global_k = F.linear(key, k_weight, k_bias).split(
+                self.embed_dim, dim=-1
+            )
+            sparse_v, global_v = F.linear(value, v_weight, v_bias).split(
+                self.embed_dim, dim=-1
+            )
+
+        def heads(x, length):
+            return x.view(
+                *bshape, length, self.num_heads, self.head_dim
+            ).transpose(-3, -2)
+
+        sparse_q, global_q = heads(sparse_q, tgt_len), heads(global_q, tgt_len)
+        sparse_k, global_k = heads(sparse_k, src_len), heads(global_k, src_len)
+        sparse_v, global_v = heads(sparse_v, src_len), heads(global_v, src_len)
+        if rope is not None:
+            sparse_q = rope.rotate_queries_or_keys(sparse_q)
+            global_q = rope.rotate_queries_or_keys(global_q)
+            sparse_k = rope.rotate_queries_or_keys(sparse_k)
+            global_k = rope.rotate_queries_or_keys(global_k)
+        if self.qk_norm is not None:
+            sparse_q = self.qk_norm.normalize_q(sparse_q)
+            sparse_k = self.qk_norm.normalize_k(sparse_k)
+        if self.global_qk_norm is not None:
+            global_q = self.global_qk_norm.normalize_q(global_q)
+            global_k = self.global_qk_norm.normalize_k(global_k)
+        return sparse_q, sparse_k, sparse_v, global_q, global_k, global_v
+
     def _project_cached_query(self, query, weight, bias, norm, rope):
         bshape, length = query.shape[:-2], query.shape[-2]
         q = F.linear(query, weight[: self.embed_dim], bias[: self.embed_dim])
@@ -588,6 +659,34 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
         if rope is not None:
             q = rope.rotate_queries_or_keys(q)
         return norm.normalize_q(q) if norm is not None else q
+
+    def _project_cached_queries(self, query, rope):
+        bshape, length = query.shape[:-2], query.shape[-2]
+        weight = torch.cat((
+            self.in_proj_weight[: self.embed_dim],
+            self.global_in_proj_weight[: self.embed_dim],
+        ))
+        bias = torch.cat((
+            self.in_proj_bias[: self.embed_dim],
+            self.global_in_proj_bias[: self.embed_dim],
+        ))
+        sparse_q, global_q = F.linear(query, weight, bias).split(
+            self.embed_dim, dim=-1
+        )
+        sparse_q = sparse_q.view(
+            *bshape, length, self.num_heads, self.head_dim
+        ).transpose(-3, -2)
+        global_q = global_q.view(
+            *bshape, length, self.num_heads, self.head_dim
+        ).transpose(-3, -2)
+        if rope is not None:
+            sparse_q = rope.rotate_queries_or_keys(sparse_q)
+            global_q = rope.rotate_queries_or_keys(global_q)
+        if self.qk_norm is not None:
+            sparse_q = self.qk_norm.normalize_q(sparse_q)
+        if self.global_qk_norm is not None:
+            global_q = self.global_qk_norm.normalize_q(global_q)
+        return sparse_q, global_q
 
     def _prepare_dual_support(self, sparse_k, sparse_v, global_k, global_v):
         prepared = {
@@ -599,17 +698,7 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
 
     @staticmethod
     def _gate_route_features(route_quality):
-        return torch.stack(
-            (
-                route_quality[..., 0],
-                route_quality[..., 1],
-                route_quality[..., 2],
-                route_quality[..., 3] / 8,
-                route_quality[..., 4] / 8,
-                route_quality[..., 5],
-            ),
-            dim=-1,
-        )
+        return DualPathGateV3._base_features(route_quality)
 
     def forward(
         self,
@@ -629,13 +718,7 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
                 raise ValueError("Dual-path cache must contain sparse and global K/V heads")
             sparse_k, global_k = cached_kv.key.split(self.num_heads, dim=-3)
             sparse_v, global_v = cached_kv.value.split(self.num_heads, dim=-3)
-            sparse_q = self._project_cached_query(
-                query, self.in_proj_weight, self.in_proj_bias, self.qk_norm, rope
-            )
-            global_q = self._project_cached_query(
-                query, self.global_in_proj_weight, self.global_in_proj_bias,
-                self.global_qk_norm, rope,
-            )
+            sparse_q, global_q = self._project_cached_queries(query, rope)
             prepared = None
             if (
                 not self.training
@@ -664,8 +747,8 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
 
         key = query if key is None else key
         value = key if value is None else value
-        sparse_q, sparse_k, sparse_v = super()._project(query, key, value, rope)
-        global_q, global_k, global_v = self._project_global(query, key, value, rope)
+        (sparse_q, sparse_k, sparse_v,
+         global_q, global_k, global_v) = self._project_dual(query, key, value, rope)
         output = self._dual_attention(
             sparse_q, sparse_k, sparse_v, global_q, global_k, global_v
         )
@@ -692,7 +775,9 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
             global_q, global_k, global_v, global_prepared
         )
         self.diagnostics_enabled = diagnose
-        if sparse_k.shape[-2] <= self.block_size * self.num_selected_blocks:
+        if self._force_dense_sparse or sparse_k.shape[-2] <= (
+            self.block_size * self.num_selected_blocks
+        ):
             attention_q = (
                 self.qk_norm.scale_query(sparse_q, sparse_k.shape[-2])
                 if self.qk_norm is not None else sparse_q
@@ -710,49 +795,39 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
                 {"route": route_prepared} if route_prepared is not None else None,
                 return_quality=True,
             )
+        global_gate, sparse_gate, gate_diagnostics = self.gate_controller(
+            global_q, sparse_q, route_quality, sparse_k.shape[-2]
+        )
         with torch.autocast(device_type=sparse_q.device.type, enabled=False):
-            gate_features = self._gate_route_features(route_quality.float())
-            global_logit = (
-                torch.einsum(
-                    "bhtd,hd->bht", global_q.float(),
-                    self.global_gate_query_weight.float(),
-                )
-                + torch.einsum(
-                    "bhtf,hf->bht", gate_features,
-                    self.global_gate_route_weight.float(),
-                )
-                + self.global_gate_bias.float()[None, :, None]
-            )
-            sparse_logit = (
-                torch.einsum(
-                    "bhtd,hd->bht", sparse_q.float(),
-                    self.sparse_gate_query_weight.float(),
-                )
-                + torch.einsum(
-                    "bhtf,hf->bht", gate_features,
-                    self.sparse_gate_route_weight.float(),
-                )
-                + self.sparse_gate_bias.float()[None, :, None]
-            )
-            global_gate = torch.sigmoid(global_logit)[..., None]
-            sparse_gate = torch.sigmoid(sparse_logit)[..., None]
-            global_scaled = (global_heads.float() * global_gate).to(sparse_q.dtype)
-            sparse_scaled = (sparse_heads.float() * sparse_gate).to(sparse_q.dtype)
+            global_scaled = global_heads.float() * global_gate
+            sparse_scaled = sparse_heads.float() * sparse_gate
+            if self._branch_policy == "global_only":
+                sparse_scaled = torch.zeros_like(sparse_scaled)
+            elif self._branch_policy == "sparse_only":
+                global_scaled = torch.zeros_like(global_scaled)
+            elif self._branch_policy != "native":
+                raise ValueError(f"Unknown dual branch policy: {self._branch_policy!r}")
+            global_scaled = global_scaled.to(sparse_q.dtype)
+            sparse_scaled = sparse_scaled.to(sparse_q.dtype)
         global_flat = global_scaled.transpose(-3, -2).contiguous().view(
             *sparse_q.shape[:-3], sparse_q.shape[-2], self.embed_dim
         )
         sparse_flat = sparse_scaled.transpose(-3, -2).contiguous().view_as(global_flat)
-        output = F.linear(global_flat, self.global_out_proj.weight)
-        sparse_contribution = F.linear(sparse_flat, self.out_proj.weight, self.out_proj.bias)
-        output = output + sparse_contribution
+        packed = torch.cat((global_flat, sparse_flat), dim=-1)
+        packed_weight = torch.cat(
+            (self.global_out_proj.weight, self.out_proj.weight), dim=1
+        )
+        output = F.linear(packed, packed_weight, self.out_proj.bias)
         if diagnose:
-            self.last_diagnostics.update({
+            global_contribution = F.linear(global_flat, self.global_out_proj.weight)
+            sparse_contribution = F.linear(sparse_flat, self.out_proj.weight)
+            diagnostics = {
                 "fusion_global_gate_mean": global_gate.detach().mean(),
                 "fusion_sparse_gate_mean": sparse_gate.detach().mean(),
                 "fusion_gate_sum_mean": (global_gate + sparse_gate).detach().mean(),
                 "global_branch_rms": global_heads.detach().float().square().mean().sqrt(),
                 "sparse_branch_rms": sparse_heads.detach().float().square().mean().sqrt(),
-                "global_contribution_rms": output.detach().sub(sparse_contribution.detach()).float().square().mean().sqrt(),
+                "global_contribution_rms": global_contribution.detach().float().square().mean().sqrt(),
                 "sparse_contribution_rms": sparse_contribution.detach().float().square().mean().sqrt(),
                 "fusion_global_gate_p10": torch.quantile(global_gate.detach().float(), 0.1),
                 "fusion_global_gate_p90": torch.quantile(global_gate.detach().float(), 0.9),
@@ -767,7 +842,23 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
                 "route_top_score_z": route_quality[..., 3].mean(),
                 "route_boundary_margin": route_quality[..., 4].mean(),
                 "route_entropy": route_quality[..., 5].mean(),
-            })
+                **gate_diagnostics,
+            }
+            first = min(
+                max(self.diagnostic_query_start, 0), global_gate.shape[-2] - 1
+            )
+            for prefix, gates in (
+                ("fusion_global_gate", global_gate),
+                ("fusion_sparse_gate", sparse_gate),
+            ):
+                values_by_head = gates.detach().float()[:, :, first:, 0].transpose(0, 1)
+                for head, values in enumerate(values_by_head):
+                    values = values.reshape(-1)
+                    diagnostics[f"head_{head}/{prefix}_mean"] = values.mean()
+                    diagnostics[f"head_{head}/{prefix}_std"] = values.std(unbiased=False)
+                    diagnostics[f"head_{head}/{prefix}_min"] = values.min()
+                    diagnostics[f"head_{head}/{prefix}_max"] = values.max()
+            self.last_diagnostics.update(diagnostics)
         return output
 
 

@@ -1,15 +1,18 @@
 import torch
 import pytest
 
-from tabicl._model.icl_attention import SetRetrievalAttention
+from tabicl._model.icl_attention import DualPathRetrievalAttention, SetRetrievalAttention
 from tabicl._model.tabicl import TabICL
 from scripts.diagnose_icl_checkpoint import POLICIES, _metrics, evaluate, resolve_checkpoints
 
 
+@pytest.mark.parametrize("attention", ["global_sparse", "dual_path"])
 @pytest.mark.parametrize("device,dtype", [
     ("cpu", torch.float32), ("cuda", torch.float32), ("cuda", torch.bfloat16),
 ])
-def test_mechanism_diagnostic_policies_restore_model_and_return_records(device, dtype):
+def test_mechanism_diagnostic_policies_restore_model_and_return_records(
+    device, dtype, attention,
+):
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA unavailable")
     torch.manual_seed(7)
@@ -26,10 +29,13 @@ def test_mechanism_diagnostic_policies_restore_model_and_return_records(device, 
         icl_nhead=4,
         icl_ssmax=False,
         ff_factor=2,
-        icl_attention="global_sparse",
+        icl_attention=attention,
+        icl_attention_impl_version=8 if attention == "dual_path" else 4,
         icl_sparse_every=2,
         icl_block_size=16,
         icl_num_selected_blocks=1,
+        icl_partition="content_tree" if attention == "dual_path" else "projection",
+        icl_qk_norm=attention == "dual_path",
     ).to(device).eval()
     modules = [(name, module) for name, module in model.icl_predictor.named_modules()
                if isinstance(module, SetRetrievalAttention)]
@@ -42,6 +48,11 @@ def test_mechanism_diagnostic_policies_restore_model_and_return_records(device, 
     y = torch.cat((torch.arange(32).remainder(2), torch.full((4,), 2))).unsqueeze(0)
     modes = {module: module.training for module in model.modules()}
     original_hybrid = [module._hybrid_attention for _, module in modules]
+    original_routes = [module.route for _, module in modules]
+    original_branches = [
+        module._branch_policy if isinstance(module, DualPathRetrievalAttention) else None
+        for _, module in modules
+    ]
     records = evaluate(
         model, modules, [{"id": "tiny", "x": x, "y": y, "train_size": 32}],
         torch.device(device), dtype, POLICIES, query_count=2, seed=11, permutation=True,
@@ -54,6 +65,12 @@ def test_mechanism_diagnostic_policies_restore_model_and_return_records(device, 
     assert any(key.endswith("head_0/recall_at_k") for key in native)
     assert any(key.endswith("head_0/fusion_sparse_gate_std") for key in native)
     assert all(module._hybrid_attention == original for (_, module), original in zip(modules, original_hybrid))
+    assert all(module.route == original for (_, module), original in zip(modules, original_routes))
+    assert all(
+        not isinstance(module, DualPathRetrievalAttention)
+        or module._branch_policy == original
+        for (_, module), original in zip(modules, original_branches)
+    )
     assert all(not module.diagnostics_enabled for _, module in modules)
     assert all(module.diagnostic_query_start == 0 for _, module in modules)
     assert all(module.training == training for module, training in modes.items())

@@ -397,6 +397,12 @@ def build_parser():
         default="legacy",
         help="Global/local fusion geometry for hybrid ICL retrieval layers.",
     )
+    parser.add_argument(
+        "--icl_dual_gate",
+        choices=("static", "linear_v1", "evidence_v3"),
+        default="evidence_v3",
+        help="Per-head controller used by additive dual-path attention.",
+    )
     parser.add_argument("--icl_summary_slots", type=int, default=1,
                         help="Summary tokens per unselected content-tree leaf in adaptive_frontier.")
     parser.add_argument("--icl_global_type", choices=("elu", "induced"), default="elu",

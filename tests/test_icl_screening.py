@@ -11,13 +11,14 @@ import torch
 from torch.utils.data import DataLoader
 
 from tabicl._model.tabicl import TabICL
-from tabicl._model.icl_attention import SetRetrievalAttention
+from tabicl._model.icl_attention import DualPathRetrievalAttention, SetRetrievalAttention
 from tabicl.prior._dataset import PriorDataset
 from tabicl.train._screening import (
     EVAL_ATTENTION_POLICIES,
     StepSeededPrior,
     evaluate_cases,
     load_common_initialization,
+    _attention_policy,
 )
 
 
@@ -36,6 +37,25 @@ def small_config(**overrides):
         zero_init=False,
         **overrides,
     )
+
+
+def test_dual_path_screening_policy_uses_native_gate_knockout_and_restores():
+    model = TabICL(**small_config(
+        icl_attention="dual_path",
+        icl_attention_impl_version=8,
+        icl_partition="content_tree",
+        icl_block_size=16,
+        icl_num_selected_blocks=1,
+        icl_qk_norm=True,
+    ))
+    modules = [
+        module for module in model.icl_predictor.modules()
+        if isinstance(module, DualPathRetrievalAttention)
+    ]
+    assert modules and all(module._branch_policy == "native" for module in modules)
+    with _attention_policy(model, "global_only"):
+        assert all(module._branch_policy == "global_only" for module in modules)
+    assert all(module._branch_policy == "native" for module in modules)
 
 
 def test_formal_screen_uses_eager_training_model(monkeypatch, tmp_path):
@@ -67,6 +87,12 @@ def test_formal_screen_uses_eager_training_model(monkeypatch, tmp_path):
     assert module.VARIANTS["global_sparse_alternating_content_tree"] == (
         "global_sparse_alternating", "elu", "content_tree"
     )
+
+    options = module.train_options(args, "dual_path_evidence_v3", 42)
+    assert options["icl_attention"] == "dual_path"
+    assert options["icl_partition"] == "content_tree"
+    assert options["icl_dual_gate"] == "evidence_v3"
+    assert options["muon_route_mode"] == "attention"
 
     monkeypatch.setattr(
         "sys.argv",

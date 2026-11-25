@@ -321,7 +321,8 @@ class Trainer:
             "icl_nhead": self.config.icl_nhead,
             "icl_attention": self.config.icl_attention,
             "icl_attention_impl_version": (
-                5 if self.config.icl_attention in ("dual_path", "adaptive_frontier") else 4
+                8 if self.config.icl_attention == "dual_path"
+                else 5 if self.config.icl_attention == "adaptive_frontier" else 4
             ),
             "icl_sparse_every": self.config.icl_sparse_every,
             "icl_block_size": self.config.icl_block_size,
@@ -331,6 +332,7 @@ class Trainer:
             "icl_router_beam": self.config.icl_router_beam,
             "icl_partition": self.config.icl_partition,
             "icl_fusion": self.config.icl_fusion,
+            "icl_dual_gate": self.config.icl_dual_gate,
             "icl_summary_slots": self.config.icl_summary_slots,
             "icl_global_type": self.config.icl_global_type,
             "icl_num_induced_slots": self.config.icl_num_induced_slots,
@@ -624,7 +626,7 @@ class Trainer:
         # Reject semantic architecture changes even when parameter shapes match.
         stored = checkpoint.get("config", {})
         mode = self.model_config["icl_attention"]
-        expected_impl = 5 if mode in ("dual_path", "adaptive_frontier") else 4
+        expected_impl = 8 if mode == "dual_path" else 5 if mode == "adaptive_frontier" else 4
         if mode != "dense" and stored.get("icl_attention_impl_version") != expected_impl:
             raise ValueError(
                 f"Experimental checkpoint requires ICL implementation version {expected_impl}; "
@@ -635,6 +637,7 @@ class Trainer:
                     "icl_router": "centroid", "icl_router_beam": 16,
                     "icl_partition": "projection",
                     "icl_fusion": "legacy",
+                    "icl_dual_gate": "evidence_v3",
                     "icl_summary_slots": 1,
                     "icl_global_type": "elu", "icl_num_induced_slots": 128,
                     "icl_ssmax": False, "icl_qk_norm": False}
@@ -650,6 +653,8 @@ class Trainer:
             keys.append("icl_sparse_every")
         if mode in ("global_full", "global_sparse"):
             keys.append("icl_fusion")
+        if mode == "dual_path":
+            keys.append("icl_dual_gate")
         if mode == "adaptive_frontier":
             keys.append("icl_summary_slots")
         if mode in (
@@ -923,7 +928,8 @@ class Trainer:
             "layernorm": [p for p in named.values() if id(p) in norm_ids],
             "inducing": [p for name, p in named.items()
                          if "ind_vectors" in name or "inducing_points" in name],
-            "fusion_gate": [p for name, p in named.items() if "fusion_gate" in name],
+            "fusion_gate": [p for name, p in named.items()
+                            if "fusion_gate" in name or "gate_controller" in name],
             "qk_norm": [p for name, p in named.items() if "qk_norm" in name],
         }
         if hasattr(self, "optimizer"):
@@ -1144,6 +1150,25 @@ class Trainer:
                 micro_results[f"icl_diag/{name}/grad_in_proj_rms"] = float(grad_rms)
                 if getattr(self.config, "fail_fast", False) and not torch.isfinite(grad_rms):
                     raise FloatingPointError(f"Non-finite ICL projection gradient: {name}")
+            for label, parameter_name in (
+                ("global_in_proj", "global_in_proj_weight"),
+                ("gate_base", "gate_controller.global_query_weight"),
+                ("gate_adapter", "gate_controller.output_weight"),
+            ):
+                parameter = module
+                for part in parameter_name.split("."):
+                    parameter = getattr(parameter, part, None)
+                    if parameter is None:
+                        break
+                if parameter is None or parameter.grad is None:
+                    continue
+                grad_rms = (
+                    parameter.grad.detach().float().square().mean().sqrt()
+                    / self.scaler.get_scale()
+                )
+                micro_results[f"icl_diag/{name}/grad_{label}_rms"] = float(grad_rms)
+                if getattr(self.config, "fail_fast", False) and not torch.isfinite(grad_rms):
+                    raise FloatingPointError(f"Non-finite ICL {label} gradient: {name}")
         return micro_results
 
     def move_micro_batch(self, x, y, d):
@@ -1217,7 +1242,8 @@ class Trainer:
             "layernorm": [p for p in named.values() if id(p) in norm_ids],
             "inducing": [p for name, p in named.items()
                          if "ind_vectors" in name or "inducing_points" in name],
-            "fusion_gate": [p for name, p in named.items() if "fusion_gate" in name],
+            "fusion_gate": [p for name, p in named.items()
+                            if "fusion_gate" in name or "gate_controller" in name],
             "qk_norm": [p for name, p in named.items() if "qk_norm" in name],
         }
         return {f"component_grad/{category}": parameters

@@ -599,6 +599,7 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         router_beam: int = 16,
         partition: str = "projection",
         fusion: str = "legacy",
+        dual_gate: str = "evidence_v3",
         summary_slots: int = 1,
         qk_norm: bool = False,
         global_type: str = "elu",
@@ -638,6 +639,8 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
                 "adaptive_frontier": AdaptiveResolutionAttention,
             }.get(attention_type, SetRetrievalAttention)
             extra = {"summary_slots": summary_slots} if attention_type == "adaptive_frontier" else {}
+            if attention_type == "dual_path":
+                extra["dual_gate"] = dual_gate
             self.attn = attention_class(
                 d_model, nhead, dropout, False, mode=attention_type, qk_norm=qk_norm,
                 block_size=block_size, num_selected_blocks=num_selected_blocks,
