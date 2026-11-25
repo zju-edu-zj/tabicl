@@ -1,0 +1,42 @@
+src/tabicl/_model/streaming_frontend.py
+  s_f5e5071e1de2de::t_17754bc0618523 1-15,20-59,76-164,169-175,355-485,487-490,492-500,502,504-514,516,519-524,530-553,567-591,593-595,617-678,682,706,725,739-747,751-753
+  s_f5e5071e1de2de::t_3abd7413006383 515,517-518,525-529,554-562,592,596-597,600-610,612-616
+  s_f5e5071e1de2de::t_1340ef7b42963d 165-168,486,491,501,503
+  s_f5e5071e1de2de::t_a7344a2e321029 16-19,60-75
+  s_f5e5071e1de2de::t_4d5900220dfe8b 308-310
+  s_f5e5071e1de2de::t_0df78f32a94289 679-681,683-705,707-724,726-738,748-750
+  s_f5e5071e1de2de::t_6cc4c0b32cacbb 176-262,267-272,274-278,290-307,311-354
+  s_f5e5071e1de2de::t_496a22625a3b25 263-266,273,279-289,598-599,611
+  s_f5e5071e1de2de::t_2025bf877b11c2 563-566
+tests/test_streaming_frontend.py
+  s_45ae9b06ddb295::t_c1753bac268b14 127-129,192-206,253-259
+  s_f5e5071e1de2de::t_4d5900220dfe8b 210,218,222-227,229
+  s_f5e5071e1de2de::t_29259a88183b63 1-6,8,10-12,14-17,27-36,38-108,207-209,211-215,217,219-221,228,230-252,260
+  s_f5e5071e1de2de::t_492727aaca48c8 9,13,18-26,37,109-126,130-146,148-191
+  s_f5e5071e1de2de::t_82dbfbdf67dfe3 147
+  s_f5e5071e1de2de::t_6c4547c664b162 7,216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b5593d4fdc0406014d09daabf381368e9caa898a",
+  "prompts": {},
+  "sessions": {
+    "s_45ae9b06ddb295": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a212f5-8cd2-7533-bcb2-a368e151230e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    },
+    "s_f5e5071e1de2de": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2121a-bdc2-7b63-875f-bb4025b175f3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "长湖 <changhu@U-V93QC6JD-0003.local>"
+    }
+  }
+}
