@@ -13,9 +13,9 @@ from torch.utils.data import IterableDataset, get_worker_info
 
 from tabicl._model.icl_attention import (
     AdaptiveResolutionAttention,
-    DualPathRetrievalAttention,
     SetRetrievalAttention,
 )
+from tabicl._model.dual_path_v3 import DualPathRetrievalAttentionV3 as DualPathRetrievalAttention
 
 
 EVAL_ATTENTION_POLICIES = ("native", "global_only", "sparse_only")

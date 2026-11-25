@@ -321,7 +321,7 @@ class Trainer:
             "icl_nhead": self.config.icl_nhead,
             "icl_attention": self.config.icl_attention,
             "icl_attention_impl_version": (
-                8 if self.config.icl_attention == "dual_path"
+                9 if self.config.icl_attention == "dual_path"
                 else 5 if self.config.icl_attention == "adaptive_frontier" else 4
             ),
             "icl_sparse_every": self.config.icl_sparse_every,
@@ -332,7 +332,9 @@ class Trainer:
             "icl_router_beam": self.config.icl_router_beam,
             "icl_partition": self.config.icl_partition,
             "icl_fusion": self.config.icl_fusion,
-            "icl_dual_gate": self.config.icl_dual_gate,
+            "icl_dual_controller": self.config.icl_dual_controller,
+            "icl_storage_page_rows": self.config.icl_storage_page_rows,
+            "icl_exhaustive_support_limit": self.config.icl_exhaustive_support_limit,
             "icl_summary_slots": self.config.icl_summary_slots,
             "icl_global_type": self.config.icl_global_type,
             "icl_num_induced_slots": self.config.icl_num_induced_slots,
@@ -626,7 +628,7 @@ class Trainer:
         # Reject semantic architecture changes even when parameter shapes match.
         stored = checkpoint.get("config", {})
         mode = self.model_config["icl_attention"]
-        expected_impl = 8 if mode == "dual_path" else 5 if mode == "adaptive_frontier" else 4
+        expected_impl = 9 if mode == "dual_path" else 5 if mode == "adaptive_frontier" else 4
         if mode != "dense" and stored.get("icl_attention_impl_version") != expected_impl:
             raise ValueError(
                 f"Experimental checkpoint requires ICL implementation version {expected_impl}; "
@@ -637,7 +639,9 @@ class Trainer:
                     "icl_router": "centroid", "icl_router_beam": 16,
                     "icl_partition": "projection",
                     "icl_fusion": "legacy",
-                    "icl_dual_gate": "evidence_v3",
+                    "icl_dual_controller": "none",
+                    "icl_storage_page_rows": 128,
+                    "icl_exhaustive_support_limit": 8192,
                     "icl_summary_slots": 1,
                     "icl_global_type": "elu", "icl_num_induced_slots": 128,
                     "icl_ssmax": False, "icl_qk_norm": False}
@@ -654,7 +658,11 @@ class Trainer:
         if mode in ("global_full", "global_sparse"):
             keys.append("icl_fusion")
         if mode == "dual_path":
-            keys.append("icl_dual_gate")
+            keys.extend((
+                "icl_dual_controller",
+                "icl_storage_page_rows",
+                "icl_exhaustive_support_limit",
+            ))
         if mode == "adaptive_frontier":
             keys.append("icl_summary_slots")
         if mode in (

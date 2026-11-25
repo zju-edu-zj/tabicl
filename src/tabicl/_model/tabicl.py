@@ -250,7 +250,9 @@ class TabICL(nn.Module):
         icl_router_beam: int = 16,
         icl_partition: str = "projection",
         icl_fusion: str = "legacy",
-        icl_dual_gate: str = "evidence_v3",
+        icl_dual_controller: str = "none",
+        icl_storage_page_rows: int = 128,
+        icl_exhaustive_support_limit: int = 8192,
         icl_summary_slots: int = 1,
         icl_qk_norm: bool = False,
         icl_global_type: str = "elu",
@@ -302,7 +304,7 @@ class TabICL(nn.Module):
         self.bias_free_ln = bias_free_ln
         self.zero_init = zero_init
         self.icl_attention = icl_attention
-        expected_impl = 8 if icl_attention == "dual_path" else 5 if icl_attention == "adaptive_frontier" else 4
+        expected_impl = 9 if icl_attention == "dual_path" else 5 if icl_attention == "adaptive_frontier" else 4
         if icl_attention != "dense" and icl_attention_impl_version != expected_impl:
             raise ValueError(
                 f"ICL attention {icl_attention!r} requires implementation version "
@@ -320,10 +322,16 @@ class TabICL(nn.Module):
         if icl_fusion not in ("legacy", "independent_v1"):
             raise ValueError("icl_fusion must be legacy or independent_v1")
         self.icl_fusion = icl_fusion
-        from ._dual_gate_v3 import DUAL_GATE_MODES
-        if icl_dual_gate not in DUAL_GATE_MODES:
-            raise ValueError(f"icl_dual_gate must be one of {DUAL_GATE_MODES}")
-        self.icl_dual_gate = icl_dual_gate
+        from ._dual_gate_v3 import DUAL_CONTROLLER_MODES
+        if icl_dual_controller not in DUAL_CONTROLLER_MODES:
+            raise ValueError(
+                f"icl_dual_controller must be one of {DUAL_CONTROLLER_MODES}"
+            )
+        if icl_storage_page_rows != 128:
+            raise ValueError("dual_path v3 currently requires 128-row physical pages")
+        self.icl_dual_controller = icl_dual_controller
+        self.icl_storage_page_rows = icl_storage_page_rows
+        self.icl_exhaustive_support_limit = icl_exhaustive_support_limit
         if icl_attention == "adaptive_frontier" and icl_summary_slots != 1:
             raise ValueError("adaptive_frontier v1 requires icl_summary_slots=1")
         if icl_summary_slots < 1:
@@ -390,7 +398,9 @@ class TabICL(nn.Module):
             router_beam=icl_router_beam,
             partition=icl_partition,
             fusion=icl_fusion,
-            dual_gate=icl_dual_gate,
+            dual_controller=icl_dual_controller,
+            storage_page_rows=icl_storage_page_rows,
+            exhaustive_support_limit=icl_exhaustive_support_limit,
             summary_slots=icl_summary_slots,
             qk_norm=icl_qk_norm,
             global_type=icl_global_type,

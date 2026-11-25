@@ -1,7 +1,8 @@
 import torch
 import pytest
 
-from tabicl._model.icl_attention import DualPathRetrievalAttention, SetRetrievalAttention
+from tabicl._model.icl_attention import SetRetrievalAttention
+from tabicl._model.dual_path_v3 import DualPathRetrievalAttentionV3 as DualPathRetrievalAttention
 from tabicl._model.tabicl import TabICL
 from scripts.diagnose_icl_checkpoint import POLICIES, _metrics, evaluate, resolve_checkpoints
 
@@ -30,10 +31,10 @@ def test_mechanism_diagnostic_policies_restore_model_and_return_records(
         icl_ssmax=False,
         ff_factor=2,
         icl_attention=attention,
-        icl_attention_impl_version=8 if attention == "dual_path" else 4,
+        icl_attention_impl_version=9 if attention == "dual_path" else 4,
         icl_sparse_every=2,
-        icl_block_size=16,
-        icl_num_selected_blocks=1,
+        icl_block_size=32 if attention == "dual_path" else 16,
+        icl_num_selected_blocks=32 if attention == "dual_path" else 1,
         icl_partition="content_tree" if attention == "dual_path" else "projection",
         icl_qk_norm=attention == "dual_path",
     ).to(device).eval()

@@ -21,6 +21,7 @@ def _forward(
     ORDER,
     O,
     LSE,
+    EVIDENCE,
     N,
     S,
     H: tl.constexpr,
@@ -29,6 +30,7 @@ def _forward(
     NC: tl.constexpr,
     C: tl.constexpr,
     SCALE: tl.constexpr,
+    RETURN_EVIDENCE: tl.constexpr,
 ):
     t = tl.program_id(0)
     h = tl.program_id(1)
@@ -52,6 +54,13 @@ def _forward(
     out = tl.sum(prob[:, None] * value, 0)
     tl.store(O + (((b * H + h) * N + t) * D + d), out)
     tl.store(LSE + (b * H + h) * N + t, m + tl.log(z))
+    if RETURN_EVIDENCE:
+        row = (b * H + h) * N + t
+        expected = tl.sum(prob * logits, 0)
+        p2 = tl.sum(prob * prob, 0)
+        tl.store(EVIDENCE + row * 3 + 0, 1.0 / z)
+        tl.store(EVIDENCE + row * 3 + 1, m + tl.log(z) - expected)
+        tl.store(EVIDENCE + row * 3 + 2, 1.0 / tl.maximum(p2, 1.0e-20))
 
 
 @triton.jit(do_not_specialize=["N", "S"])
@@ -197,7 +206,7 @@ def _backward_kv(
 
 class _RoutedAttention(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, q, k, v, order, indices, block_size):
+    def forward(ctx, q, k, v, order, indices, block_size, return_evidence):
         b, h, n, d = q.shape
         s = k.shape[2]
         nc = indices.shape[-1]
@@ -217,18 +226,29 @@ class _RoutedAttention(torch.autograd.Function):
         if ctx.grouped:
             from ._sparse_grouped import grouped_attention
 
-            output, lse, metadata = grouped_attention(q, k, v, order, indices, block_size)
+            output, lse, metadata, evidence = grouped_attention(
+                q, k, v, order, indices, block_size, return_evidence=return_evidence
+            )
         else:
             output = torch.empty_like(q)
             lse = torch.empty((b, h, n), device=q.device, dtype=torch.float32)
-            _forward[(n, h, b)](q, k, v, indices, order, output, lse, n, s, h, d, block_size, nc, c, scale, num_warps=8)
+            evidence = torch.empty((b, h, n, 3), device=q.device, dtype=torch.float32)
+            _forward[(n, h, b)](
+                q, k, v, indices, order, output, lse, evidence,
+                n, s, h, d, block_size, nc, c, scale, return_evidence,
+                num_warps=8,
+            )
         ctx.save_for_backward(q, k, v, order, indices, output, lse, *metadata)
         ctx.args = (block_size, nc, c, scale)
+        ctx.return_evidence = return_evidence
+        if return_evidence:
+            ctx.mark_non_differentiable(evidence)
+            return output, evidence
         return output
 
     @staticmethod
     @once_differentiable
-    def backward(ctx, dout):
+    def backward(ctx, dout, devidence=None):
         q, k, v, order, indices, out, lse, *metadata = ctx.saved_tensors
         bs, nc, c, scale = ctx.args
         b, h, n, d = q.shape
@@ -242,8 +262,9 @@ class _RoutedAttention(torch.autograd.Function):
         if ctx.grouped:
             from ._sparse_grouped import grouped_attention
 
-            dq, _, _ = grouped_attention(q, k, v, order, indices, bs,
-                                         metadata, (out, lse, dout))
+            dq, _, _, _ = grouped_attention(
+                q, k, v, order, indices, bs, metadata, (out, lse, dout)
+            )
             nk = triton.cdiv(s, bs)
             dk, dv = torch.empty_like(k), torch.empty_like(v)
             starts, reverse = metadata
@@ -258,10 +279,10 @@ class _RoutedAttention(torch.autograd.Function):
             _backward[(n, h, b)](
                 q, k, v, indices, order, out, lse, dout, dq, dk, dv, n, s, h, d, bs, nc, c, scale, num_warps=8
             )
-        return dq, dk.to(k.dtype), dv.to(v.dtype), None, None, None
+        return dq, dk.to(k.dtype), dv.to(v.dtype), None, None, None, None
 
 
-def routed_attention(q, k, v, order, indices, block_size):
+def routed_attention(q, k, v, order, indices, block_size, return_evidence=False):
     if q.shape[-1] not in (16, 32, 64, 128):
         raise ValueError("Triton routed attention supports head dimensions 16/32/64/128")
     if indices.ndim != 4 or indices.shape[:3] != q.shape[:3]:
@@ -270,4 +291,6 @@ def routed_attention(q, k, v, order, indices, block_size):
         raise ValueError("Triton routed attention supports at most 2048 candidate tokens")
     if order.dtype != torch.int32 or indices.dtype != torch.int32:
         raise ValueError("Routing metadata must use int32")
-    return _RoutedAttention.apply(q, k, v, order, indices, block_size)
+    return _RoutedAttention.apply(
+        q, k, v, order, indices, block_size, return_evidence
+    )

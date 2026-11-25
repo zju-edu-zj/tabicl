@@ -599,7 +599,9 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         router_beam: int = 16,
         partition: str = "projection",
         fusion: str = "legacy",
-        dual_gate: str = "evidence_v3",
+        dual_controller: str = "none",
+        storage_page_rows: int = 128,
+        exhaustive_support_limit: int = 8192,
         summary_slots: int = 1,
         qk_norm: bool = False,
         global_type: str = "elu",
@@ -628,19 +630,20 @@ class MultiheadAttentionBlock(nn.TransformerEncoderLayer):
         elif attention_type in (
             "sparse", "fused_sparse", "fused_full", "dual_path", "adaptive_frontier"
         ):
-            from .icl_attention import (
-                AdaptiveResolutionAttention,
-                DualPathRetrievalAttention,
-                SetRetrievalAttention,
-            )
+            from .icl_attention import AdaptiveResolutionAttention, SetRetrievalAttention
+            from .dual_path_v3 import DualPathRetrievalAttentionV3
 
             attention_class = {
-                "dual_path": DualPathRetrievalAttention,
+                "dual_path": DualPathRetrievalAttentionV3,
                 "adaptive_frontier": AdaptiveResolutionAttention,
             }.get(attention_type, SetRetrievalAttention)
             extra = {"summary_slots": summary_slots} if attention_type == "adaptive_frontier" else {}
             if attention_type == "dual_path":
-                extra["dual_gate"] = dual_gate
+                extra.update(
+                    dual_controller=dual_controller,
+                    storage_page_rows=storage_page_rows,
+                    exhaustive_support_limit=exhaustive_support_limit,
+                )
             self.attn = attention_class(
                 d_model, nhead, dropout, False, mode=attention_type, qk_norm=qk_norm,
                 block_size=block_size, num_selected_blocks=num_selected_blocks,

@@ -42,11 +42,8 @@ VARIANTS = {
     "global_sparse_alternating_content_tree": (
         "global_sparse_alternating", "elu", "content_tree"
     ),
-    "dual_path_static": ("dual_path", "elu", "content_tree", "static"),
-    "dual_path_linear_v1": ("dual_path", "elu", "content_tree", "linear_v1"),
-    "dual_path_evidence_v3": (
-        "dual_path", "elu", "content_tree", "evidence_v3"
-    ),
+    "dual_path_v3": ("dual_path", "elu", "content_tree", "none"),
+    "dual_path_v3_semantic": ("dual_path", "elu", "content_tree", "semantic"),
 }
 DEFAULT_VARIANTS = (
     "dense",
@@ -159,7 +156,7 @@ def arguments():
 def train_options(args, variant, seed):
     specification = VARIANTS[variant]
     attention, global_type, partition = specification[:3]
-    dual_gate = specification[3] if len(specification) == 4 else "evidence_v3"
+    dual_controller = specification[3] if len(specification) == 4 else "none"
     job = args.output / f"seed_{seed}" / variant
     pilot = args.preset == "pilot"
     options = dict(
@@ -227,11 +224,13 @@ def train_options(args, variant, seed):
         icl_global_type=global_type,
         icl_num_induced_slots=128,
         icl_partition=partition,
-        icl_dual_gate=dual_gate,
+        icl_dual_controller=dual_controller,
+        icl_storage_page_rows=128,
+        icl_exhaustive_support_limit=8192,
         icl_router="centroid",
-        icl_sparse_every=3,
-        icl_block_size=128,
-        icl_num_selected_blocks=4,
+        icl_sparse_every=1 if attention == "dual_path" else 3,
+        icl_block_size=32 if attention == "dual_path" else 128,
+        icl_num_selected_blocks=32 if attention == "dual_path" else 4,
         icl_ssmax=False,
         icl_qk_norm=True,
         ff_factor=2,

@@ -22,6 +22,6 @@ exec "${PYTHON:-python}" "$REPO_ROOT/scripts/screen_icl_attention.py" \
     --micro-batch-size 4 \
     --dtype float32 \
     --optimizer hybrid \
-    --variants dual_path_static dual_path_linear_v1 dual_path_evidence_v3 \
+    --variants dual_path_v3 dual_path_v3_semantic \
     --eval-support 512 1024 2048 \
     "$@"

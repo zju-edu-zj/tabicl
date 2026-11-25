@@ -98,7 +98,9 @@ class Encoder(nn.Module):
         router_beam: int = 16,
         partition: str = "projection",
         fusion: str = "legacy",
-        dual_gate: str = "evidence_v3",
+        dual_controller: str = "none",
+        storage_page_rows: int = 128,
+        exhaustive_support_limit: int = 8192,
         summary_slots: int = 1,
         qk_norm: bool = False,
         global_type: str = "elu",
@@ -153,7 +155,9 @@ class Encoder(nn.Module):
                     router_beam=router_beam,
                     partition=partition,
                     fusion=fusion,
-                    dual_gate=dual_gate,
+                    dual_controller=dual_controller,
+                    storage_page_rows=storage_page_rows,
+                    exhaustive_support_limit=exhaustive_support_limit,
                     summary_slots=summary_slots,
                     qk_norm=qk_norm,
                     global_type=global_type,
@@ -259,6 +263,34 @@ class Encoder(nn.Module):
                 icl_cache.kv[layer_idx] = KVCacheEntry(key=k_proj, value=v_proj)
 
         return out
+
+    def forward_layerwise(
+        self,
+        src: Tensor,
+        train_size: int,
+        *,
+        support_tile_rows: int = 65536,
+        query_tile_rows: int = 256,
+        page_location: str = "device",
+        return_support: bool = False,
+    ):
+        """Dual-Path inference without retaining K/V from earlier layers."""
+        if self.attention_type != "dual_path":
+            raise ValueError("forward_layerwise is defined only for dual_path")
+        if not 0 < train_size <= src.shape[-2]:
+            raise ValueError("train_size must select a non-empty support prefix")
+        from .layerwise_inference import layerwise_dual_path_forward
+
+        support, query = src[:, :train_size], src[:, train_size:]
+        return layerwise_dual_path_forward(
+            self,
+            support,
+            query,
+            support_tile_rows=support_tile_rows,
+            query_tile_rows=query_tile_rows,
+            page_location=page_location,
+            return_support=return_support,
+        )
 
 
 class SetTransformer(nn.Module):

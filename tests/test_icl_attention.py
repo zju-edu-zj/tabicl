@@ -137,7 +137,7 @@ def test_multilayer_visibility_cache_and_permutations(mode, partition, norm_firs
             attention_type=mode,
             sparse_every=2,
             block_size=32,
-            num_selected_blocks=2,
+            num_selected_blocks=32 if mode == "dual_path" else 2,
             router_beam=4,
             router=router,
             partition=partition,
@@ -152,6 +152,13 @@ def test_multilayer_visibility_cache_and_permutations(mode, partition, norm_firs
     changed = x.clone()
     changed[:, s:] *= 5
     torch.testing.assert_close(model(changed, train_size=s)[:, :s], full[:, :s])
+    if mode == "dual_path":
+        perm = torch.randperm(s, device=device)
+        reordered = torch.cat((x[:, perm], x[:, s:]), 1)
+        torch.testing.assert_close(
+            model(reordered, train_size=s)[:, s:], full[:, s:], atol=3e-6, rtol=3e-5
+        )
+        return
     cache = KVCache()
     model.forward_with_cache(x[:, :s], cache, train_size=s, store_cache=True)
     outputs = [
@@ -179,7 +186,8 @@ def test_checkpoint_replay_matches_uncheckpointed(mode, partition):
     if mode in ("dual_path", "adaptive_frontier") and partition != "content_tree":
         pytest.skip("new content-tree architectures require content_tree")
     torch.manual_seed(92)
-    m = Encoder(3, 32, 2, 64, attention_type=mode, block_size=32, num_selected_blocks=2,
+    m = Encoder(3, 32, 2, 64, attention_type=mode, block_size=32,
+                num_selected_blocks=32 if mode == "dual_path" else 2,
                 zero_init=False, partition=partition)
     other = copy.deepcopy(m)
     other.recompute = True

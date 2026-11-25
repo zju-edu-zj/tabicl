@@ -518,7 +518,7 @@ class SetRetrievalAttention(GlobalLinearAttention):
         return self.out_proj(combined)
 
 
-class DualPathRetrievalAttention(SetRetrievalAttention):
+class _RetiredDualPathRetrievalAttention(SetRetrievalAttention):
     """Independent global and routed-softmax experts with additive V3 fusion."""
 
     def __init__(self, *args, dual_gate="evidence_v3", **kwargs):

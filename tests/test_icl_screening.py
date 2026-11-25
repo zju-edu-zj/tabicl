@@ -11,7 +11,8 @@ import torch
 from torch.utils.data import DataLoader
 
 from tabicl._model.tabicl import TabICL
-from tabicl._model.icl_attention import DualPathRetrievalAttention, SetRetrievalAttention
+from tabicl._model.icl_attention import SetRetrievalAttention
+from tabicl._model.dual_path_v3 import DualPathRetrievalAttentionV3 as DualPathRetrievalAttention
 from tabicl.prior._dataset import PriorDataset
 from tabicl.train._screening import (
     EVAL_ATTENTION_POLICIES,
@@ -88,10 +89,12 @@ def test_formal_screen_uses_eager_training_model(monkeypatch, tmp_path):
         "global_sparse_alternating", "elu", "content_tree"
     )
 
-    options = module.train_options(args, "dual_path_evidence_v3", 42)
+    options = module.train_options(args, "dual_path_v3", 42)
     assert options["icl_attention"] == "dual_path"
     assert options["icl_partition"] == "content_tree"
-    assert options["icl_dual_gate"] == "evidence_v3"
+    assert options["icl_dual_controller"] == "none"
+    assert options["icl_block_size"] == "32"
+    assert options["icl_num_selected_blocks"] == "32"
     assert options["muon_route_mode"] == "attention"
 
     monkeypatch.setattr(

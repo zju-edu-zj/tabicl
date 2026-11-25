@@ -6,9 +6,8 @@ from torch.nn import functional as F
 
 from tabicl._model.icl_attention import (
     AdaptiveResolutionAttention,
-    DualPathRetrievalAttention,
 )
-from tabicl._model.kv_cache import KVCacheEntry
+from tabicl._model.dual_path_v3 import DualPathRetrievalAttentionV3
 from tabicl._model.layers import MultiheadAttentionBlock
 
 
@@ -24,34 +23,32 @@ def _manual_frontier(module, q, k, v):
     )
 
 
-@pytest.mark.parametrize("attention_class", [DualPathRetrievalAttention, AdaptiveResolutionAttention])
+@pytest.mark.parametrize("attention_class", [DualPathRetrievalAttentionV3, AdaptiveResolutionAttention])
 def test_new_attention_requires_content_tree(attention_class):
+    block_size = 32 if attention_class is DualPathRetrievalAttentionV3 else 16
+    selected = 32 if attention_class is DualPathRetrievalAttentionV3 else 1
     with pytest.raises(ValueError, match="partition=content_tree"):
-        attention_class(32, 2, block_size=16, num_selected_blocks=1)
+        attention_class(32, 2, block_size=block_size, num_selected_blocks=selected)
 
 
 def test_dual_path_v3_requires_qk_norm():
     with pytest.raises(ValueError, match="qk_norm=True"):
-        DualPathRetrievalAttention(
-            32, 2, block_size=16, num_selected_blocks=1,
+        DualPathRetrievalAttentionV3(
+            32, 2, block_size=32, num_selected_blocks=32,
             partition="content_tree", qk_norm=False,
         )
 
 
-def test_dual_path_cache_gates_and_all_branch_gradients():
+def test_dual_path_v3_all_branch_gradients():
     torch.manual_seed(701)
-    module = DualPathRetrievalAttention(
-        32, 2, block_size=16, num_selected_blocks=2,
-        partition="content_tree", qk_norm=True,
-    ).eval()
+    module = DualPathRetrievalAttentionV3(
+        32, 2, block_size=32, num_selected_blocks=32,
+        partition="content_tree", qk_norm=True, dual_controller="semantic",
+    )
     module.use_triton = False
     query = torch.randn(2, 11, 32, requires_grad=True)
     support = torch.randn(2, 83, 32, requires_grad=True)
-    output, packed_k, packed_v = module(query, support, support, need_kv=True)
-    assert packed_k.shape == (2, 4, 83, 16)
-    assert packed_v.shape == packed_k.shape
-    cached = module(query, cached_kv=KVCacheEntry(packed_k, packed_v))
-    torch.testing.assert_close(cached, output, atol=3e-6, rtol=3e-5)
+    output = module(query, support, support)
 
     loss = output.float().square().mean()
     loss.backward()
@@ -60,87 +57,66 @@ def test_dual_path_cache_gates_and_all_branch_gradients():
         module.global_in_proj_weight,
         module.out_proj.weight,
         module.global_out_proj.weight,
-        module.gate_controller.global_query_weight,
-        module.gate_controller.sparse_query_weight,
-        module.gate_controller.global_route_weight,
-        module.gate_controller.sparse_route_weight,
+        module.gate_controller.query_weight,
+        module.gate_controller.evidence_weight,
         module.gate_controller.output_weight,
     )
     assert query.grad is not None and torch.isfinite(query.grad).all()
     assert support.grad is not None and torch.isfinite(support.grad).all()
     assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in required)
 
-    q = torch.randn(1, 2, 3, 16)
-    quality = torch.tensor([[[[1.0, 0.25, 0.7, 8.0, 4.0, 0.5]]]]).expand(1, 2, 3, 6)
-    features = module._gate_route_features(quality)
-    assert features.shape == quality.shape
-    assert ((features >= 0) & (features <= 1)).all()
-
-
-def test_dual_path_v3_starts_at_exact_v1_half_gates():
+def test_dual_path_v3_controller_starts_at_unit_modulation():
     torch.manual_seed(708)
-    module = DualPathRetrievalAttention(
-        32, 2, block_size=16, num_selected_blocks=1,
-        partition="content_tree", qk_norm=True,
+    module = DualPathRetrievalAttentionV3(
+        32, 2, block_size=32, num_selected_blocks=32,
+        partition="content_tree", qk_norm=True, dual_controller="semantic",
     )
-    global_q = torch.randn(2, 2, 7, 16)
-    sparse_q = torch.randn(2, 2, 7, 16)
-    quality = torch.rand(2, 2, 7, 6)
-    global_gate, sparse_gate, diagnostics = module.gate_controller(
-        global_q, sparse_q, quality, support_size=97
+    query = torch.randn(2, 7, 32)
+    evidence = torch.rand(2, 2, 7, 3)
+    candidates = torch.full((2, 2, 7), 97.0)
+    global_scale, sparse_scale, diagnostics = module.gate_controller(
+        query, evidence, support_size=97, candidate_rows=candidates
     )
-    torch.testing.assert_close(global_gate, torch.full_like(global_gate, 0.5))
-    torch.testing.assert_close(sparse_gate, torch.full_like(sparse_gate, 0.5))
-    assert diagnostics["fusion_common_delta_rms"] == 0
-    assert diagnostics["fusion_differential_delta_rms"] == 0
+    torch.testing.assert_close(global_scale, torch.ones_like(global_scale))
+    torch.testing.assert_close(sparse_scale, torch.ones_like(sparse_scale))
+    assert diagnostics["fusion_controller_logit_rms"] == 0
 
 
-def test_dual_path_static_gate_is_parameter_independent():
-    module = DualPathRetrievalAttention(
-        32, 2, block_size=16, num_selected_blocks=1,
-        partition="content_tree", qk_norm=True, dual_gate="static",
+def test_dual_path_v3_default_has_no_controller_parameters():
+    module = DualPathRetrievalAttentionV3(
+        32, 2, block_size=32, num_selected_blocks=32,
+        partition="content_tree", qk_norm=True, dual_controller="none",
     )
-    global_q = torch.randn(2, 2, 7, 16, requires_grad=True)
-    sparse_q = torch.randn(2, 2, 7, 16, requires_grad=True)
-    quality = torch.rand(2, 2, 7, 6)
-    global_gate, sparse_gate, _ = module.gate_controller(
-        global_q, sparse_q, quality, support_size=97
+    query = torch.randn(2, 7, 32)
+    evidence = torch.rand(2, 2, 7, 3)
+    candidates = torch.full((2, 2, 7), 97.0)
+    global_scale, sparse_scale, _ = module.gate_controller(
+        query, evidence, support_size=97, candidate_rows=candidates
     )
-    torch.testing.assert_close(global_gate, torch.full_like(global_gate, 0.5))
-    torch.testing.assert_close(sparse_gate, torch.full_like(sparse_gate, 0.5))
-    assert not global_gate.requires_grad and not sparse_gate.requires_grad
+    assert not tuple(module.gate_controller.parameters())
+    torch.testing.assert_close(global_scale, torch.ones_like(global_scale))
+    torch.testing.assert_close(sparse_scale, torch.ones_like(sparse_scale))
 
 
 def test_dual_path_v3_packed_projection_matches_independent_projection():
     torch.manual_seed(709)
-    module = DualPathRetrievalAttention(
-        32, 2, block_size=16, num_selected_blocks=1,
+    module = DualPathRetrievalAttentionV3(
+        32, 2, block_size=32, num_selected_blocks=32,
         partition="content_tree", qk_norm=True,
     )
     query, support = torch.randn(2, 7, 32), torch.randn(2, 41, 32)
-    actual = module._project_dual(query, support, support, None)
+    actual = module._project_dual(query, support, None)
     sparse = module._project(query, support, support, None)
-    global_branch = module._project_global(query, support, support, None)
-    for got, expected in zip(actual, (*sparse, *global_branch)):
+    for got, expected in zip(actual[:3], sparse):
         torch.testing.assert_close(got, expected)
-
-
-def test_dual_path_v3_evidence_is_bounded_at_ten_million_rows():
-    module = DualPathRetrievalAttention(
-        32, 2, block_size=128, num_selected_blocks=4,
-        partition="content_tree", qk_norm=True,
-    )
-    quality = torch.tensor([[[[2.0, 512 / 10_000_000, 0.7, 8.0, 4.0, 0.5]]]])
-    evidence = module.gate_controller._evidence_features(quality, 10_000_000)
-    assert evidence.shape[-1] == module.gate_controller._EVIDENCE_FEATURES
-    assert torch.isfinite(evidence).all()
-    assert ((evidence >= -1) & (evidence <= 1)).all()
+    assert all(tensor.shape == sparse[index].shape for index, tensor in enumerate(actual[3:]))
+    assert all(torch.isfinite(tensor).all() for tensor in actual)
 
 
 def test_dual_path_branch_policy_is_native_gate_knockout():
     torch.manual_seed(710)
-    module = DualPathRetrievalAttention(
-        32, 2, block_size=16, num_selected_blocks=1,
+    module = DualPathRetrievalAttentionV3(
+        32, 2, block_size=32, num_selected_blocks=32,
         partition="content_tree", qk_norm=True,
     )
     module.use_triton = False
@@ -159,26 +135,19 @@ def test_dual_path_branch_policy_is_native_gate_knockout():
     )
 
 
-@pytest.mark.parametrize(
-    "attention_class", [DualPathRetrievalAttention, AdaptiveResolutionAttention]
-)
-def test_inference_tensor_cache_reuses_prepared_support(attention_class):
+def test_dual_path_prepared_support_matches_direct_forward():
     torch.manual_seed(707)
-    module = attention_class(
-        32, 2, block_size=16, num_selected_blocks=1,
+    module = DualPathRetrievalAttentionV3(
+        32, 2, block_size=32, num_selected_blocks=32,
         partition="content_tree", qk_norm=True,
     ).eval()
     module.use_triton = False
     support, query = torch.randn(1, 65, 32), torch.randn(1, 5, 32)
     with torch.inference_mode():
-        _, k, v = module(query, support, support, need_kv=True)
-        cache = KVCacheEntry(k, v)
-        first = module(query, cached_kv=cache)
-        assert "state" in cache._derived
-        prepared_id = id(cache._derived["state"])
-        second = module(query, cached_kv=cache)
-        assert id(cache._derived["state"]) == prepared_id
-    torch.testing.assert_close(first, second)
+        direct = module(query, support, support)
+        prepared = module.prepare_support(support)
+        paged = module.apply_prepared(query, prepared)
+    torch.testing.assert_close(direct, paged, atol=3e-6, rtol=3e-5)
 
 
 def test_adaptive_frontier_matches_explicit_union_softmax_and_gradients():
@@ -263,11 +232,10 @@ def test_adaptive_frontier_cache_and_full_budget_fast_path():
     torch.testing.assert_close(actual, expected, atol=3e-6, rtol=3e-5)
 
 
-@pytest.mark.parametrize("attention", ["dual_path", "adaptive_frontier"])
-def test_new_attention_zero_init_has_finite_two_step_bootstrap(attention):
+def test_adaptive_frontier_zero_init_has_finite_two_step_bootstrap():
     torch.manual_seed(706)
     block = MultiheadAttentionBlock(
-        32, 2, 64, zero_init=True, attention_type=attention,
+        32, 2, 64, zero_init=True, attention_type="adaptive_frontier",
         block_size=16, num_selected_blocks=1, partition="content_tree",
         qk_norm=True,
     )

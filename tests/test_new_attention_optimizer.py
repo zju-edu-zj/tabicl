@@ -20,11 +20,11 @@ def _model(attention):
         icl_nhead=2,
         zero_init=False,
         icl_attention=attention,
-        icl_attention_impl_version=8 if attention == "dual_path" else 5,
+        icl_attention_impl_version=9 if attention == "dual_path" else 5,
         icl_partition="content_tree",
         icl_global_type="elu",
-        icl_block_size=16,
-        icl_num_selected_blocks=1,
+        icl_block_size=32 if attention == "dual_path" else 16,
+        icl_num_selected_blocks=32 if attention == "dual_path" else 1,
         icl_qk_norm=True,
         icl_ssmax=False,
     )
@@ -47,9 +47,7 @@ def test_new_attention_all_matrix_muon_has_finite_update(attention):
         assert routed[
             "icl_predictor.tf_icl.blocks.0.attn.global_in_proj_weight"
         ]["use_muon"]
-        assert routed[
-            "icl_predictor.tf_icl.blocks.0.attn.gate_controller.global_route_weight"
-        ]["use_muon"]
+        assert not any("gate_controller" in name for name in routed)
     else:
         assert not routed[
             "icl_predictor.tf_icl.blocks.0.attn.summary_bias"

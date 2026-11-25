@@ -94,7 +94,9 @@ class ICLearning(nn.Module):
         router_beam: int = 16,
         partition: str = "projection",
         fusion: str = "legacy",
-        dual_gate: str = "evidence_v3",
+        dual_controller: str = "none",
+        storage_page_rows: int = 128,
+        exhaustive_support_limit: int = 8192,
         summary_slots: int = 1,
         qk_norm: bool = False,
         global_type: str = "elu",
@@ -126,7 +128,9 @@ class ICLearning(nn.Module):
             router_beam=router_beam,
             partition=partition,
             fusion=fusion,
-            dual_gate=dual_gate,
+            dual_controller=dual_controller,
+            storage_page_rows=storage_page_rows,
+            exhaustive_support_limit=exhaustive_support_limit,
             summary_slots=summary_slots,
             qk_norm=qk_norm,
             global_type=global_type,
@@ -634,6 +638,35 @@ class ICLearning(nn.Module):
         out = self.decoder(src)
 
         return out
+
+    @torch.inference_mode()
+    def forward_layerwise(
+        self,
+        R: Tensor,
+        y_train: Tensor,
+        *,
+        support_tile_rows: int = 65536,
+        query_tile_rows: int = 256,
+        page_location: str = "device",
+    ) -> Tensor:
+        """Predict with one layer's sparse pages live at a time."""
+        train_size = y_train.shape[1]
+        if self.max_classes > 0:
+            target = self.y_encoder(y_train.float())
+        else:
+            target = self.y_encoder(y_train.unsqueeze(-1))
+        support = R[:, :train_size] + target
+        query = R[:, train_size:]
+        output = self.tf_icl.forward_layerwise(
+            torch.cat((support, query), 1),
+            train_size,
+            support_tile_rows=support_tile_rows,
+            query_tile_rows=query_tile_rows,
+            page_location=page_location,
+        )
+        if self.norm_first:
+            output = self.ln(output)
+        return self.decoder(output)
 
     def forward_with_repr_cache(
         self,

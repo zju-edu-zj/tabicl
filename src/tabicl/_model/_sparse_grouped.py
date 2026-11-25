@@ -48,7 +48,7 @@ def invert_routes(indices, support, block_size):
 
 
 @triton.jit(do_not_specialize=["N", "S", "KEYS", "NK"])
-def _leaf_tiles(Q, K, V, ORDER, STARTS, REVERSE, PART, PLSE,
+def _leaf_tiles(Q, K, V, ORDER, STARTS, REVERSE, PART, PLSE, PSTATS,
                 O, LSE, DO, N, S, KEYS,
                 D: tl.constexpr, NC: tl.constexpr, NK,
                 BS: tl.constexpr, SCALE: tl.constexpr, BACKWARD: tl.constexpr,
@@ -108,12 +108,31 @@ def _leaf_tiles(Q, K, V, ORDER, STARTS, REVERSE, PART, PLSE,
         else:
             part = acc / z[:, None]
             tl.store(PLSE + edge, m + tl.log(z), valid)
+            prob_scale = 1.0 / z
+            # Statistics are local to this leaf. The merge kernel applies the
+            # cross-leaf normalizer exactly.
+            expected = tl.full((BQ,), 0.0, tl.float32)
+            p2 = tl.full((BQ,), 0.0, tl.float32)
+            for start in range(0, BS, BT):
+                r = leaf * BS + start + tl.arange(0, BT)
+                original = tl.load(ORDER + bh * S + r, r < S, other=0)
+                ko = (bh * S + original[:, None]) * D + d[None, :]
+                k = tl.load(K + ko, (r < S)[:, None], other=0).to(q.dtype)
+                score = tl.dot(q, tl.trans(k), input_precision="tf32x3") * SCALE
+                score = tl.where((r < S)[None, :], score, -float("inf"))
+                p = tl.exp(score - m[:, None]) * prob_scale[:, None]
+                expected += tl.sum(tl.where(r[None, :] < S, p * score, 0.0), 1)
+                p2 += tl.sum(p * p, 1)
+            tl.store(PSTATS + edge * 3 + 0, expected, valid)
+            tl.store(PSTATS + edge * 3 + 1, p2, valid)
+            tl.store(PSTATS + edge * 3 + 2, prob_scale, valid)
         tl.store(PART + edge[:, None] * D + d[None, :], part, valid[:, None])
 
 
 @triton.jit
-def _merge(PART, PLSE, OUT, LSE, ROWS, D: tl.constexpr,
-           NC: tl.constexpr, BC: tl.constexpr, BACKWARD: tl.constexpr):
+def _merge(PART, PLSE, PSTATS, OUT, LSE, EVIDENCE, ROWS, D: tl.constexpr,
+           NC: tl.constexpr, BC: tl.constexpr, BACKWARD: tl.constexpr,
+           RETURN_EVIDENCE: tl.constexpr):
     row = tl.program_id(0)
     c, d = tl.arange(0, BC), tl.arange(0, D)
     part = tl.load(PART + (row * NC + c[:, None]) * D + d[None, :], c[:, None] < NC, other=0)
@@ -125,11 +144,28 @@ def _merge(PART, PLSE, OUT, LSE, ROWS, D: tl.constexpr,
         w = tl.exp(lse - m)
         z = tl.sum(w, 0)
         out = tl.sum(part * (w / z)[:, None], 0)
-        tl.store(LSE + row, m + tl.log(z))
+        full_lse = m + tl.log(z)
+        tl.store(LSE + row, full_lse)
+        if RETURN_EVIDENCE:
+            stats = tl.load(
+                PSTATS + (row * NC + c[:, None]) * 3 + tl.arange(0, 3)[None, :],
+                (c[:, None] < NC),
+                other=0.0,
+            )
+            weight = w / z
+            expected = tl.sum(weight * stats[:, 0], 0)
+            p2 = tl.sum(weight * weight * stats[:, 1], 0)
+            max_prob = tl.max(weight * stats[:, 2], 0)
+            tl.store(EVIDENCE + row * 3 + 0, max_prob)
+            tl.store(EVIDENCE + row * 3 + 1, full_lse - expected)
+            tl.store(EVIDENCE + row * 3 + 2, 1.0 / tl.maximum(p2, 1.0e-20))
     tl.store(OUT + row * D + d, out)
 
 
-def grouped_attention(q, k, v, order, indices, block_size, metadata=None, backward=None):
+def grouped_attention(
+    q, k, v, order, indices, block_size, metadata=None, backward=None,
+    return_evidence=False,
+):
     b, h, n, d = q.shape
     s, nc = k.shape[2], indices.shape[-1]
     nk = triton.cdiv(s, block_size)
@@ -138,16 +174,21 @@ def grouped_attention(q, k, v, order, indices, block_size, metadata=None, backwa
     starts, reverse = metadata
     partial = torch.empty((*indices.shape, d), device=q.device, dtype=torch.float32)
     partial_lse = torch.empty(indices.shape, device=q.device, dtype=torch.float32)
+    partial_stats = torch.empty((*indices.shape, 3), device=q.device, dtype=torch.float32)
     output = torch.empty_like(q)
     lse = torch.empty((b, h, n), device=q.device, dtype=torch.float32)
+    evidence = torch.empty((b, h, n, 3), device=q.device, dtype=torch.float32)
     out, full_lse, grad = (q, lse, q) if backward is None else backward
     _leaf_tiles[(triton.cdiv(reverse.numel(), 32),)](
-        q, k, v, order, starts, reverse, partial, partial_lse,
+        q, k, v, order, starts, reverse, partial, partial_lse, partial_stats,
         out, full_lse, grad, n, s, b * h * nk, d, nc, nk,
         block_size, d**-0.5, backward is not None,
         32 if d >= 128 or block_size % 64 else 64,
         num_warps=4, num_stages=1,
     )
-    _merge[(b * h * n,)](partial, partial_lse, output, lse, b * h * n,
-                        d, nc, triton.next_power_of_2(nc), backward is not None, num_warps=4)
-    return output, lse, metadata
+    _merge[(b * h * n,)](
+        partial, partial_lse, partial_stats, output, lse, evidence, b * h * n,
+        d, nc, triton.next_power_of_2(nc), backward is not None,
+        return_evidence, num_warps=4,
+    )
+    return output, lse, metadata, evidence

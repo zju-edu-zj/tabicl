@@ -28,7 +28,8 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-from tabicl._model.icl_attention import DualPathRetrievalAttention, SetRetrievalAttention
+from tabicl._model.icl_attention import SetRetrievalAttention
+from tabicl._model.dual_path_v3 import DualPathRetrievalAttentionV3 as DualPathRetrievalAttention
 from tabicl._model.tabicl import TabICL
 from tabicl.prior._dataset import PriorDataset
 from tabicl.prior.graph_lib._config import PriorConfig
