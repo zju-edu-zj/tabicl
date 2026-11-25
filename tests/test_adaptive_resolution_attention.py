@@ -8,6 +8,7 @@ from tabicl._model.icl_attention import (
     AdaptiveResolutionAttention,
 )
 from tabicl._model.dual_path_v3 import DualPathRetrievalAttentionV3
+from tabicl._model.kv_cache import KVCacheEntry
 from tabicl._model.layers import MultiheadAttentionBlock
 
 

@@ -86,7 +86,7 @@ class ContentIndexV3:
             )
             initial_order = torch.einsum(
                 "bhsd,d->bhs", k.float(), direction
-            ).argsort(-1, stable=True)
+            ).argsort(dim=-1, stable=True)
         order = content_tree_order(
             k, initial_order, layout.logical_leaf_rows, use_triton=use_triton
         ).to(torch.int64)

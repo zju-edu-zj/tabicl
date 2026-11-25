@@ -43,10 +43,10 @@ def small_config(**overrides):
 def test_dual_path_screening_policy_uses_native_gate_knockout_and_restores():
     model = TabICL(**small_config(
         icl_attention="dual_path",
-        icl_attention_impl_version=8,
+        icl_attention_impl_version=9,
         icl_partition="content_tree",
-        icl_block_size=16,
-        icl_num_selected_blocks=1,
+        icl_block_size=32,
+        icl_num_selected_blocks=32,
         icl_qk_norm=True,
     ))
     modules = [

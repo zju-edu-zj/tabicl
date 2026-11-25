@@ -168,7 +168,7 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
         ):
             initial = torch.einsum(
                 "bhsd,d->bhs", sparse_k.float(), self.route_direction.float()
-            ).argsort(-1, stable=True)
+            ).argsort(dim=-1, stable=True)
             return ContentIndexV3.build(
                 sparse_k,
                 self.layout,
@@ -253,7 +253,58 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
                 evidence_parts.append(evidence)
             out = torch.cat(outputs, 2)
             evidence = torch.cat(evidence_parts, 2)
+        if self.diagnostics_enabled:
+            self._diagnose(
+                attention_q,
+                k,
+                v,
+                route.logical_leaf_ids,
+                order,
+            )
         return out, evidence, route
+
+    @torch.no_grad()
+    def _diagnose(self, q, k, v, selected=None, order=None):
+        """Collect semantic retrieval diagnostics without changing execution."""
+        first = min(max(self.diagnostic_query_start, 0), q.shape[-2] - 1)
+        count = min(self.diagnostic_queries, q.shape[-2] - first)
+        sample = torch.linspace(first, q.shape[-2] - 1, count, device=q.device).long()
+        if order is None:
+            order = torch.arange(k.shape[-2], device=k.device, dtype=torch.int64)
+            order = order[None, None].expand(k.shape[0], k.shape[1], -1)
+        sorted_k = k.gather(
+            2, order.long()[..., None].expand_as(k)
+        )
+        sorted_v = v.gather(
+            2, order.long()[..., None].expand_as(v)
+        )
+        logits = torch.einsum(
+            "bhqd,bhsd->bhqs", q[:, :, sample].float(), sorted_k.float()
+        ) / math.sqrt(self.head_dim)
+        dense_prob = logits.softmax(-1)
+        if selected is None:
+            mask = torch.ones_like(logits, dtype=torch.bool)
+        else:
+            positions = torch.arange(k.shape[-2], device=q.device)
+            leaf_ids = positions // self.layout.logical_leaf_rows
+            mask = (selected[:, :, sample, :, None] == leaf_ids).any(-2)
+        sparse_prob = logits.masked_fill(~mask, -float("inf")).softmax(-1)
+        topk = logits.topk(min(self.diagnostic_topk, k.shape[-2]), -1).indices
+        dense_out = torch.einsum("bhqs,bhsd->bhqd", dense_prob, sorted_v.float())
+        sparse_out = torch.einsum("bhqs,bhsd->bhqd", sparse_prob, sorted_v.float())
+        for head in range(self.num_heads):
+            dense_rms = dense_out[:, head].square().mean().sqrt().clamp_min(1e-6)
+            self.last_diagnostics[f"head_{head}/recall_at_k"] = (
+                mask[:, head].gather(-1, topk[:, head]).float().mean()
+            )
+            self.last_diagnostics[f"head_{head}/retained_mass"] = (
+                dense_prob[:, head] * mask[:, head]
+            ).sum(-1).mean()
+            self.last_diagnostics[f"head_{head}/dense_output_relative_error"] = (
+                (sparse_out[:, head] - dense_out[:, head]).square().mean().sqrt()
+                / dense_rms
+            )
+        self.diagnostics_enabled = False
 
     def _fuse(
         self,

@@ -48,7 +48,7 @@ def test_mechanism_diagnostic_policies_restore_model_and_return_records(
     # query targets also contain class 2, which the support did not observe.
     y = torch.cat((torch.arange(32).remainder(2), torch.full((4,), 2))).unsqueeze(0)
     modes = {module: module.training for module in model.modules()}
-    original_hybrid = [module._hybrid_attention for _, module in modules]
+    original_hybrid = [getattr(module, "_hybrid_attention", None) for _, module in modules]
     original_routes = [module.route for _, module in modules]
     original_branches = [
         module._branch_policy if isinstance(module, DualPathRetrievalAttention) else None
@@ -65,7 +65,10 @@ def test_mechanism_diagnostic_policies_restore_model_and_return_records(
     assert "support_permutation_logit_max_abs" in native
     assert any(key.endswith("head_0/recall_at_k") for key in native)
     assert any(key.endswith("head_0/fusion_sparse_gate_std") for key in native)
-    assert all(module._hybrid_attention == original for (_, module), original in zip(modules, original_hybrid))
+    assert all(
+        getattr(module, "_hybrid_attention", None) == original
+        for (_, module), original in zip(modules, original_hybrid)
+    )
     assert all(module.route == original for (_, module), original in zip(modules, original_routes))
     assert all(
         not isinstance(module, DualPathRetrievalAttention)

@@ -112,28 +112,24 @@ def _install_policy(modules, policy, seed):
     saved = []
     generator = torch.Generator(device="cpu").manual_seed(seed)
     for name, module in modules:
-        saved.append((
-            name,
-            module,
-            module._hybrid_attention,
-            module.route,
-            getattr(module, "_branch_policy", None),
-            getattr(module, "_force_dense_sparse", None),
-        ))
+        saved.append({
+            "name": name,
+            "module": module,
+            "hybrid": getattr(module, "_hybrid_attention", None),
+            "route": getattr(module, "route", None),
+            "branch_policy": getattr(module, "_branch_policy", None),
+            "force_dense_sparse": getattr(module, "_force_dense_sparse", None),
+        })
         if isinstance(module, DualPathRetrievalAttention):
             if policy == "global_only":
                 module._branch_policy = "global_only"
             elif policy == "sparse_only":
                 module._branch_policy = "sparse_only"
-            elif policy == "dense_only":
-                module._branch_policy = "sparse_only"
-                module._force_dense_sparse = True
-            elif policy in ("random_candidates", "oracle_candidates"):
-                module.route = (
-                    _make_random_route(module, generator)
-                    if policy == "random_candidates"
-                    else _make_oracle_route(module)
-                )
+            # V3 has no legacy route callback. Candidate perturbations are
+            # intentionally unavailable until a page-level intervention is
+            # implemented; these labels still provide paired branch records.
+            continue
+        if not hasattr(module, "_hybrid_attention"):
             continue
         if policy == "native":
             original_hybrid = module._hybrid_attention
@@ -185,13 +181,16 @@ def _install_policy(modules, policy, seed):
 
 
 def _restore(saved):
-    for _, module, hybrid, route, branch_policy, force_dense_sparse in saved:
-        module._hybrid_attention = hybrid
-        module.route = route
-        if branch_policy is not None:
-            module._branch_policy = branch_policy
-        if force_dense_sparse is not None:
-            module._force_dense_sparse = force_dense_sparse
+    for state in saved:
+        module = state["module"]
+        if state["hybrid"] is not None:
+            module._hybrid_attention = state["hybrid"]
+        if state["route"] is not None:
+            module.route = state["route"]
+        if state["branch_policy"] is not None:
+            module._branch_policy = state["branch_policy"]
+        if state["force_dense_sparse"] is not None:
+            module._force_dense_sparse = state["force_dense_sparse"]
 
 
 def _enable_diagnostics(modules, query_count, query_start=0):

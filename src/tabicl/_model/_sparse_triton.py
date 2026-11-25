@@ -226,13 +226,22 @@ class _RoutedAttention(torch.autograd.Function):
         if ctx.grouped:
             from ._sparse_grouped import grouped_attention
 
-            output, lse, metadata, evidence = grouped_attention(
+            grouped = grouped_attention(
                 q, k, v, order, indices, block_size, return_evidence=return_evidence
             )
+            if return_evidence:
+                output, lse, metadata, evidence = grouped
+            else:
+                output, lse, metadata = grouped
+                evidence = None
         else:
             output = torch.empty_like(q)
             lse = torch.empty((b, h, n), device=q.device, dtype=torch.float32)
-            evidence = torch.empty((b, h, n, 3), device=q.device, dtype=torch.float32)
+            evidence = (
+                torch.empty((b, h, n, 3), device=q.device, dtype=torch.float32)
+                if return_evidence
+                else torch.empty(0, device=q.device, dtype=torch.float32)
+            )
             _forward[(n, h, b)](
                 q, k, v, indices, order, output, lse, evidence,
                 n, s, h, d, block_size, nc, c, scale, return_evidence,
@@ -262,7 +271,7 @@ class _RoutedAttention(torch.autograd.Function):
         if ctx.grouped:
             from ._sparse_grouped import grouped_attention
 
-            dq, _, _, _ = grouped_attention(
+            dq, _, _ = grouped_attention(
                 q, k, v, order, indices, bs, metadata, (out, lse, dout)
             )
             nk = triton.cdiv(s, bs)

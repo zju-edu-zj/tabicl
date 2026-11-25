@@ -191,4 +191,6 @@ def grouped_attention(
         d, nc, triton.next_power_of_2(nc), backward is not None,
         return_evidence, num_warps=4,
     )
-    return output, lse, metadata, evidence
+    if return_evidence:
+        return output, lse, metadata, evidence
+    return output, lse, metadata
