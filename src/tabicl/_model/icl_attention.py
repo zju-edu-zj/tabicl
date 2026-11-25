@@ -813,11 +813,10 @@ class DualPathRetrievalAttention(SetRetrievalAttention):
             *sparse_q.shape[:-3], sparse_q.shape[-2], self.embed_dim
         )
         sparse_flat = sparse_scaled.transpose(-3, -2).contiguous().view_as(global_flat)
-        packed = torch.cat((global_flat, sparse_flat), dim=-1)
-        packed_weight = torch.cat(
-            (self.global_out_proj.weight, self.out_proj.weight), dim=1
+        output = F.linear(global_flat, self.global_out_proj.weight)
+        output = output + F.linear(
+            sparse_flat, self.out_proj.weight, self.out_proj.bias
         )
-        output = F.linear(packed, packed_weight, self.out_proj.bias)
         if diagnose:
             global_contribution = F.linear(global_flat, self.global_out_proj.weight)
             sparse_contribution = F.linear(sparse_flat, self.out_proj.weight)
