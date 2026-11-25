@@ -42,8 +42,8 @@ class DualPathRetrievalAttentionV3(SetRetrievalAttention):
             logical_leaf_rows=self.block_size,
             storage_page_rows=storage_page_rows,
             selected_logical_leaves=self.num_selected_blocks,
-            search_beam_pages=max(self.router_beam, 64),
-            proposal_pages=max(self.router_beam, 64),
+            search_beam_leaves=max(self.router_beam, 64),
+            proposal_leaves=max(self.router_beam, 64),
             exhaustive_support_limit=exhaustive_support_limit,
             query_tile_rows=self.query_chunk_size,
         )

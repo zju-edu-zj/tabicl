@@ -18,8 +18,8 @@ class DualPathLayout:
     logical_leaf_rows: int = 32
     storage_page_rows: int = 128
     selected_logical_leaves: int = 32
-    search_beam_pages: int = 64
-    proposal_pages: int = 64
+    search_beam_leaves: int = 64
+    proposal_leaves: int = 64
     exhaustive_support_limit: int = 8192
     query_tile_rows: int = 256
 
@@ -30,8 +30,8 @@ class DualPathLayout:
             raise ValueError("storage pages must contain whole logical leaves")
         if self.selected_logical_leaves < 1:
             raise ValueError("selected logical leaves must be positive")
-        if self.search_beam_pages < 1 or self.proposal_pages < 1:
-            raise ValueError("search beam and proposal page counts must be positive")
+        if self.search_beam_leaves < 1 or self.proposal_leaves < 1:
+            raise ValueError("search beam and proposal leaf counts must be positive")
         if self.query_tile_rows < 1:
             raise ValueError("query tile rows must be positive")
 
@@ -61,10 +61,14 @@ class ContentIndexV3:
     leaf_lengths: Tensor
     tree_representatives: Tensor
     tree_rep_counts: Tensor
-    page_capacity: int
-    num_pages: int
+    leaf_capacity: int
+    num_leaves: int
     support_size: int
     layout: DualPathLayout
+
+    @property
+    def num_pages(self) -> int:
+        return (self.num_leaves + self.layout.leaves_per_page - 1) // self.layout.leaves_per_page
 
     @staticmethod
     def _lengths(total: int, unit: int, device) -> Tensor:
@@ -102,27 +106,21 @@ class ContentIndexV3:
         ).reshape(leaves, 2)
         leaf_lengths = cls._lengths(support, layout.logical_leaf_rows, k.device)
 
-        pages = (leaves + layout.leaves_per_page - 1) // layout.leaves_per_page
-        capacity = 1 << (pages - 1).bit_length()
+        capacity = 1 << (leaves - 1).bit_length()
         leaf_sums = (
             leaf_representatives * leaf_rep_counts[None, None, :, :, None]
         ).sum(3)
-        padded_leaves = capacity * layout.leaves_per_page
-        padded_leaf_sums = F.pad(
-            leaf_sums, (0, 0, 0, padded_leaves - leaves)
-        ).reshape(b, h, capacity, layout.leaves_per_page, d)
+        padded_leaf_sums = F.pad(leaf_sums, (0, 0, 0, capacity - leaves))
         padded_leaf_lengths = F.pad(
-            leaf_lengths, (0, padded_leaves - leaves)
-        ).reshape(capacity, layout.leaves_per_page)
-        page_sums = padded_leaf_sums.sum(3)
-        page_counts = padded_leaf_lengths.sum(1)
+            leaf_lengths, (0, capacity - leaves)
+        )
 
         nodes = 2 * capacity - 1
         sums = torch.zeros((b, h, nodes, d), device=k.device, dtype=torch.float32)
         counts = torch.zeros(nodes, device=k.device, dtype=torch.float32)
         leaf_offset = capacity - 1
-        sums[:, :, leaf_offset:] = page_sums
-        counts[leaf_offset:] = page_counts
+        sums[:, :, leaf_offset:] = padded_leaf_sums
+        counts[leaf_offset:] = padded_leaf_lengths
         representatives = torch.zeros(
             (b, h, nodes, 2, d), device=k.device, dtype=torch.float32
         )
@@ -151,19 +149,8 @@ class ContentIndexV3:
             rep_counts[parent_slice, 1] = right_count
             level_start, level_width = parent_start, parent_width
 
-        # Page nodes retain two half-page representatives. This is vectorized
-        # over pages, including the partial final page.
-        half = layout.leaves_per_page // 2
-        page_leaf_sums = padded_leaf_sums.reshape(
-            b, h, capacity, 2, half, d
-        ).sum(4)
-        page_leaf_counts = padded_leaf_lengths.reshape(capacity, 2, half).sum(2)
-        page_reps = page_leaf_sums / page_leaf_counts.clamp_min(1)[None, None, :, :, None]
-        representatives[:, :, leaf_offset:, :] = page_reps
-        rep_counts[leaf_offset:, :] = page_leaf_counts
-        if pages < capacity:
-            representatives[:, :, leaf_offset + pages :] = 0
-            rep_counts[leaf_offset + pages :] = 0
+        representatives[:, :, leaf_offset : leaf_offset + leaves] = leaf_representatives
+        rep_counts[leaf_offset : leaf_offset + leaves] = leaf_rep_counts
 
         return cls(
             order=order,
@@ -172,8 +159,8 @@ class ContentIndexV3:
             leaf_lengths=leaf_lengths,
             tree_representatives=representatives,
             tree_rep_counts=rep_counts,
-            page_capacity=capacity,
-            num_pages=pages,
+            leaf_capacity=capacity,
+            num_leaves=leaves,
             support_size=support,
             layout=layout,
         )
@@ -201,10 +188,10 @@ class ContentIndexV3:
         logits = logits.masked_fill(counts == 0, -float("inf"))
         return torch.logsumexp(logits, -1)
 
-    def _page_proposals(self, q: Tensor) -> tuple[Tensor, int]:
+    def _leaf_proposals(self, q: Tensor) -> tuple[Tensor, int]:
         b, h, t, d = q.shape
         nodes = torch.zeros((b, h, t, 1), device=q.device, dtype=torch.long)
-        depth = self.page_capacity.bit_length() - 1
+        depth = self.leaf_capacity.bit_length() - 1
         visited = 0
         for _ in range(depth):
             children = (nodes[..., None] * 2 + 1 + torch.arange(2, device=q.device)).flatten(-2)
@@ -218,13 +205,14 @@ class ContentIndexV3:
             logits = logits + rep_counts.clamp_min(1).log()
             logits = logits.masked_fill(rep_counts == 0, -float("inf"))
             scores = torch.logsumexp(logits, -1)
-            keep = min(self.layout.search_beam_pages, count)
+            keep = min(self.layout.search_beam_leaves, count)
             nodes = children.gather(-1, scores.topk(keep, -1).indices)
             visited += count
-        pages = nodes - (self.page_capacity - 1)
-        valid = pages < self.num_pages
-        pages = pages.masked_fill(~valid, 0)
-        return pages[..., : min(self.layout.proposal_pages, pages.shape[-1])], visited
+        leaves = nodes - (self.leaf_capacity - 1)
+        valid = leaves < self.num_leaves
+        leaves = leaves.masked_fill(~valid, 0)
+        keep = min(self.layout.proposal_leaves, leaves.shape[-1])
+        return leaves[..., :keep], valid[..., :keep], visited
 
     @torch.no_grad()
     def search(self, q: Tensor) -> RoutingResult:
@@ -235,13 +223,7 @@ class ContentIndexV3:
             scores = self._leaf_scores(q)
             visited = leaves
         else:
-            pages, visited = self._page_proposals(q)
-            slots = torch.arange(self.layout.leaves_per_page, device=q.device)
-            proposal_ids = (
-                pages[..., None] * self.layout.leaves_per_page + slots
-            ).flatten(-2)
-            valid = proposal_ids < leaves
-            proposal_ids = proposal_ids.clamp_max(leaves - 1)
+            proposal_ids, valid, visited = self._leaf_proposals(q)
             scores = self._leaf_scores(q, proposal_ids).masked_fill(~valid, -float("inf"))
 
         top = scores.topk(min(budget + 1, scores.shape[-1]), -1)

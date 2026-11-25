@@ -119,10 +119,12 @@ def test_vectorized_tree_counts_partial_pages_and_padding():
     index = _index(key, support)
     assert index.order.dtype == torch.int32
     assert index.num_pages == 33
-    assert index.page_capacity == 64
+    assert index.num_leaves == 129
+    assert index.leaf_capacity == 256
     assert index.tree_rep_counts[0].sum().item() == support
     assert index.tree_rep_counts[0].tolist() == [4096, 1]
-    assert index.tree_rep_counts[64 + 31].tolist() == [1, 0]
+    leaf_offset = index.leaf_capacity - 1
+    assert index.tree_rep_counts[leaf_offset + 128].tolist() == [1, 0]
     weighted_root = (
         index.tree_representatives[0, 0, 0]
         * index.tree_rep_counts[0, :, None]
@@ -132,7 +134,33 @@ def test_vectorized_tree_counts_partial_pages_and_padding():
         * index.leaf_rep_counts[:, :, None]
     ).sum((0, 1)) / support
     torch.testing.assert_close(weighted_root, expected_root)
-    assert (index.tree_rep_counts[64 + 33 :] == 0).all()
+    assert (index.tree_rep_counts[leaf_offset + index.num_leaves :] == 0).all()
+
+
+def test_routing_is_independent_of_physical_page_size():
+    torch.manual_seed(20261125)
+    support = 9001
+    key = torch.randn(1, 2, support, 16)
+    initial = torch.arange(support).expand(1, 2, -1)
+    small_pages = ContentIndexV3.build(
+        key,
+        DualPathLayout(storage_page_rows=64),
+        use_triton=False,
+        initial_order=initial,
+    )
+    large_pages = ContentIndexV3.build(
+        key,
+        DualPathLayout(storage_page_rows=256),
+        use_triton=False,
+        initial_order=initial,
+    )
+    query = torch.randn(1, 2, 5, 16)
+    small_route = small_pages.search(query)
+    large_route = large_pages.search(query)
+    torch.testing.assert_close(
+        small_route.logical_leaf_ids, large_route.logical_leaf_ids
+    )
+    torch.testing.assert_close(small_route.candidate_rows, large_route.candidate_rows)
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required for host-page transfer")
